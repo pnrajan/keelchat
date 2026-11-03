@@ -141,7 +141,7 @@ export type Dashboard = {
   days: { day: string; conversations: number; completed: number; handed_off: number; dropped: number; turns: number; p50_ms: number | null; p95_ms: number | null; error_turns: number }[];
   agents: { agent: string; conversations: number; completion_rate: number; handoff_rate: number; drop_rate: number; turns_per_conversation: number; p95_ms: number | null; llm_calls_per_turn: number; top_rejected_field: string | null }[];
 };
-export type UsageLine = { key: string; calls: number; input_tokens: number; output_tokens: number; cached_tokens: number; cost_usd: number | null; unpriced_calls: number; p50_ms: number | null };
+export type UsageLine = { key: string; calls: number; input_tokens: number; output_tokens: number; cached_tokens: number; saved_tokens: number; cost_usd: number | null; unpriced_calls: number; p50_ms: number | null };
 export type UsageReport = {
   total: UsageLine; by_model: UsageLine[]; by_purpose: UsageLine[]; by_agent: UsageLine[]; by_day: UsageLine[]; conversations: number; cost_per_conversation: number | null;
   models: { generate: string; classify: string; verify: string };

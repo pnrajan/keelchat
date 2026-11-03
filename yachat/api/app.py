@@ -1116,6 +1116,7 @@ def create_app(
                 output_tokens=c.output_tokens,
                 cached_tokens=c.cached_tokens,
                 cost_usd=c.cost_usd,
+                saved_tokens=c.saved_tokens or None,
             )
             for c in calls
         ]

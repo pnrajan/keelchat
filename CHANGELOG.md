@@ -4,6 +4,19 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added
+- `from yachat import tool, node, ...`: the extension API in one import; `py.typed` so installed yachat exposes its types.
+- `yachat new agent|package <name>`: starter files that build and pass the contract suite.
+- `pytest --offline`: runs the tests that don't need a model when no key is set; CI runs them on fork PRs.
+- `@metered` (`runtime/usage.py`): decorate an LLM client's provider call to record tokens, time and cost.
+- Cost behind a LiteLLM gateway is that of the routed model (or the gateway's own cost), not unknown; Headroom's saved
+  tokens are recorded and shown on the cost page.
+- The Analytics Service returns its model calls with each answer; they count toward the turn that asked.
+
+### Fixed
+- `./run.sh` no longer uninstalls extras installed with `uv sync --all-extras`.
+- The booking example guardrail's `check()` is typed with `GuardContext`.
+
 ## [0.1.0]
 
 ### Added

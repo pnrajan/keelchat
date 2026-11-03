@@ -280,6 +280,7 @@ def llm_events(policy: CompiledPolicy, session_id: str, turn_id: str, calls: lis
             output_tokens=c.output_tokens,
             cached_tokens=c.cached_tokens,
             cost_usd=c.cost_usd,
+            saved_tokens=c.saved_tokens or None,
         )
         for c in calls
     ]
@@ -291,6 +292,8 @@ class UsageLine(BaseModel):
     input_tokens: int
     output_tokens: int
     cached_tokens: int
+    #: input tokens a Headroom proxy removed before the calls (not billed)
+    saved_tokens: int = 0
     #: None when no call in the group had a known price
     cost_usd: float | None
     #: calls with no known price (their tokens are counted, their cost is not)
@@ -321,6 +324,7 @@ def _line(key: str, xs: list[AuditEvent]) -> UsageLine:
         input_tokens=sum(e.input_tokens or 0 for e in xs),
         output_tokens=sum(e.output_tokens or 0 for e in xs),
         cached_tokens=sum(e.cached_tokens or 0 for e in xs),
+        saved_tokens=sum(e.saved_tokens or 0 for e in xs),
         cost_usd=round(sum(priced), 6) if priced else None,
         unpriced_calls=len(xs) - len(priced),
         p50_ms=_pct([e.ms for e in xs if e.ms is not None], 50),

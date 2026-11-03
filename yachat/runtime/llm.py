@@ -6,13 +6,13 @@ Every classification call uses structured output (a tool with a JSON schema); ev
 from __future__ import annotations
 
 import os
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from dataclasses import field as dc_field
 from typing import Any
 
 from yachat.logging import get_logger
+from yachat.runtime.usage import metered
 
 log = get_logger("llm")
 
@@ -107,13 +107,17 @@ class AnthropicLLMClient(LLMClient):
             return await self._create_untraced(req, **extra)
 
     async def _create_untraced(self, req: LLMRequest, **extra: Any) -> Any:
+        resp = await self._send(req, **extra)
+        if resp.stop_reason == "refusal":  # billed: the call was made
+            raise LLMError("refused by safety classifier")
+        return resp
+
+    @metered()
+    async def _send(self, req: LLMRequest, **extra: Any) -> Any:
         from anthropic import APIConnectionError, APIStatusError, RateLimitError
 
-        from yachat.runtime.usage import record, usage_of
-
-        t0 = time.perf_counter()
         try:
-            resp = await self._client.beta.messages.create(  # type: ignore[call-overload]
+            return await self._client.beta.messages.create(  # type: ignore[call-overload]
                 model=req.model,
                 max_tokens=req.max_tokens,
                 system=req.system,
@@ -131,11 +135,6 @@ class AnthropicLLMClient(LLMClient):
             raise LLMError(f"api status {e.status_code}: {msg[:160]}") from e
         except APIConnectionError as e:
             raise LLMError("connection error") from e
-        tin, tout, cached = usage_of(resp)
-        record(req.model, req.purpose, tin, tout, cached_tokens=cached, ms=(time.perf_counter() - t0) * 1000)
-        if resp.stop_reason == "refusal":
-            raise LLMError("refused by safety classifier")
-        return resp
 
     async def complete(self, req: LLMRequest) -> str:
         resp = await self._create(req)

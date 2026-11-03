@@ -193,6 +193,8 @@ class AuditEvent(BaseModel):
     subject: str | None = None
     #: turn records: the agent's reply, redacted like `text` (the whole conversation is readable for insights)
     reply: str = ""
+    #: llm records only, added later: input tokens a Headroom proxy removed before the call
+    saved_tokens: int | None = None
 
 
 HandoffStatus = Literal["open", "claimed", "resolved"]

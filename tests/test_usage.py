@@ -162,3 +162,70 @@ async def test_cheaper_models_are_suggested_from_the_live_catalog_and_priced_on_
     listen = usage.cheaper("", 1000, 100, min_context=8_000, audio=True)
     assert listen and all(m.audio_in for m in usage._catalog if f"openrouter/{m.id}" in {o["model"] for o in listen})
     assert usage.job_of("intent_detect") == "classify" and usage.job_of("reply_verify") == "verify" and usage.job_of("render") == "generate"
+
+
+class _Resp:
+    """The shape of a provider response as litellm returns it: OpenAI-style usage, and proxy headers when present."""
+
+    def __init__(self, headers: dict[str, str] | None = None) -> None:
+        self.usage = type("U", (), {"prompt_tokens": 1000, "completion_tokens": 50, "prompt_tokens_details": None})()
+        self._hidden_params = {"additional_headers": {"llm_provider-" + k: v for k, v in (headers or {}).items()}}
+
+
+def test_proxy_headers_name_the_routed_model_its_cost_and_the_tokens_saved():
+    gw = {"x-litellm-model-name": "openai/Qwen/Qwen3.5-35B-A3B", "x-litellm-response-cost": "0.0012", "x-headroom-tokens-saved": "340"}
+    assert usage.proxy_report(_Resp(gw)) == ("openai/Qwen/Qwen3.5-35B-A3B", 0.0012, 340)
+    # a gateway that has no price for the model reports 0: unknown, not free
+    assert usage.proxy_report(_Resp({"x-litellm-response-cost-original": "0.0"})) == (None, None, 0)
+    assert usage.proxy_report(object()) == (None, None, 0)
+
+
+async def test_metered_records_any_clients_calls_with_the_gateways_cost(monkeypatch):
+    """`@metered` on a client's provider call is all a custom LLMClient needs for the cost page."""
+    from yachat.runtime.llm import LLMRequest
+
+    class MyClient:
+        @usage.metered()
+        async def _send(self, req: LLMRequest, headers: dict[str, str]) -> _Resp:
+            return _Resp(headers)
+
+    req = LLMRequest("intent_detect", "large", "system", [{"role": "user", "content": "hi"}])
+    with usage.metering() as calls:
+        await MyClient()._send(
+            req, headers={"x-litellm-model-name": "openai/Qwen/Qwen3.5-35B-A3B", "x-litellm-response-cost": "0.002", "x-headroom-tokens-saved": "120"}
+        )
+        monkeypatch.setenv("YACHAT_MODEL_PRICES", '{"large": [1, 1]}')  # a configured price beats the gateway's
+        usage.price_overrides.cache_clear()
+        await MyClient()._send(req, headers={"x-litellm-response-cost": "0.002"})
+    usage.price_overrides.cache_clear()
+    assert [(c.model, c.input_tokens, c.output_tokens, c.saved_tokens, c.cost_usd) for c in calls] == [
+        ("large", 1000, 50, 120, 0.002),
+        ("large", 1000, 50, 0, 0.00105),
+    ]
+    assert usage.METER.get() is None  # metering() leaves the turn's meter as it was
+
+
+def test_the_report_counts_tokens_saved_by_headroom():
+    now = datetime.now(UTC)
+    ev = [
+        AuditEvent(tenant="t", agent="a", kind="llm", decision="call", ref="m", reason="r", input_tokens=10, output_tokens=1, saved_tokens=s, at=now)
+        for s in (5, None)
+    ]
+    assert usage_report(ev, now - timedelta(days=1), now).total.saved_tokens == 5
+
+
+@pytest.mark.skipif(not __import__("os").getenv("LITELLM_PROXY_URL"), reason="needs a running LiteLLM gateway (docker compose --profile gateway)")
+async def test_calls_through_a_live_gateway_are_priced_by_the_model_it_routed_to():
+    """The gateway's aliases (small, large) have no price of their own: the model it routed each call to is priced."""
+    from yachat.runtime.llm import LLMRequest, ModelConfig
+    from yachat.runtime.llm_factory import llm_from_env
+
+    await usage.refresh_openrouter()
+    try:
+        with usage.metering() as calls:
+            req = LLMRequest("intent_detect", ModelConfig.from_env().classify, "Reply in one word.", [{"role": "user", "content": "hi"}], max_tokens=10)
+            await llm_from_env().complete(req)
+    finally:
+        usage.load_openrouter([])
+    (c,) = calls
+    assert c.input_tokens > 0 and c.output_tokens > 0 and c.cost_usd is not None, c

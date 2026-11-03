@@ -56,6 +56,7 @@ FIELDS: list[tuple[str, IcebergType, bool]] = [
     ("cost_usd", DoubleType(), False),
     ("subject", StringType(), False),  # added later: optional, so existing tables gain the column
     ("reply", StringType(), False),
+    ("saved_tokens", LongType(), False),  # added later: optional
 ]
 SCHEMA = Schema(*(NestedField(i, name, t, required=req) for i, (name, t, req) in enumerate(FIELDS, start=1)))
 SPEC = PartitionSpec(

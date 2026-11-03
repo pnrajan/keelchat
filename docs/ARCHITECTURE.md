@@ -96,6 +96,12 @@ context compression). Model tiers are pinned per build in `CompiledPolicy.models
 when `YACHAT_MODEL_VERIFY` is unset). There is no fake model anywhere: tests, simulations and
 evals call the configured provider.
 
+Usage and cost: each client's provider call is decorated with `runtime/usage.py:metered`. It records model, purpose,
+tokens in, out and cached, time and cost to the turn's meter (a context variable), and the runtime writes them to the
+audit log. Behind a LiteLLM gateway it reads the routed model and the gateway's cost from the response headers;
+behind Headroom, the tokens saved. A service that makes its own model calls (the Analytics Service) collects them with
+`metering()` and returns them in its response, and the runtime adds them to the turn that called it.
+
 ## 5. Knowledge Service
 
 Runs as its own process (`yachat knowledge serve`) and owns its sources. The runtime's

@@ -440,8 +440,18 @@ With `YACHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry a
 | Headroom → LiteLLM | add `HEADROOM_PROXY_URL`; context is compressed before the gateway |
 
 `YACHAT_MODEL_CLASSIFY` (intents, validation, planning) and `YACHAT_MODEL_GENERATE` (replies) are the two tiers, and
-`YACHAT_MODEL_VERIFY` checks reasoning and replies. Token usage and cost are tracked per model, with prices from
-OpenRouter's public list.
+`YACHAT_MODEL_VERIFY` checks reasoning and replies.
+
+**Cost tracking** works with every layout. Each model call is recorded with its tokens in and out, cached tokens,
+time and cost, and summed by model, purpose, agent and day on the console's **Settings** page
+(`GET /v1/tenants/{t}/usage`). The Analytics Service's own calls are added to the turn that asked.
+- Behind a LiteLLM gateway, aliases like `large` are priced as the model the gateway actually routed to, or at the
+  cost the gateway reports.
+- Behind Headroom, the tokens it removed are shown as **saved**. Headroom compresses tool-result messages, not chat
+  text, so savings depend on the traffic.
+- Prices come from `YACHAT_MODEL_PRICES`, then the gateway, then OpenRouter's public list, then litellm's.
+- A model client you write yourself gets all of this by decorating its provider call with `@metered`
+  ([`runtime/usage.py`](yachat/runtime/usage.py)).
 
 ### Configuration
 
