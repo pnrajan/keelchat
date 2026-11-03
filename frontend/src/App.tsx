@@ -199,7 +199,7 @@ export default function App() {
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {  // the API restarted and lost its in-memory policies
         setBuilt(null);
-        setNotice({ kind: "err", text: "The API no longer has this policy (it restarted). Press Build policy again." });
+        setNotice({ kind: "err", text: "The API no longer has this policy (it restarted). Press Build & try again." });
       } else setNotice({ kind: "err", text: (e as Error).message });
     }
   }

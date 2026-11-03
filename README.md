@@ -69,7 +69,7 @@ Bot   Hi! I can help with orders and returns. Is it OK if I note details from th
 You   sure. my parcel arrived damaged
 Bot   Sorry to hear that. What is your order number?
 You   how long do refunds take?
-Bot   Refunds reach your card within 5–7 working days of the return arriving.   ← from your documents
+Bot   Refunds reach your card within 5–7 working days of the return arriving.   ← from your documents, once indexed
       What is your order number?                                               ← back to the open question
 You   ORD-12345
 Bot   Thanks. What went wrong with it?
@@ -114,9 +114,11 @@ uv sync --extra api
 
 Then:
 
-1. Open http://127.0.0.1:5173 and pick **Support** from the policy menu.
+1. Open http://127.0.0.1:5173 and pick **Support assistant** from the policy menu.
 2. Press **Build & try**, then **New session**.
-3. Chat. Try a side question mid-form, change an earlier answer ("actually it's ORD-9"), or ask for a person.
+3. Chat. Try changing an earlier answer ("actually it's ORD-9") or asking for a person. Side questions are answered
+   from the Markdown files in [`examples/knowledge`](examples/knowledge), which are only small samples: add your own
+   pages there to try it.
 4. Open the **Inspector** to see why each reply was chosen.
 
 `./run.sh --build` serves everything from one port (http://127.0.0.1:8000/console/).
@@ -685,7 +687,7 @@ docs/            ARCHITECTURE, WRITING_AN_AGENT, ADDING_A_CAPABILITY, DEVELOPER_
 
 | Symptom | Fix |
 |---|---|
-| "… is unavailable right now" in a reply | the tool's backend URL is unset: start the service, or run with `--fake-tools` |
+| A reply says it can't do something "right now" ("I can't look that up right now…") | the tool's service is down or its URL is unset: start it (`./run.sh` starts Knowledge and Analytics), or run with `--fake-tools` |
 | "The API no longer has this policy" or "This session is no longer on the server" | the API restarted with in-memory state: **Build & try** again and start a new session, or set `DATABASE_URL` and `REDIS_URL` |
 | API exits at start with a database error | `DATABASE_URL` names a missing database: `scripts/db.sh up`, or leave it empty |
 | **Save version** is disabled | the editor found problems; only valid builds are saved. Fix the marked lines |
