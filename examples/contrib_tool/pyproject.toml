@@ -1,0 +1,16 @@
+[project]
+name = "contrib-tool"
+version = "0.1.0"
+description = "Sample third-party yachat capability, registered via entry point"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.entry-points."yachat.capabilities"]
+salary_lookup = "contrib_tool.salary:register"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["contrib_tool"]

@@ -1,0 +1,7 @@
+conversations:
+  - name: happy
+    messages: ["hello", "yes", "backend engineer in austin", "1", "Jane Doe", "123 Main St, Austin TX 78701", "submit"]
+  - name: bad_address
+    messages: ["hello", "yes", "backend engineer", "1", "Jane Doe", "my address is downtown", "my address is near the park"]
+  - name: disengaged
+    messages: ["hello", "yes", "engineer", "1", "benefits?", "remote?", "parking?", "cafeteria?"]

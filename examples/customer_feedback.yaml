@@ -1,0 +1,22 @@
+# A feedback survey written as objectives: the agent finds each out in a natural conversation, skips what the person
+# already said, and follows up only where an answer is thin. The score is read in code (NPS).
+agent: customer-feedback
+charter: >
+  Learn how a customer's recent order went, in a short, warm conversation. One question at a time.
+  Out of scope: refunds, order changes, legal questions; for those, say a person will follow up.
+languages: [en]
+flow:
+  - greet_consent
+  - conversation_survey:
+      objectives:
+        - key: nps
+          learn: How likely they are to recommend us to a friend
+          measure: nps
+        - key: experience
+          learn: What stood out about their order, good or bad, and why
+          max_probes: 1
+        - key: improve
+          learn: The one thing we could do better next time
+      max_questions: 6
+handoff:
+  when: [user_request]

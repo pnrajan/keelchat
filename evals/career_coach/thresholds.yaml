@@ -1,0 +1,7 @@
+agent: career-coach
+minimums:
+  role_adherence: 0.8
+  conversation_relevancy: 0.7
+  faithfulness: 0.8
+  non_advice: 0.9
+calibration: {}

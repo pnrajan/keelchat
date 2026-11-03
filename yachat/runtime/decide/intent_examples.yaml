@@ -1,0 +1,87 @@
+# Few-shot examples for the Intent Detector, per supported language and per intent.
+# Each example: the open question (ask), the user message, and the expected list of intents.
+# Keep them short and varied; every logged verdict can later train a fine-tuned classifier.
+en:
+  new_answer:
+    - ask: What is your home address?
+      message: 123 Main St, Austin TX
+      intents: [{intent: new_answer, fields: {address: "123 Main St, Austin TX"}}]
+    - ask: What is your home address?
+      message: my address is near the station
+      # an attempt to answer, even a vague one, is an answer: validation decides it is not a full address
+      intents: [{intent: new_answer, fields: {address: near the station}}]
+    - ask: What is your full name?
+      message: Ana Ruiz, 12 Elm St Austin
+      intents: [{intent: new_answer, fields: {full_name: Ana Ruiz, address: 12 Elm St Austin}}]
+    - ask: Do you consent? (yes/no)
+      message: yes, I live in Austin
+      intents: [{intent: new_answer, fields: {consent: "yes", location: Austin}}]
+    - ask: What role and location are you looking for?
+      message: you have work tomorrow near me?
+      intents: [{intent: new_answer, fields: {role: any, location: near me}}]
+    - ask: Which job interests you?
+      message: actually, nursing jobs in Dallas
+      intents: [{intent: new_answer, fields: {role: nursing, location: Dallas}}]
+    - ask: What is your full name?
+      message: si, I can start monday
+      intents: [{intent: new_answer, fields: {full_name: "si, I can start monday"}}]
+  edit:
+    - ask: What is your full name?
+      message: actually, I meant Dallas
+      intents: [{intent: edit, fields: {location: Dallas}, edited_field: location}]
+    - ask: What is your home address?
+      message: actually I don't want that job
+      intents: [{intent: new_answer}]
+      clear_outputs: [selected_job]
+    - ask: What is your home address?
+      message: change my full name to Ana Ruiz
+      intents: [{intent: edit, fields: {full_name: Ana Ruiz}, edited_field: full_name}]
+  enquiry:
+    - ask: What is your home address?
+      message: do you offer dental?
+      intents: [{intent: enquiry, on_step: false}]
+    - ask: What is your full name?
+      message: benefits?
+      intents: [{intent: enquiry, on_step: false}]
+    - ask: What is your full name?
+      message: is it remote?
+      intents: [{intent: enquiry, on_step: false}]
+    - ask: Which job interests you?
+      message: which pays more and is closer to 78704?
+      intents: [{intent: enquiry, needs_multi_step: true, on_step: true}]
+    - ask: Which job interests you?
+      message: the second one. do you have health insurance?
+      intents: [{intent: new_answer, fields: {job_pick: "2"}}, {intent: enquiry, on_step: false}]
+    - ask: Which job interests you?
+      message: is the first one remote?
+      intents: [{intent: enquiry, on_step: true}]
+  off_topic:
+    - ask: Which job interests you?
+      message: which is better, the gym or the cafeteria?
+      intents: [{intent: off_topic, needs_multi_step: true}]
+    - ask: What is your home address?
+      message: can you review my lease?
+      intents: [{intent: off_topic}]
+es:
+  new_answer:
+    - ask: Pide la dirección
+      message: Calle Mayor 5, Madrid
+      intents: [{intent: new_answer, fields: {address: "Calle Mayor 5, Madrid"}}]
+    - ask: ¿Qué puesto te interesa?
+      message: busco trabajo de enfermera en Austin
+      intents: [{intent: new_answer, fields: {role: enfermera, location: Austin}}]
+    - ask: ¿Qué puesto te interesa?
+      message: La segunda. ¿Tienen seguro médico?
+      intents: [{intent: new_answer, fields: {job_pick: "2"}}, {intent: enquiry, on_step: false}]
+  edit:
+    - ask: Pide el nombre
+      message: perdón, es 14 Elm St
+      intents: [{intent: edit, fields: {address: 14 Elm St}, edited_field: address}]
+  enquiry:
+    - ask: Pide la dirección
+      message: ¿ofrecen seguro dental?
+      intents: [{intent: enquiry, on_step: false}]
+  off_topic:
+    - ask: Pide la dirección
+      message: ¿me ayudas con mi visa?
+      intents: [{intent: off_topic}]

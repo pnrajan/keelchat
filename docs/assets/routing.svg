@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="200" viewBox="0 0 760 200" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <style>
+    .app { fill:#eef2ff; stroke:#4f46e5; stroke-width:2; rx:12; }
+    .box { fill:#f8fafc; stroke:#94a3b8; stroke-width:1.5; rx:10; }
+    .t { fill:#0f172a; text-anchor:middle; }
+    .h { font-weight:600; font-size:16px; }
+    .s { font-size:12px; fill:#475569; }
+    .chip { fill:#f8fafc; stroke:#cbd5e1; stroke-width:1; rx:4; }
+    .lbl { font-size:12px; fill:#334155; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .e { stroke:#6b7280; stroke-width:1.6; fill:none; marker-end:url(#a); }
+  </style>
+  <rect class="app" x="20" y="70" width="120" height="60"/>
+  <text class="t h" x="80" y="106">yachat</text>
+
+  <rect class="box" x="580" y="20" width="160" height="44"/>
+  <text class="t" x="660" y="47">provider</text>
+  <rect class="box" x="580" y="78" width="160" height="44"/>
+  <text class="t" x="660" y="105">providers</text>
+
+  <rect class="box" x="360" y="78" width="160" height="44"/>
+  <text class="t" x="440" y="100">LiteLLM gateway</text>
+  <text class="t s" x="440" y="115">aliases · keys · fallbacks</text>
+
+  <rect class="box" x="200" y="136" width="130" height="44"/>
+  <text class="t" x="265" y="158">Headroom</text>
+  <text class="t s" x="265" y="173">context compression</text>
+
+  <!-- direct -->
+  <path class="e" d="M140,85 C300,85 420,42 578,42"/>
+  <rect class="chip" x="240" y="44" width="54" height="18"/><text class="lbl" x="246" y="57">direct</text>
+  <!-- gateway -->
+  <path class="e" d="M140,100 L358,100"/>
+  <rect class="chip" x="146" y="80" width="134" height="18"/><text class="lbl" x="150" y="93">LITELLM_PROXY_URL</text>
+  <path class="e" d="M520,100 L578,100"/>
+  <!-- headroom -->
+  <path class="e" d="M140,118 C170,118 170,158 198,158"/>
+  <rect class="chip" x="40" y="150" width="148" height="18"/><text class="lbl" x="44" y="163">HEADROOM_PROXY_URL</text>
+  <path class="e" d="M330,158 C350,158 350,122 370,122" />
+</svg>

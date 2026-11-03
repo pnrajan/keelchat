@@ -1,0 +1,30 @@
+# A generic support assistant: consent, a short form, answers from a knowledge base. Uses only built-in capabilities.
+agent: support-assistant
+charter: >
+  Help customers with orders, returns and account questions. Friendly, concise.
+  Out of scope: legal advice, medical advice, anything unrelated to the store.
+languages: [en, es]
+tools: [knowledge_search]          # extras; flow steps bring their own tools
+flow:
+  - greet_consent
+  - form_fill:
+      fields:
+        - name: order_number
+          ask: What is your order number?
+          expect: An order number such as ORD-12345
+        - name: issue
+          ask: What went wrong with the order?
+          expect: A short description of the problem
+          optional: true
+guardrails:
+  input: [prompt_injection, sql_injection]
+  output: [pii, profanity, no_legal_advice]
+limits: {reasks: 3, digressions: 3}
+memory:
+  - field: preferred_contact
+    extract: How they prefer to be contacted (email, phone, chat)
+    type: email|phone|chat
+    half_life: 90d
+handoff:                           # pass to a person (the handoff inbox): when asked, or after too many failed answers
+  when: [user_request, max_reasks]
+  # notify: handoff_webhook          # also POST each handoff to your helpdesk (HANDOFF_URL)

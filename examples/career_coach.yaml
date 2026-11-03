@@ -1,0 +1,10 @@
+agent: career-coach
+charter: >
+  Help people explore career moves.
+  Out of scope: legal, medical, pay negotiation.
+tools: [skills_search, role_search]
+guardrails: {output: [pii, no_medical_advice]}
+memory:
+  - field: career_goal
+    extract: Role they want in 2 years
+    half_life: 180d

@@ -1,0 +1,36 @@
+agent: hiring-agent
+charter: >
+  Help candidates find and apply to jobs. Direct tone.
+  Out of scope: legal, immigration, pay promises.
+languages: [en, es]
+tools: [knowledge_search]          # extras only; flow steps bring their own tools
+flow:
+  - greet_consent
+  - job_search
+  - form_fill:
+      requires: [job_search]       # optional; default is the step before it
+      fields:
+        - name: full_name
+          ask: What is your full name?
+          expect: Full name of a person
+        - name: address
+          ask: What is your home address?
+          expect: A valid US address
+          max_reasks: 2            # per-field override of limits.reasks
+guardrails:                        # named checks from the registry; a base set always runs
+  input: [prompt_injection, sql_injection]
+  output: [pii, profanity, no_legal_advice]
+limits: {reasks: 3, digressions: 3}  # optional; also reopens (2), planner_calls (6), on_step_enquiries (3)
+memory:                            # optional; typed fields, not free text
+  - field: location
+    extract: City or ZIP they want to work in
+    type: string
+    half_life: 30d
+  - field: job_preferences
+    extract: Roles, shift and minimum pay they mention
+    type: {roles: "list[string]", shift: "day|night|any", min_pay: number}
+    half_life: 90d
+  - field: address
+    from: form_fill.address        # copy a validated answer instead of extracting
+    confirm_on_reuse: true
+mode: adaptive                     # flow (default with a flow) | adaptive (planner may take one turn) | planner (no flow)

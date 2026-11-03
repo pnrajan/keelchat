@@ -1,0 +1,14 @@
+agent: hiring-agent
+minimums:
+  conversation_completeness: 0.7
+  knowledge_retention: 0.7
+  role_adherence: 0.8
+  conversation_relevancy: 0.7
+  faithfulness: 0.8
+  pii_leakage: 0.9
+  non_advice: 0.9
+  no_language_switch_on_names: 0.8
+  confirm_before_switching: 0.8
+  job_text_as_posted: 0.8
+  natural_tone: 0.7
+calibration: {}   # metric → agreement with the human-labeled set; fill in before using a metric as a gate (docs/EVALS.md)

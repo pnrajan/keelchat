@@ -1,0 +1,65 @@
+name: CI
+on:
+  push: {branches: [main]}
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: {python-version: "3.12"}
+      - run: uv sync --all-extras --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+
+  console:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: frontend}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json}
+      - run: npm ci
+      - run: npm run build
+
+  tests:
+    # Tests call a real model. They run when the repository has a provider key configured as a secret.
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      YACHAT_LLM: litellm
+      SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+      YACHAT_MODEL_GENERATE: siliconflow/Qwen/Qwen3.5-35B-A3B
+      YACHAT_MODEL_CLASSIFY: siliconflow/Qwen/Qwen3.5-35B-A3B
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: {python-version: "3.12"}
+      - run: uv sync --all-extras --frozen
+      - name: sandbox image (analytics statistics tests)
+        run: docker build -q -t yachat-sandbox:latest deploy/sandbox
+      - name: pytest
+        if: env.SILICONFLOW_API_KEY != ''
+        run: uv run pytest -q -n 2
+      - name: evals gate
+        if: env.SILICONFLOW_API_KEY != ''
+        run: uv run yachat evals run
+      - if: env.SILICONFLOW_API_KEY == ''
+        run: echo "SILICONFLOW_API_KEY secret not set; model tests skipped" >> "$GITHUB_STEP_SUMMARY"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t yachat:ci .
+      - name: smoke the image as the non-root user
+        run: |
+          docker run -d --name smoke -p 8080:8080 -e YACHAT_LLM=litellm -e SILICONFLOW_API_KEY=x \
+            -e YACHAT_MODEL_GENERATE=siliconflow/x -e YACHAT_MODEL_CLASSIFY=siliconflow/x yachat:ci
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8080/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:8080/health
+          test "$(docker exec smoke awk '/^Uid:/{print $2}' /proc/1/status)" = "10001"   # the server process, not the exec shell
+          docker rm -f smoke

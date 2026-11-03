@@ -1,0 +1,32 @@
+# A salon's booking assistant built on an extension package (examples/extensions/booking_caps): a custom tool
+# (slot_search), a custom step that offers and books slots (pick_slot) and a custom output guardrail
+# (no_price_promises). Run it with
+#   PYTHONPATH=examples/extensions YACHAT_CAPABILITY_PACKAGES=booking_caps uv run yachat build examples/booking_assistant.yaml
+agent: booking-assistant
+charter: >
+  Help clients of Luma Salon find an appointment slot. Warm and brief. Prices are confirmed in the salon.
+  Out of scope: medical advice about skin or scalp conditions, anything unrelated to the salon.
+languages: [en]
+tools: [slot_search]          # also open to the planner, for side questions while a step is open
+mode: adaptive                # steps ask; a multi-part side question ("any colour slot on Friday?") may use the planner
+flow:
+  - greet_consent
+  - form_fill:
+      fields:
+        - name: service
+          ask: Which service would you like?
+          expect: one of haircut, colour or manicure
+        - name: preferred_day
+          ask: Which day suits you?
+          expect: a weekday, Monday to Sunday
+        - name: full_name
+          ask: What name should the booking be under?
+          expect: a person's name
+  - pick_slot:                # the package's own step: looks up slots with slot_search, offers them, takes the pick
+      service_field: service
+      day_field: preferred_day
+guardrails:
+  input: [prompt_injection]
+  output: [pii, no_price_promises]
+handoff:
+  when: [user_request, max_reasks]

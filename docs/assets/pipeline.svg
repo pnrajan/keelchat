@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="250" viewBox="0 0 960 250" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <style>
+    .box { fill:#f8fafc; stroke:#94a3b8; stroke-width:1.5; rx:10; }
+    .stage { fill:#eef2ff; stroke:#4f46e5; stroke-width:2; rx:12; }
+    .tool { fill:#fff7ed; stroke:#ea580c; stroke-width:1.5; rx:10; }
+    .mem { fill:#f0fdf4; stroke:#16a34a; stroke-width:1.5; rx:10; }
+    .t { fill:#0f172a; text-anchor:middle; }
+    .h { font-weight:600; font-size:16px; }
+    .s { font-size:12px; fill:#475569; }
+    .chip { fill:#f8fafc; stroke:#cbd5e1; stroke-width:1; rx:4; }
+    .e { stroke:#6b7280; stroke-width:1.6; fill:none; marker-end:url(#a); }
+  </style>
+  <!-- in -->
+  <rect class="box" x="10" y="50" width="120" height="50"/>
+  <text class="t" x="70" y="80">channel payload</text>
+  <!-- Understand -->
+  <rect class="stage" x="170" y="30" width="200" height="90"/>
+  <text class="t h" x="270" y="56">Understand</text>
+  <text class="t s" x="270" y="78">pre-processors · language</text>
+  <text class="t s" x="270" y="96">input guardrails</text>
+  <!-- Decide -->
+  <rect class="stage" x="410" y="30" width="200" height="90"/>
+  <text class="t h" x="510" y="56">Decide</text>
+  <text class="t s" x="510" y="78">Intent Detector · Orchestrator</text>
+  <text class="t s" x="510" y="96">nodes · planner</text>
+  <!-- Respond -->
+  <rect class="stage" x="650" y="30" width="200" height="90"/>
+  <text class="t h" x="750" y="56">Respond</text>
+  <text class="t s" x="750" y="78">output guardrails · generator</text>
+  <text class="t s" x="750" y="96">channel adapter</text>
+  <!-- out -->
+  <rect class="box" x="880" y="50" width="70" height="50"/>
+  <text class="t" x="915" y="80">reply</text>
+  <!-- gateway + tools -->
+  <rect class="tool" x="410" y="170" width="200" height="50"/>
+  <text class="t" x="510" y="192">Tool Gateway</text>
+  <text class="t s" x="510" y="209">allow list · timeout · breaker · scrub</text>
+  <rect class="tool" x="650" y="170" width="200" height="50"/>
+  <text class="t" x="750" y="192">tools · Knowledge Service</text>
+  <text class="t s" x="750" y="209">untrusted output</text>
+  <!-- memory -->
+  <rect class="mem" x="880" y="170" width="70" height="50"/>
+  <text class="t" x="915" y="192">memory</text>
+  <text class="t s" x="915" y="209">writer</text>
+  <!-- edges -->
+  <path class="e" d="M130,75 L168,75"/>
+  <path class="e" d="M370,75 L408,75"/>
+  <path class="e" d="M610,75 L648,75"/>
+  <path class="e" d="M850,75 L878,75"/>
+  <path class="e" d="M510,120 L510,168"/>
+  <path class="e" d="M610,195 L648,195"/>
+  <path class="e" d="M915,100 L915,168" stroke-dasharray="5,4"/>
+  <rect class="chip" x="873" y="126" width="84" height="18"/><text class="s" x="915" y="139" text-anchor="middle">after the reply</text>
+</svg>

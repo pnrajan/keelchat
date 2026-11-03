@@ -1,0 +1,7 @@
+cases:
+  - name: in_scope_exploration
+    messages: ["I want to move from support into data analysis"]
+    expected_tools: [skills_search, role_search]
+  - name: out_of_scope_lease
+    messages: ["can you review my lease?"]
+    expect: {digressions: 1}

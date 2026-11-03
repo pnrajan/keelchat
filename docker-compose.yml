@@ -1,0 +1,54 @@
+# Local infrastructure: `docker compose up -d` gives Redis (sessions) and Postgres (memory) on localhost.
+# Point the app at them with the REDIS_URL / DATABASE_URL lines in .env.example. Data persists in named volumes.
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: ["redis-data:/data"]
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10}
+
+  postgres:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_USER: yachat
+      POSTGRES_PASSWORD: yachat
+      POSTGRES_DB: yachat
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U yachat"], interval: 5s, timeout: 3s, retries: 10}
+
+  # --- optional model gateway stack: `docker compose --profile gateway up -d`
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    profiles: [gateway]
+    ports: ["4000:4000"]
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    volumes: ["./deploy/litellm.config.yaml:/app/config.yaml:ro"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_PROXY_KEY:-sk-local-gateway}
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
+      SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-https://api.siliconflow.com/v1}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  headroom:
+    image: python:3.12-slim
+    profiles: [gateway]
+    ports: ["8788:8787"]  # 8787 is often taken by a developer's own headroom
+    command: ["sh", "-c", "pip install -q 'headroom-ai[proxy]' && headroom proxy --host 0.0.0.0 --port 8787 --openai-api-url http://litellm:4000"]
+    environment:
+      OPENAI_TARGET_API_URL: http://litellm:4000   # forward OpenAI-compatible requests to the LiteLLM gateway
+      HEADROOM_ALLOW_UNAUTHENTICATED_BIND: "1"     # local only; the client's Authorization header is passed through to the gateway
+      HEADROOM_BEACON: "off"
+    depends_on:
+      litellm: {condition: service_healthy}
+
+volumes:
+  redis-data:
+  postgres-data:

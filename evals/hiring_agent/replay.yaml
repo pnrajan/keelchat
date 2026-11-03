@@ -1,0 +1,34 @@
+cases:
+  - name: happy_path
+    messages: ["hello", "yes", "backend engineer in austin", "1", "Jane Doe", "123 Main St, Austin TX 78701", "submit"]
+    expected_tools: [job_search]
+    expect: {completed: true, exit_reason: completed}
+  - name: multi_answer
+    messages: ["hello", "yes", "backend engineer in austin", "1", "Ana Ruiz, 12 Elm St, Austin TX 78704"]
+    expect: {fields: {full_name: "Ana Ruiz"}}
+  - name: address_max_reasks
+    messages: ["hello", "yes", "backend engineer", "1", "Jane Doe", "my address is downtown", "my address is near the park"]
+    expect: {exit_reason: max_reasks}
+  - name: benefits_mid_form
+    messages: ["hello", "yes", "backend engineer", "1", "do you offer dental benefits?", "Jane Doe"]
+    expected_tools: [knowledge_search]
+    expect: {digressions: 0}
+  - name: disengaged
+    messages: ["hello", "yes", "engineer", "1", "benefits?", "remote?", "parking?", "cafeteria?"]
+    expect: {exit_reason: disengaged, nudges: 1}
+  - name: adaptive_detour
+    messages: ["hello", "yes", "engineer in austin", "which pays more and is closer to 78704?", "1"]
+    expected_tools: [job_search]
+    expect: {digressions: 0}
+  - name: spanish_session
+    messages: ["hola, busco trabajo en Madrid", "sí", "ingeniero en Austin"]
+    expect: {language: es}
+  - name: french_unsupported
+    messages: ["Bonjour, je cherche un emploi à Paris"]
+    expect: {language: en}
+  - name: drop_job
+    messages: ["hello", "yes", "backend engineer in austin", "1", "Jane Doe", "actually I don't want that job", "data analyst", "2"]
+    expect: {fields: {full_name: "Jane Doe"}}
+  - name: edit_location
+    messages: ["hello", "yes", "backend engineer in austin", "1", "Actually, I meant Dallas"]
+    expect: {fields: {location: "Dallas"}}

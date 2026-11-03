@@ -1,0 +1,12 @@
+# No flow: the planner routes every turn. It reads the question, picks tools from the allow list, and answers from
+# what they return (read-only tools only; counting and budgets are enforced in code via limits.planner_calls).
+agent: hotel-concierge
+charter: >
+  Answer guests' questions about the hotel and its area: opening hours, amenities, directions, local tips.
+  Short, friendly answers. Out of scope: bookings and payments; for those, offer a person.
+languages: [en, es]
+mode: planner
+tools: [knowledge_search]
+limits: {planner_calls: 3, digressions: 3}
+handoff:
+  when: [user_request]
