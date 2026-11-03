@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import re
 
-from yachat.registry.core import Guardrail, GuardResult, guardrail
-from yachat.runtime.context import TurnContext
+from yachat.registry.core import GuardContext, Guardrail, GuardResult, guardrail
 
 PRICE = re.compile(r"[$€£]\s?\d+(?:[.,]\d{2})?")
 
@@ -14,7 +13,7 @@ PRICE = re.compile(r"[$€£]\s?\d+(?:[.,]\d{2})?")
 class NoPricePromises(Guardrail):
     """Removes quoted prices from replies; the salon confirms prices in person."""
 
-    async def check(self, text: str, ctx: TurnContext) -> GuardResult:
+    async def check(self, text: str, ctx: GuardContext) -> GuardResult:
         if not PRICE.search(text):
             return GuardResult()
         return GuardResult(flagged=True, reason="price quoted", redacted=PRICE.sub("(price confirmed at the salon)", text))

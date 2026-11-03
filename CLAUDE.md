@@ -107,6 +107,7 @@ yachat/
   api/app.py     FastAPI; serves frontend/dist when built; tenant keys; mcp_server.py (/mcp for Claude and MCP clients)
   sim/harness.py simulated users: scripted replays and model-played personas, on fake tools; sim/refine.py (survey self-test: pretend customers, confidence score, revise)
   testing/fakes.py  FakeTools (tool backends only; the model is never faked)
+  scaffold.py    `yachat new agent|package` starter files; __init__.py re-exports the extension API (`from yachat import tool, node, ...`)
   logging.py     JSON logs (session_id, turn_id, policy_hash, stage, latency_ms), Metrics; tracing.py (Sentry spans); voice.py (speech in/out ports)
 evals/           replay, personas, metrics (DeepEval catalogue + thresholds gate), judge (litellm), run, online; <agent>/ sets
 examples/        policies (support, booking, concierge, hiring, surveys, analyst, coach), data/, sim_script.yaml, contrib_tool/,

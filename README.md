@@ -245,7 +245,7 @@ A capability is one decorated function or class. For example, a tool: its type h
 docstring is what the model reads.
 
 ```python
-from yachat.registry.core import tool
+from yachat import tool
 
 
 @tool("slot_search", timeout_s=3.0, retries=1)
@@ -258,7 +258,10 @@ async def slot_search(service: str, day: str = "") -> dict[str, list[str]]:
 tools: [slot_search]          # allowed for this agent
 ```
 
-The [booking extension package](examples/extensions/booking_caps) has a working tool, step, guardrail and channel.
+Start your own with `uv run yachat new package acme_caps`: a tool, a step, a guardrail, an agent that uses them and a
+contract test, all working as written. [Your first step in ten minutes](docs/ADDING_A_CAPABILITY.md#start-here-your-first-step-in-ten-minutes)
+walks through them. The [booking extension package](examples/extensions/booking_caps) is a fuller example, with a
+channel.
 
 ### Orchestration and routing
 
@@ -385,6 +388,7 @@ them. Open Claude Code at the repository root and ask, for example:
 ### CLI
 
 ```bash
+uv run yachat new agent|package <name>                # starter files that build and pass the contract suite
 uv run yachat build <policy.yaml>                     # validate and compile
 uv run yachat schema                                  # JSON Schema of the policy, from the registry
 uv run yachat registry                                # tools, steps, guardrails, pre-processors
