@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with: {python-version: "3.12"}
       - run: uv sync --all-extras --frozen
       - run: uv run ruff check .
@@ -36,7 +36,7 @@ jobs:
       YACHAT_MODEL_CLASSIFY: siliconflow/Qwen/Qwen3.5-35B-A3B
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with: {python-version: "3.12"}
       - run: uv sync --all-extras --frozen
       - name: sandbox image (analytics statistics tests)
