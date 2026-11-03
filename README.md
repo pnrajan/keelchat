@@ -1,19 +1,37 @@
-<h1 align="center">yachat</h1>
+<div align="center">
 
-<p align="center"><b>Chatbots you write in YAML and extend in Python.</b><br>
-One policy file says what the bot is for, what it asks, what it may use and where it must stop. One runtime runs every
-bot, with the counting, safety checks and channel rules in code instead of in a prompt.</p>
+# yachat
 
-<p align="center">
-<a href="#quickstart">Quickstart</a> ·
-<a href="#examples">Examples</a> ·
-<a href="#the-test-console">Test console</a> ·
-<a href="#channels">Channels</a> ·
-<a href="#how-to-guides">How-to guides</a> ·
-<a href="#configuration">Configuration</a>
-</p>
+**Chatbots you write in YAML and extend in Python.**
 
----
+One policy file says what the bot is for, what it asks, what it may use and where it must stop.<br>
+One runtime runs every bot, with the counting, safety checks and channel rules in code instead of in a prompt.
+
+[![CI](https://github.com/pnrajan/yachat/actions/workflows/ci.yml/badge.svg)](https://github.com/pnrajan/yachat/actions/workflows/ci.yml) [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white)](pyproject.toml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-informational)](CHANGELOG.md) [![Ruff](https://img.shields.io/badge/lint-ruff-d7ff64)](https://docs.astral.sh/ruff/) [![mypy strict](https://img.shields.io/badge/types-mypy%20strict-2a6db2)](https://mypy-lang.org/)
+
+[Quickstart](#quickstart) · [Examples](#examples) · [Test console](#the-test-console) · [Channels](#channels) ·
+[How-to guides](#how-to-guides) · [Configuration](#configuration) · [Docs](#documentation)
+
+<img src="docs/assets/console.jpg" alt="The yachat test console: the policy editor on the left, a test chat in the middle, and the launch checklist on the right" width="900">
+
+</div>
+
+## Contents
+
+- [What it looks like](#what-it-looks-like)
+- [Why yachat](#why-yachat)
+- [Quickstart](#quickstart)
+- [Examples](#examples)
+- [The test console](#the-test-console)
+- [Channels](#channels)
+- [How it works](#how-it-works)
+- [How-to guides](#how-to-guides): tools, MCP, flow steps, guardrails, channels, routing, memory, handoff, testing
+- [Use with Claude](#use-with-claude): the plugin, any MCP client, and Claude Code in this repo
+- [Reference](#reference): CLI, HTTP API, keys, model routing, configuration
+- [Deployment](#deployment)
+- [Documentation](#documentation) · [Contributing](#contributing) · [Security](#security) · [License](#license)
+
+## What it looks like
 
 ```yaml
 agent: support-assistant
@@ -33,30 +51,28 @@ limits: {reasks: 3, digressions: 3}
 handoff: {when: [user_request, max_reasks]}
 ```
 
-That file is a working bot. It greets and asks for consent, then collects an order number, asking again when an
-answer is unclear (a limited number of times). It answers side questions from your documents, refuses tricks like
-"ignore your rules", strips personal details from replies, and hands the chat to a person when asked or stuck.
+That file is a working bot. It:
+
+- greets and asks for consent;
+- collects an order number, asking again when an answer is unclear, but only a limited number of times;
+- answers side questions from your documents, then returns to the open question;
+- refuses tricks like "ignore your rules" and strips personal details from replies;
+- hands the chat to a person when asked, or when it gets stuck.
 
 ## Why yachat
 
-- **The policy is the product.** Behaviour comes from a validated YAML file, compiled and pinned per conversation.
-  Unknown keys are rejected with their path. A new bot is a new file, and a running conversation never changes version
-  under the user.
-- **Counting lives in code.** Re-asks, digressions, nudges, reopened steps and planner calls are counted by the
-  runtime from structured verdicts. A model never decides to end a conversation.
-- **Extend without forking.** A tool, a flow step, a guardrail, a pre-processor or a channel is one decorated function
-  or class, in this repo, in your own package, or behind an MCP server. Each passes the same contract suite.
-- **Tools behind one gateway.** Allow lists, timeouts, retries, a circuit breaker and scrubbing of sensitive values
-  apply to every tool call, however the tool was added.
-- **Every dependency behind a port.** Sessions, memory, documents, vectors, datasets, the sandbox and each channel
-  have an in-memory version, so a bot runs on a laptop with only a model key, and on Redis, Postgres and S3 in
-  production.
-- **Any model.** Anthropic directly, or any provider through litellm (OpenAI, Gemini, Bedrock, Azure, OpenRouter,
-  SiliconFlow, Ollama…), with a cheap model for classification and a stronger one for replies.
+| | |
+|---|---|
+| **The policy is the product** | Behaviour comes from a validated YAML file, compiled and pinned per conversation. Unknown keys are rejected with their path. A new bot is a new file, and a running conversation never changes version under the user. |
+| **Counting lives in code** | Re-asks, digressions, nudges, reopened steps and planner calls are counted by the runtime from structured verdicts. A model never decides to end a conversation. |
+| **Extend without forking** | A tool, flow step, guardrail, pre-processor or channel is one decorated function or class: in this repo, in your own package, or behind an MCP server. Each passes the same contract suite. |
+| **One gateway for tools** | Allow lists, timeouts, retries, a circuit breaker and scrubbing of sensitive values apply to every tool call, however the tool was added. |
+| **Every dependency behind a port** | Sessions, memory, documents, vectors, datasets, the sandbox and each channel have an in-memory version. A bot runs on a laptop with only a model key, and on Redis, Postgres and S3 in production. |
+| **Any model** | Anthropic directly, or any provider through litellm (OpenAI, Gemini, Bedrock, Azure, OpenRouter, SiliconFlow, Ollama…), with a cheap model for classification and a stronger one for replies. |
 
 ## Quickstart
 
-Needs Python 3.12, [uv](https://docs.astral.sh/uv/), Node 20+ (for the console) and one model provider key.
+**Requirements:** Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 20+ (for the console) and one model provider key.
 
 ```bash
 git clone https://github.com/pnrajan/yachat && cd yachat
@@ -68,20 +84,30 @@ uv sync --extra api
 Open http://127.0.0.1:5173, pick **Support** from the policy menu, press **Build & try**, then **New session** and
 chat. `./run.sh --build` serves everything from one port (http://127.0.0.1:8000/console/).
 
-Without the console:
+<details>
+<summary><b>Without the console: the CLI and the HTTP API</b></summary>
 
 ```bash
 uv run yachat build examples/support_assistant.yaml   # validate and compile; errors carry the YAML path
 uv run yachat serve --port 8000                       # the runtime API; interactive docs at /docs
-
-curl -s localhost:8000/v1/agents -H 'content-type: application/json' \
-  -d "{\"yaml\": $(python3 -c 'import json;print(json.dumps(open("examples/support_assistant.yaml").read()))')}"
-curl -s localhost:8000/v1/sessions -H 'content-type: application/json' -d '{"agent": "support-assistant", "user_id": "u1"}'
-# → {"id": "ses_…", ...}
-curl -s localhost:8000/v1/sessions/ses_…/turns -H 'content-type: application/json' -d '{"text": "hi, my order arrived damaged"}'
 ```
 
-Each turn returns the reply, every stage with its timing, the model and tool calls, and the route taken.
+In another terminal (needs [`jq`](https://jqlang.org/)):
+
+```bash
+API=localhost:8000
+jq -n --rawfile yaml examples/support_assistant.yaml '{yaml: $yaml}' \
+  | curl -s $API/v1/agents -H 'content-type: application/json' -d @- > /dev/null
+SID=$(curl -s $API/v1/sessions -H 'content-type: application/json' \
+  -d '{"agent": "support-assistant", "user_id": "u1"}' | jq -r .id)
+curl -s $API/v1/sessions/$SID/turns -H 'content-type: application/json' \
+  -d '{"text": "hi, my order arrived damaged"}' | jq .outbound.text
+```
+
+Each turn returns the reply (`outbound`), every stage with its timing (`trace`), the model and tool calls, and the
+route taken.
+
+</details>
 
 ## Examples
 
@@ -106,19 +132,20 @@ PYTHONPATH=examples/extensions YACHAT_CAPABILITY_PACKAGES=booking_caps uv run ya
 
 ## The test console
 
-`frontend/` is a React console for building and testing bots, served at `/console/` once built:
+`frontend/` is a React console for building and testing bots, served at `/console/` once built.
 
-- **Editor · test chat.** A YAML editor that completes keys, step names, tools and guardrails, shows each key's docs on
-  hover, and marks build errors on their lines as you type. **Build & try** compiles it and the chat pane talks to it.
-- **Inspector.** For each turn: every stage with its timing, the intent verdict, the route, tool calls, the session
-  state and what was remembered.
-- **Simulate.** Model-played personas and scripted replays against the policy, on fake tools.
-- **Versions.** Save a build as a version, compare versions line by line, roll back, copy an agent.
-- **Channels.** What to paste or configure for the website widget, a link, WordPress, WhatsApp, SMS, Slack and phone.
-- **Publish · results.** Publish an agent as a widget and app. For surveys: scores over time, splits and themes.
-- **Outcomes** and **Handoffs.** How conversations ended, the decision audit log, and the inbox of chats passed to a
-  person.
-- **Settings.** API keys, models, token usage and cost by model, purpose and day.
+| Tab | What you do there |
+|---|---|
+| **Editor · test chat** | Edit the YAML with completion for keys, step names, tools and guardrails, docs on hover, and build errors marked on their lines as you type. **Build & try** compiles it and the chat pane talks to it. |
+| **Inspector** | For each turn: every stage with its timing, the intent verdict, the route, tool calls, the session state and what was remembered. |
+| **Simulate** | Model-played personas and scripted replays against the policy, on fake tools. |
+| **Versions** | Save a build as a version, compare versions line by line, roll back, copy an agent. |
+| **Channels** | What to paste or configure for the website widget, a link, WordPress, WhatsApp, SMS, Slack and phone. |
+| **Publish · results** | Publish an agent as a widget and app. For surveys: scores over time, splits and themes. |
+| **Outcomes · Handoffs** | How conversations ended, the decision audit log, and the inbox of chats passed to a person. |
+| **Settings** | API keys, models, token usage and cost by model, purpose and day. |
+
+<p align="center"><img src="docs/assets/console-trace.jpg" alt="The Trace tab: each Understand, Decide and Respond stage of a turn with its time in milliseconds" width="900"></p>
 
 ## Channels
 
@@ -138,26 +165,42 @@ The runtime produces one channel-neutral message; each channel owns its own limi
 From your own webhook, open a session on that channel, then post the raw payload:
 
 ```bash
-curl -s $HOST/v1/sessions -H 'content-type: application/json' -d '{"agent": "support-assistant", "user_id": "+14155550100", "channel": "sms"}'
-curl -s $HOST/v1/sessions/ses_…/turns -H 'content-type: application/json' -d '{"payload": {"Body": "hi", "From": "+14155550100", "MessageSid": "SM1"}}'
+curl -s $API/v1/sessions -H 'content-type: application/json' -d '{"agent": "support-assistant", "user_id": "+14155550100", "channel": "sms"}'
+curl -s $API/v1/sessions/$SID/turns -H 'content-type: application/json' -d '{"payload": {"Body": "hi", "From": "+14155550100", "MessageSid": "SM1"}}'
 ```
 
 ## How it works
 
 <p align="center"><img src="docs/assets/pipeline.svg" alt="channel payload → Understand → Decide → Respond → reply; Decide calls tools through the Tool Gateway; memory is written after the reply" width="900"></p>
 
-Every turn runs three stages over one `TurnContext`. **Understand** runs the pre-processors (language, shorthand,
-entity normalisation, opt-out) and the input guardrails. **Decide** classifies the message into intents; then the
-orchestrator routes it to the next ready flow step, an edit of an earlier answer, a side question, the planner, a
-handoff or the exit. **Respond** phrases the reply from the step's goal, checks it, runs the output guardrails and
-renders it for the channel. Memory is extracted after the reply is sent. Details:
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Every turn runs three stages over one `TurnContext`:
+
+1. **Understand** runs the pre-processors (language, shorthand, entity normalisation, opt-out) and the input
+   guardrails.
+2. **Decide** classifies the message into intents. The orchestrator then routes it to the next ready flow step, an
+   edit of an earlier answer, a side question, the planner, a handoff or the exit.
+3. **Respond** phrases the reply from the step's goal, checks it, runs the output guardrails and renders it for the
+   channel.
+
+Memory is extracted after the reply is sent. Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## How-to guides
 
 Every capability is discovered at startup from `yachat/capabilities/`, from any package named in
 `YACHAT_CAPABILITY_PACKAGES`, or from an installed `yachat.capabilities` entry point. A policy refers to it by name,
 and the build checks that the name exists. `uv run yachat registry` lists everything registered.
+
+| I want to… | Guide |
+|---|---|
+| call my own code or API | [Add a tool](#add-a-tool) · [Register an HTTP endpoint](#register-an-http-endpoint-as-a-tool) |
+| use tools from an MCP server | [Connect an MCP server](#connect-an-mcp-server) |
+| add a custom step to a conversation | [Add a flow step](#add-a-flow-step) |
+| check or rewrite messages | [Add a guardrail](#add-a-guardrail) · [Add a pre-processor](#add-a-pre-processor) |
+| reach users on another platform | [Add a channel](#add-a-channel) |
+| ship my extensions as a package | [Package your extensions](#package-your-extensions) |
+| control how much the model plans | [Orchestration and routing](#orchestration-and-routing) |
+| remember users, hand off, answer from docs or data | [Memory](#remember-things-between-conversations) · [Handoff](#hand-a-conversation-to-a-person) · [Documents](#answer-from-documents) · [Data](#answer-questions-about-data) |
+| check a bot before launch | [Test a bot](#test-a-bot) |
 
 ### Add a tool
 
@@ -438,7 +481,53 @@ The console's **Simulate** tab plays model-driven personas against a policy on f
 Tests call the configured model: there is no fake LLM, so what passes is what runs. Guide:
 [`docs/EVALS.md`](docs/EVALS.md).
 
-## CLI
+## Use with Claude
+
+### Build bots from Claude Code: the plugin
+
+The [`yachat` plugin](plugins/yachat) connects Claude to your server's `/mcp` endpoint with a tenant key, and adds a
+**build-agent** skill: Claude asks what the bot must do, drafts the policy, checks readiness, tries a few
+conversations and shows you the result before it saves anything.
+
+```bash
+export YACHAT_URL=http://localhost:8000 YACHAT_KEY=<tenant key>   # a key with the build scope
+claude
+```
+
+```text
+/plugin install yachat --marketplace pnrajan/yachat
+```
+
+Then ask in plain words:
+
+> Build a returns desk for a shoe store. Get the order number and what went wrong, answer refund questions from the
+> help centre, speak English and Spanish, and never promise refund amounts. Try a few customers before you save.
+
+Claude uses the same tools the console does (`whoami`, `get_schema`, `list_bot_types`, `draft_policy`,
+`create_agent`, `get_policy`, `check_readiness`, `try_conversation`, `save_version`, `activate_version`). It acts only
+in the key's tenant, and only builds that pass are saved.
+
+### Any MCP client
+
+Point it at `$YACHAT_URL/mcp` (streamable HTTP) with `Authorization: Bearer <key>`. For Claude Code without the
+plugin:
+
+```bash
+claude mcp add --transport http yachat "$YACHAT_URL/mcp" --header "Authorization: Bearer $YACHAT_KEY"
+```
+
+### Work on yachat itself with Claude Code
+
+[`CLAUDE.md`](CLAUDE.md) gives Claude the project's rules (the architectural laws, how a change is verified, where
+code lives), and [`.claude/skills/verify`](.claude/skills/verify/SKILL.md) tells it how to run the services and drive
+them. Open Claude Code at the repository root and ask, for example:
+
+> Add a `calendar_lookup` tool under `examples/extensions/booking_caps`, make it pass the contract suite, and use it
+> in `booking_assistant.yaml`.
+
+## Reference
+
+### CLI
 
 ```bash
 uv run yachat build <policy.yaml>                     # validate and compile
@@ -451,7 +540,7 @@ uv run yachat knowledge serve|add ...                 # Knowledge Service and in
 uv run yachat analytics serve                         # Analytics Service
 ```
 
-## HTTP API
+### HTTP API
 
 Interactive docs at `/docs`. The main routes:
 
@@ -471,11 +560,17 @@ Interactive docs at `/docs`. The main routes:
 ### Tenants and API keys
 
 `YACHAT_API_KEY` is the admin key. Issue keys per tenant with `POST /v1/tenants/{t}/keys`; each is shown once and
-stored as a hash. Scopes are `build` (everything in its tenant), `read`, or `runtime` (sessions and turns only: the key
-for a website or messaging backend). A key reaches only its own tenant. With `YACHAT_JWT_SECRET`, keys are signed JWTs
-whose tenant, scopes and expiry are set by the server.
+stored as a hash. A key reaches only its own tenant.
 
-## Model routing
+| Scope | Allows |
+|---|---|
+| `build` | everything in its tenant |
+| `read` | read-only access |
+| `runtime` | sessions and turns only: the key for a website or messaging backend |
+
+With `YACHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry are set by the server.
+
+### Model routing
 
 <p align="center"><img src="docs/assets/routing.svg" alt="yachat calls a provider directly, or a LiteLLM gateway, or Headroom in front of the gateway" width="720"></p>
 
@@ -489,9 +584,13 @@ whose tenant, scopes and expiry are set by the server.
 `YACHAT_MODEL_VERIFY` checks reasoning and replies. Token usage and cost are tracked per model, with prices from
 OpenRouter's public list.
 
-## Configuration
+### Configuration
 
-Everything is an environment variable, loaded from `.env`; [`.env.example`](.env.example) documents every key.
+Everything is an environment variable, loaded from `.env`; [`.env.example`](.env.example) documents every key. Only
+the model provider is required; everything else runs in memory when unset.
+
+<details>
+<summary><b>All variables</b></summary>
 
 | Variable | Purpose |
 |---|---|
@@ -510,6 +609,8 @@ Everything is an environment variable, loaded from `.env`; [`.env.example`](.env
 | `SENTRY_DSN` | errors and traces per stage and model call; no message text is sent |
 | `YACHAT_TOOLS=fake` | development only: fake backends for tools whose URL is unset |
 
+</details>
+
 ## Deployment
 
 ```bash
@@ -520,7 +621,8 @@ One image serves the API (with the console), the Knowledge Service or the Analyt
 picks which (`deploy/entrypoint.sh`). It runs as a non-root user and exposes `/health`. `docker-compose.yml` runs
 Redis, Postgres and an optional LiteLLM gateway next to it.
 
-## Project layout
+<details>
+<summary><b>Project layout</b></summary>
 
 ```
 yachat/
@@ -540,20 +642,36 @@ evals/           replay sets and personas
 docs/            ARCHITECTURE, WRITING_AN_AGENT, ADDING_A_CAPABILITY, DEVELOPER_GUIDE, EVALS
 ```
 
+</details>
+
 ## Documentation
 
-- [`docs/WRITING_AN_AGENT.md`](docs/WRITING_AN_AGENT.md): every policy key, and a pre-launch checklist
-- [`docs/ADDING_A_CAPABILITY.md`](docs/ADDING_A_CAPABILITY.md): tools, steps, guardrails, MCP, HTTP tools, packaging
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): components, the life of a message, boundaries
-- [`docs/BUILDING_AN_AGENT_END_TO_END.md`](docs/BUILDING_AN_AGENT_END_TO_END.md): one complex agent from plan to launch
-- [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md): run modes, an API walkthrough, debugging
-- [`docs/EVALS.md`](docs/EVALS.md): replay sets, personas and judged metrics
+| Guide | Covers |
+|---|---|
+| [`WRITING_AN_AGENT.md`](docs/WRITING_AN_AGENT.md) | every policy key, and a pre-launch checklist |
+| [`ADDING_A_CAPABILITY.md`](docs/ADDING_A_CAPABILITY.md) | tools, steps, guardrails, MCP, HTTP tools, packaging |
+| [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) | components, the life of a message, boundaries |
+| [`BUILDING_AN_AGENT_END_TO_END.md`](docs/BUILDING_AN_AGENT_END_TO_END.md) | one complex agent from plan to launch |
+| [`DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) | run modes, an API walkthrough, debugging |
+| [`EVALS.md`](docs/EVALS.md) | replay sets, personas and judged metrics |
+| [`CHANGELOG.md`](CHANGELOG.md) | what changed in each release |
 
 ## Contributing
 
-`uv run pytest`, `uv run ruff check .` and `uv run mypy` must pass, and `npm run build` for the console. New
-capabilities must also pass `tests/test_registry.py`. Tests call the real model configured in `.env`. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) and [`SECURITY.md`](SECURITY.md).
+Contributions are welcome. Before opening a pull request:
+
+```bash
+uv run pytest && uv run ruff check . && uv run mypy      # tests call the real model configured in .env
+cd frontend && npm run build                              # when the console changed
+```
+
+New capabilities must also pass `tests/test_registry.py`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the
+[code of conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+Please don't report vulnerabilities in public issues; [`SECURITY.md`](SECURITY.md) explains how to report one, and
+which protections the runtime has built in.
 
 ## License
 

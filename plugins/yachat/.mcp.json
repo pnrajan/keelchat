@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "yachat": {
+      "type": "http",
+      "url": "${YACHAT_URL}/mcp",
+      "headers": { "Authorization": "Bearer ${YACHAT_KEY}" }
+    }
+  }
+}

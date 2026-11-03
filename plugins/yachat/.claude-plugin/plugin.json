@@ -1,0 +1,7 @@
+{
+  "name": "yachat",
+  "version": "0.1.0",
+  "description": "Build, check, try and launch goal-oriented chat agents on your yachat server, scoped to the tenant your key belongs to.",
+  "author": { "name": "yachat" },
+  "license": "Apache-2.0"
+}

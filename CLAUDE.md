@@ -112,6 +112,7 @@ evals/           replay, personas, metrics (DeepEval catalogue + thresholds gate
 examples/        policies (support, booking, concierge, hiring, surveys, analyst, coach), data/, sim_script.yaml, contrib_tool/,
                  extensions/booking_caps (example tool, guardrail and channel package)
 frontend/        React test console (policy editor, chat, trace/state inspector, simulate, versions, channels, results, handoff inbox)
+plugins/yachat/  Claude Code plugin (.mcp.json → /mcp, build-agent skill); .claude-plugin/marketplace.json lists it
 docs/            DEVELOPER_GUIDE.md, ARCHITECTURE.md, WRITING_AN_AGENT.md, ADDING_A_CAPABILITY.md, EVALS.md
 scripts/        dev.sh, knowledge.sh, analytics.sh, db.sh (docker compose Redis+Postgres); run.sh at the root;
                  Dockerfile, docker-compose.yml; deploy/sandbox (sandbox image)

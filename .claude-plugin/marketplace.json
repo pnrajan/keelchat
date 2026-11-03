@@ -1,0 +1,11 @@
+{
+  "name": "yachat",
+  "owner": { "name": "yachat" },
+  "plugins": [
+    {
+      "name": "yachat",
+      "source": "./plugins/yachat",
+      "description": "Build, check, try and launch goal-oriented chat agents on your yachat server, scoped to your tenant."
+    }
+  ]
+}
