@@ -10,7 +10,7 @@ git clone https://github.com/pnrajan/yachat && cd yachat
 cp .env.example .env            # a model provider key is required even for tests
 uv sync --all-extras
 uv run pre-commit install       # ruff + mypy on commit
-./run.sh                        # console, API and Knowledge Service
+./run.sh                        # console, API, Knowledge and Analytics Services
 ```
 
 ## Before opening a pull request
@@ -18,6 +18,7 @@ uv run pre-commit install       # ruff + mypy on commit
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run pytest                   # calls the model in .env; 3 workers; one automatic rerun per flaky test
+uv run pytest --offline         # no key: only the tests that don't call the model (CI runs this on forks)
 cd frontend && npm run build    # when the console changed
 uv run yachat evals run   # when a policy, prompt or example agent changed
 ```

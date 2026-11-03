@@ -108,7 +108,7 @@ Bot   I've passed this to a colleague with everything you've told me.           
 ```bash
 git clone https://github.com/pnrajan/yachat && cd yachat
 cp .env.example .env              # set YACHAT_LLM and the matching *_API_KEY
-uv sync --extra api
+uv sync --all-extras
 ./run.sh                          # console :5173, API :8000, Knowledge :8001, Analytics :8002
 ```
 
@@ -199,7 +199,7 @@ The runtime produces one channel-neutral message; each channel owns its own limi
 | **Voice in the browser** | the widget's microphone; speech-to-text and spoken replies through the `VOICE_*` models, or the browser's own |
 | **SMS** | splits to 160 characters and answers STOP before the pipeline runs. Post Twilio's form fields as the turn's `payload` |
 | **Slack** | renders blocks for lists. Post the Slack event as the turn's `payload` |
-| **Your own** | one class: see [Add a channel](#add-a-channel) |
+| **Your own** | one class: see [Add a channel](docs/ADDING_A_CAPABILITY.md#channel) |
 
 From your own webhook, open a session on that channel, then post the raw payload:
 
@@ -231,23 +231,20 @@ and the build checks that the name exists. `uv run yachat registry` lists everyt
 
 | I want to… | Guide |
 |---|---|
-| call my own code or API | [Add a tool](#add-a-tool) · [Register an HTTP endpoint](#register-an-http-endpoint-as-a-tool) |
-| use tools from an MCP server | [Connect an MCP server](#connect-an-mcp-server) |
-| add a custom step to a conversation | [Add a flow step](#add-a-flow-step) |
-| check or rewrite messages | [Add a guardrail](#add-a-guardrail) · [Add a pre-processor](#add-a-pre-processor) |
-| reach users on another platform | [Add a channel](#add-a-channel) |
-| ship my extensions as a package | [Package your extensions](#package-your-extensions) |
+| call my own code or API | [Add a tool](docs/ADDING_A_CAPABILITY.md#tool) · [Register an HTTP endpoint](docs/ADDING_A_CAPABILITY.md#http-endpoint-tool-registry-api) |
+| use tools from an MCP server | [Connect an MCP server](docs/ADDING_A_CAPABILITY.md#mcp-server) |
+| add a custom step to a conversation | [Add a flow step](docs/ADDING_A_CAPABILITY.md#node) |
+| check or rewrite messages | [Add a guardrail](docs/ADDING_A_CAPABILITY.md#guardrail) · [Add a pre-processor](docs/ADDING_A_CAPABILITY.md#pre-processor) |
+| reach users on another platform | [Add a channel](docs/ADDING_A_CAPABILITY.md#channel) |
+| ship my extensions as a package | [Make it discoverable](docs/ADDING_A_CAPABILITY.md#make-it-discoverable) · [Pass the contract suite](docs/ADDING_A_CAPABILITY.md#pass-the-contract-suite) |
 | control how much the model plans | [Orchestration and routing](#orchestration-and-routing) |
 | remember users, hand off, answer from docs or data | [Memory](#remember-things-between-conversations) · [Handoff](#hand-a-conversation-to-a-person) · [Documents](#answer-from-documents) · [Data](#answer-questions-about-data) |
 | check a bot before launch | [Test a bot](#test-a-bot) |
 
-### Add a tool
-
-A tool is an async function. Its type hints become the input and output JSON Schema; its docstring is what the model
-reads.
+A capability is one decorated function or class. For example, a tool: its type hints become the JSON Schema and its
+docstring is what the model reads.
 
 ```python
-# my_caps/tools.py
 from yachat.registry.core import tool
 
 
@@ -258,191 +255,10 @@ async def slot_search(service: str, day: str = "") -> dict[str, list[str]]:
 ```
 
 ```yaml
-tools: [slot_search]          # allowed for this agent; flow steps bring their own tools too
+tools: [slot_search]          # allowed for this agent
 ```
 
-- Raise `ToolError(name, kind, message)` on failure. The gateway retries `retries` times, then a circuit breaker
-  opens for that tool.
-- Anything that changes something (book, pay, submit) is an **action**, not a tool:
-  `@action("book_slot", by="candidate")` runs only from the user's explicit action, never from the model or planner.
-- Tool output goes into prompts as data, never as instructions.
-- Full example: [`examples/extensions/booking_caps/tools.py`](examples/extensions/booking_caps/tools.py).
-
-### Connect an MCP server
-
-No code. Every tool the server exposes is registered as `<alias>.<tool>` with the server's own schema, and runs
-through the same gateway.
-
-```bash
-YACHAT_MCP_SERVERS="crm=https://crm.example.com/mcp, time=npx -y @modelcontextprotocol/server-time"
-```
-
-```yaml
-tools: [crm.lookup_customer, time.get_current_time]
-```
-
-A target starting with `http` is a streamable-HTTP server; anything else is a command run over stdio. A server that
-is down at startup is logged and skipped. Tools the server marks destructive are treated as writes: never retried and
-never offered to the planner.
-
-yachat is also an MCP **server**: `/mcp` lets Claude and other MCP clients build, validate, save and try agents for the
-key's tenant.
-
-### Register an HTTP endpoint as a tool
-
-For tools that live in another service, register them at runtime. Each is visible only to that tenant's agents.
-
-```bash
-curl -X POST localhost:8000/v1/tenants/acme/tools -H 'content-type: application/json' -d '{
-  "name": "crm_lookup", "description": "Customer tier and open tickets.",
-  "url": "https://crm.acme.example/lookup",
-  "input_schema": {"type": "object", "properties": {"customer_id": {"type": "string"}}, "required": ["customer_id"]},
-  "timeout_s": 5, "retries": 1, "side_effects": "none"
-}'
-```
-
-The URL must resolve to a public address, and a registration passes the contract suite before it goes live.
-
-### Add a flow step
-
-A step (a "node") is a class. It asks for what it needs and validates answers in code; it says what the reply must
-achieve, and the model only phrases it. From the booking example
-([`steps.py`](examples/extensions/booking_caps/steps.py)):
-
-```python
-from yachat.capabilities.nodes.common import answers_for
-from yachat.registry.core import CapabilityConfig, Node, NodeResult, node
-
-ASK = ("slot", "Which of these times suits you? Reply with its number.", "the number or time of one listed slot")
-
-
-class PickSlotConfig(CapabilityConfig):
-    service_field: str = "service"
-    day_field: str = "preferred_day"
-
-
-@node("pick_slot", tools=["slot_search"], produces=["slot"])
-class PickSlot(Node[PickSlotConfig]):
-    """Offers the open appointment slots for the chosen service and day, and books the one the client picks."""
-
-    config_model = PickSlotConfig
-
-    async def act(self, ctx, config):
-        slots = ctx.state.data.get("slots", [])
-        if (picked := answers_for(ctx, "pick_slot").get("slot")) and (choice := match(picked, slots)):
-            return NodeResult(f"Booked: {choice}.", goal=f"Confirm the booking for {choice}.", outputs={"slot": choice}, complete=True)
-        res = await ctx.services.gateway.call("slot_search", {"service": ctx.state.fields[config.service_field], "day": ctx.state.fields[config.day_field]})
-        ctx.state.data["slots"] = res.data["slots"]
-        return NodeResult(ASK[1], goal="List the open times and ask which one suits them.", items=[{"title": s} for s in res.data["slots"]], ask=ASK)
-```
-
-```yaml
-flow:
-  - greet_consent
-  - form_fill: {fields: [{name: service, ...}, {name: preferred_day, ...}]}
-  - pick_slot: {service_field: service, day_field: preferred_day}
-```
-
-`produces` are the outputs that complete the step; `requires:` on a flow entry orders steps by those outputs. The
-built-in steps are `greet_consent`, `form_fill`, `survey`, `conversation_survey`, `knowledge`, `analytics`,
-`job_search`, `handoff` and `exit`. [`form_fill.py`](yachat/capabilities/nodes/form_fill.py) is a good one to read
-first.
-
-### Add a guardrail
-
-```python
-from yachat.registry.core import Guardrail, GuardResult, guardrail
-
-
-@guardrail("no_price_promises", stage="output")
-class NoPricePromises(Guardrail):
-    """Removes quoted prices from replies."""
-
-    async def check(self, text, ctx):
-        if "$" not in text:
-            return GuardResult()
-        return GuardResult(flagged=True, reason="price quoted", redacted=strip_prices(text))
-```
-
-```yaml
-guardrails: {input: [prompt_injection], output: [pii, no_price_promises]}
-```
-
-`prompt_injection` and `pii` always run. Input guardrails can stop a turn; output guardrails redact or replace the
-reply. Flagged turns are never written to memory. Full example:
-[`examples/extensions/booking_caps/guardrails.py`](examples/extensions/booking_caps/guardrails.py).
-
-### Add a pre-processor
-
-Runs in Understand, by `order`, before intents are read. The built-ins are receiver 10, opt-out 15, language 20,
-shorthand 30, entity normalisation 40 and input guardrails 50.
-
-```python
-from yachat.registry.core import PreProcessor, preprocessor
-
-
-@preprocessor("spam_filter", order=45)
-class SpamFilter(PreProcessor):
-    async def run(self, ctx):
-        if looks_like_spam(ctx.text):
-            ctx.short_circuit_with("I can't process that message.")  # skips straight to Respond
-        return ctx
-```
-
-### Add a channel
-
-A channel turns its platform's payload into an `InboundMessage`, and a reply into its own messages within its limits.
-
-```python
-from yachat.channels import CHANNELS
-from yachat.channels.base import Channel, split_text
-from yachat.runtime.context import ChannelMessage, InboundMessage
-
-
-class Telegram(Channel):
-    name = "telegram"
-
-    def normalize(self, payload):
-        m = payload["message"]
-        return InboundMessage(text=m.get("text", ""), channel="telegram", user_id=f"tg:{m['chat']['id']}", channel_message_id=str(m["message_id"]))
-
-    def render(self, message):
-        return [ChannelMessage(chunk) for chunk in split_text(message.text, 4096)]
-
-
-CHANNELS.setdefault("telegram", Telegram())
-```
-
-Open sessions with `"channel": "telegram"` and post the raw update as the turn's `payload`; your webhook sends the
-rendered messages back. Override `compliance()` for opt-out words the platform requires (see `channels/sms.py`). Full
-example: [`examples/extensions/booking_caps/telegram.py`](examples/extensions/booking_caps/telegram.py).
-
-### Package your extensions
-
-Any of the above can live outside this repo:
-
-```bash
-YACHAT_CAPABILITY_PACKAGES=my_caps        # every module under my_caps is imported at startup and at build
-```
-
-Or, for a pip-installable package, declare an entry point ([`examples/contrib_tool`](examples/contrib_tool) is the
-template):
-
-```toml
-[project.entry-points."yachat.capabilities"]
-slot_search = "my_caps.tools:register"
-```
-
-Then prove it with the contract suite, which `tests/test_registry.py` runs over everything registered:
-
-```python
-from yachat.registry.contract import check_capability
-
-await check_capability("tool", "slot_search", fake_impl)  # schemas, a fake call, the timeout, no sockets outside the gateway
-```
-
-Every option (datasets, repairs, verified reasoning, reply checks) is in
-[`docs/ADDING_A_CAPABILITY.md`](docs/ADDING_A_CAPABILITY.md).
+The [booking extension package](examples/extensions/booking_caps) has a working tool, step, guardrail and channel.
 
 ### Orchestration and routing
 
@@ -660,28 +476,8 @@ One image serves the API (with the console), the Knowledge Service or the Analyt
 picks which (`deploy/entrypoint.sh`). It runs as a non-root user and exposes `/health`. `docker-compose.yml` runs
 Redis, Postgres and an optional LiteLLM gateway next to it.
 
-<details>
-<summary><b>Project layout</b></summary>
-
-```
-yachat/
-  policy/        the YAML format: models, loader, validator, compiler, JSON Schema, drafter
-  registry/      @tool/@action/@node/@guardrail/@preprocessor, discovery, contract suite, MCP, HTTP tools
-  runtime/       pipeline, Understand/Decide/Respond, LLM clients, Tool Gateway, planner, audit, usage, findings
-  capabilities/  built-in tools, steps, guardrails and pre-processors
-  channels/      web, SMS, Slack, WhatsApp (and the Cloud API client)
-  state/         ports with in-memory versions; Redis, Postgres, S3 artifacts, mem0, the Iceberg archive
-  knowledge/     chunking, embeddings, LanceDB index, the Knowledge Service
-  analytics/     DuckDB, SQL, code agent, sandbox, the Analytics Service
-  datasets/ reasoning/ sim/ testing/ voice.py
-  api/           FastAPI app, public chat routes, widget assets, API keys, MCP server
-frontend/        the test console
-examples/        policies and extension packages
-evals/           replay sets and personas
-docs/            ARCHITECTURE, WRITING_AN_AGENT, ADDING_A_CAPABILITY, DEVELOPER_GUIDE, EVALS
-```
-
-</details>
+Where the code lives: the structure map in [`CLAUDE.md`](CLAUDE.md#4-structure), or by task in
+[`DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md#where-things-live).
 
 ## Troubleshooting
 
@@ -710,15 +506,9 @@ Every log line carries `session_id`, so `grep <session_id>` follows one conversa
 
 ## Contributing
 
-Contributions are welcome. Before opening a pull request:
-
-```bash
-uv run pytest && uv run ruff check . && uv run mypy      # tests call the real model configured in .env
-cd frontend && npm run build                              # when the console changed
-```
-
-New capabilities must also pass `tests/test_registry.py`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the
-[code of conduct](CODE_OF_CONDUCT.md).
+Contributions are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the setup, the checks to run before a pull
+request, and the review rules. Tests call the model in `.env`; without a key, `uv run pytest --offline` runs the tests
+that don't need one. Please follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Security
 

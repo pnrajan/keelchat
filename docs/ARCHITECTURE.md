@@ -91,8 +91,9 @@ metadata}`. Two clients: the Anthropic SDK (`AnthropicLLMClient`) and `LiteLLMCl
 anything else litellm routes. `runtime/llm_factory.py:llm_from_env` chooses from `YACHAT_LLM`; a selected
 provider with a missing key raises. Routing is layered by environment: direct provider, a LiteLLM gateway
 (`LITELLM_PROXY_URL`, owns fallbacks, retries, cost logging), or a Headroom proxy in front of it (`HEADROOM_PROXY_URL`,
-context compression). Model tiers are pinned per build in `CompiledPolicy.models` and honoured per session. Two model roles: `classify` (intent, validation, verification, planning steps) and
-`generate` (replies, knowledge answers, planner drafts). There is no fake model anywhere: tests, simulations and
+context compression). Model tiers are pinned per build in `CompiledPolicy.models` and honoured per session. Three model roles: `classify` (intent, validation, planning steps, the planner's grounding check),
+`generate` (replies, knowledge answers, planner drafts) and `verify` (reply and reasoning checks; the generate model
+when `YACHAT_MODEL_VERIFY` is unset). There is no fake model anywhere: tests, simulations and
 evals call the configured provider.
 
 ## 5. Knowledge Service

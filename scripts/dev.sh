@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ -f .env ] || echo "note: no .env found; YACHAT_LLM and the provider key must be exported" >&2
-uv sync -q
+uv sync -q --inexact   # keep extras installed earlier (uv sync --all-extras); plain sync would remove them
 export YACHAT_SYNCED=1
 [ -d frontend/node_modules ] || (cd frontend && npm install --silent)
 
