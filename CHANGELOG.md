@@ -5,6 +5,10 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 ## [Unreleased]
 
 ### Added
+- `rules:` on an agent or a flow step: plain-language `when` / `then` rules matched per turn (with quoted evidence
+  checked in code), `overrides` for conflicts, audit records and console display.
+- `model: small | large` and `high_stakes` per step: run a step on one model tier, or write and always check its reply
+  with the large model.
 - `from yachat import tool, node, ...`: the extension API in one import; `py.typed` so installed yachat exposes its types.
 - `yachat new agent|package <name>`: starter files that build and pass the contract suite.
 - `pytest --offline`: runs the tests that don't need a model when no key is set; CI runs them on fork PRs.

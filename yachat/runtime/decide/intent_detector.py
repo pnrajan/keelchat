@@ -20,6 +20,7 @@ from yachat.capabilities.preprocessors.opt_out import CONFIRM_STOP, CONFIRM_STOP
 from yachat.logging import get_logger
 from yachat.registry.core import REGISTRY
 from yachat.runtime.context import AnswerVerdict, IntentItem, StageTrace, TurnContext
+from yachat.runtime.decide import rules
 from yachat.runtime.llm import LLMRequest
 from yachat.runtime.redaction import redact_pii
 from yachat.state.flow import StepGraph
@@ -82,7 +83,17 @@ def asks_wants_human(ctx: TurnContext) -> bool:
 
 
 def schema_for(ctx: TurnContext) -> dict[str, Any]:
-    extra = {"wants_to_stop": WANTS_TO_STOP, **({"wants_human": WANTS_HUMAN} if asks_wants_human(ctx) else {})}
+    extra: dict[str, Any] = {"wants_to_stop": WANTS_TO_STOP, **({"wants_human": WANTS_HUMAN} if asks_wants_human(ctx) else {})}
+    if active := rules.active_rules(ctx):  # only agents with rules: other prompts and schemas stay as they are
+        extra["rules"] = {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string", "enum": [r.name for r in active]}, "quote": {"type": "string"}},
+                "required": ["name", "quote"],
+                "additionalProperties": False,
+            },
+        }
     return {**SCHEMA, "properties": {**SCHEMA["properties"], **extra}, "required": [*SCHEMA["required"], *extra]}
 
 
@@ -180,7 +191,8 @@ class IntentDetector:
     def _system(self, ctx: TurnContext) -> str:
         human = "\nSet wants_human only when the user asks to talk to a person rather than this assistant." if asks_wants_human(ctx) else ""
         stop = "\nSet wants_to_stop only when the user wants to end this conversation or stop all messages, not when they decline one question."
-        return self._task(ctx) + human + stop
+        active = rules.active_rules(ctx)
+        return self._task(ctx) + human + stop + (rules.prompt_section(active) if active else "")
 
     def _task(self, ctx: TurnContext) -> str:
         q = ctx.state.open_question
@@ -217,13 +229,15 @@ class IntentDetector:
         if msgs[0]["role"] != "user":
             msgs.insert(0, {"role": "user", "content": "(conversation start)"})
         q = ctx.state.open_question
+        step = rules.asking_step(ctx)
+        models = rules.tier(ctx.services.models, step.model if step else None)
         req = LLMRequest(
             "intent_detect",
-            ctx.services.models.classify,
+            models.classify,
             self._system(ctx),
             msgs,
             max_tokens=400,
-            effort=ctx.services.models.effort_classify,
+            effort=models.effort_classify,
             metadata={
                 "open_field": q.field if q else None,
                 "open_fields": open_fields(ctx),
@@ -259,6 +273,10 @@ class IntentDetector:
         v.reason = str(out.get("reason", ""))
         v.wants_human = bool(out.get("wants_human"))
         v.wants_to_stop = bool(out.get("wants_to_stop"))
+        reported = [m for m in out.get("rules") or [] if isinstance(m, dict)]
+        ctx.rules = rules.resolve(rules.grounded(reported, ctx.text), rules.active_rules(ctx))
+        for r in ctx.rules:
+            ctx.decide("rule", r.name, reason=r.when[:120])
         return v
 
     async def run(self, ctx: TurnContext) -> TurnContext:

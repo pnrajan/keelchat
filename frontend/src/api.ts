@@ -8,6 +8,8 @@ export type TurnResponse = {
   tool_calls: number;
   duplicate: boolean;
   route: string | null;
+  /** policy rules that matched this turn */
+  rules?: string[];
 };
 
 export type ValidationError = { path: string; message: string };

@@ -15,7 +15,7 @@ from yachat.policy.defaults import DEFAULTS, Defaults
 from yachat.policy.errors import PolicyValidationError
 from yachat.policy.loader import load_policy
 from yachat.policy.memory_types import type_to_schema
-from yachat.policy.models import AgentPolicy, HandoffSpec, Mode
+from yachat.policy.models import AgentPolicy, HandoffSpec, Mode, Rule, Tier
 from yachat.policy.validator import resolve_repairs, resolved_requires, validate_policy
 from yachat.registry.core import REGISTRY
 
@@ -33,6 +33,11 @@ class CompiledStep(BaseModel):
     repairs: dict[str, int] = Field(default_factory=dict)
     #: phrased replies are checked before they are sent (node default, step override)
     verify: bool = True
+    #: rules that apply while this step is asking
+    rules: list[Rule] = Field(default_factory=list)
+    #: the model tier this step's work runs on; None: each job keeps its usual tier
+    model: Tier | None = None
+    high_stakes: bool = False
 
 
 class CompiledMemoryItem(BaseModel):
@@ -70,6 +75,8 @@ class CompiledPolicy(BaseModel):
     hash: str
     #: how the conversation is passed to a person; None: never
     handoff: HandoffSpec | None = None
+    #: rules that apply on every turn
+    rules: list[Rule] = Field(default_factory=list)
     compiled_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @property
@@ -146,6 +153,9 @@ def compile_policy(
                 produces=list(spec.produces),
                 repairs=resolve_repairs(spec.repairs, defaults, policy.limits.repairs, s.repairs),
                 verify=spec.verify if s.verify is None else s.verify,
+                rules=s.rules,
+                model=s.model,
+                high_stakes=s.high_stakes,
             )
         )
         for t in spec.tools:
@@ -198,13 +208,14 @@ def compile_policy(
         "charter": policy.charter,
         "languages": policy.languages,
         "mode": mode,
-        "steps": [s.model_dump(mode="json") for s in steps],
+        "steps": [_step_payload(s) for s in steps],
         "allowed_tools": tool_set,
         **({"datasets": sorted(used_datasets)} if used_datasets else {}),  # absent when unused: existing hashes stay stable
         "memory": [m.model_dump(mode="json") for m in memory],
         "defaults": resolved.model_dump(mode="json"),
         "manifest": used,
         **({"handoff": policy.handoff.model_dump(mode="json")} if policy.handoff else {}),  # absent when unused: hashes stay stable
+        **({"rules": [r.model_dump(mode="json") for r in policy.rules]} if policy.rules else {}),
     }
     return CompiledPolicy(
         agent=policy.agent,
@@ -221,7 +232,20 @@ def compile_policy(
         manifest_versions=used,
         hash=content_hash(payload),
         handoff=policy.handoff,
+        rules=policy.rules,
     )
+
+
+#: step fields added after policies were first pinned: in the hash only when set, so existing hashes stay stable
+_LATER_STEP_FIELDS: dict[str, Any] = {"rules": [], "model": None, "high_stakes": False}
+
+
+def _step_payload(s: CompiledStep) -> dict[str, Any]:
+    out = s.model_dump(mode="json")
+    for k, default in _LATER_STEP_FIELDS.items():
+        if out[k] == default:
+            del out[k]
+    return out
 
 
 def build(text: str, *, tenant: str = "default", datasets: Mapping[str, DatasetKind] | None = None) -> CompiledPolicy:

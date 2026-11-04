@@ -176,6 +176,30 @@ def validate_policy(
     for i, lang in enumerate(policy.languages):
         if not (2 <= len(lang) <= 3 and lang.isalpha() and lang.islower()):
             errors.append(PolicyError(f"languages[{i}]", f"expected an ISO 639 code like 'en', got {lang!r}"))
+    errors += _rule_errors(policy)
+    return errors
+
+
+def _rule_errors(policy: AgentPolicy) -> list[PolicyError]:
+    """Rule names are unique across the agent and its steps; `overrides` names known rules and forms no cycle."""
+    located = [(f"rules[{i}]", r) for i, r in enumerate(policy.rules)] + [
+        (f"flow[{i}].{s.name}.rules[{j}]", r) for i, s in enumerate(policy.flow or []) for j, r in enumerate(s.rules)
+    ]
+    errors: list[PolicyError] = []
+    seen: set[str] = set()
+    for path, r in located:
+        if r.name in seen:
+            errors.append(PolicyError(f"{path}.name", f"duplicate rule {r.name!r}"))
+        seen.add(r.name)
+    for path, r in located:
+        for k, other in enumerate(r.overrides):
+            if other == r.name:
+                errors.append(PolicyError(f"{path}.overrides[{k}]", "a rule cannot override itself"))
+            elif other not in seen:
+                errors.append(PolicyError(f"{path}.overrides[{k}]", _unknown("rule", other, sorted(seen))))
+    graph = {r.name: [o for o in r.overrides if o in seen and o != r.name] for _, r in located}
+    if cycle := _find_cycle(graph):
+        errors.append(PolicyError("rules", f"overrides form a cycle: {' -> '.join(cycle)}"))
     return errors
 
 

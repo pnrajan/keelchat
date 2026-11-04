@@ -134,6 +134,53 @@ memory:
 - `mode: adaptive` lets a multi-step question ("which pays more and is closer?") run the planner inside a step; use
   `flow` when the domain is regulated and every reply must come from a step.
 
+### Rules: what to do in a particular situation
+
+The charter is always on. A rule applies only to the messages it fits, so the bot can carry many of them without a
+long prompt. Put rules on the agent (any turn) or on a step (only while that step is asking):
+
+```yaml
+rules:
+  - name: damaged_item
+    when: the customer says an item arrived damaged or broken
+    then: say a free replacement can be sent
+flow:
+  - form_fill:
+      rules:
+        - name: po_number
+          when: the customer gives a purchase order (PO) number instead of an order number
+          then: explain that the order number is in the confirmation email
+          overrides: [damaged_item]   # when both match, only this one applies
+      fields: [...]
+```
+
+- Each turn, the intent detector checks the active rules in the same call that reads the message, and must quote the
+  words of the latest message that meet each one; a match it cannot quote is dropped in code. So an earlier message
+  never makes a rule fire again.
+- Matched rules join the reply's instructions, and the reply checker treats what they ask for as approved. A turn with a
+  matched rule gets one extra rewrite before the plain version is sent.
+- `overrides` settles conflicts in code. Names are unique across the agent and its steps; the build rejects unknown
+  names and cycles.
+- Every match is an audit record (`kind: rule`) and appears in the console's turn details.
+- Write `when` about the customer's message, not the conversation ("asks for a refund amount", not "is unhappy").
+
+### Which model each step uses
+
+A step's work (reading the message, checking answers, writing the reply) runs on the tiers you configure
+(`YACHAT_MODEL_CLASSIFY`, `YACHAT_MODEL_GENERATE`). Change it per step by how much the step needs:
+
+```yaml
+flow:
+  - greet_consent: {model: small}     # simple: everything on the small, cheaper model
+  - claims_review: {model: large}     # nuanced: everything on the large model
+  - refund_decision: {high_stakes: true}
+```
+
+- `model: small | large` puts all of the step's jobs on one tier.
+- `high_stakes: true` on a step, or on a rule that matched, writes that turn's reply with the large model and always
+  checks it before it is sent.
+- A tenant whose plan allows only small models stays on small models.
+
 ## 6. Languages
 
 List the languages you can support end to end (prompts, tool output, human handoff). The runtime detects the

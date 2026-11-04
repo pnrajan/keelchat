@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 from yachat.capabilities.nodes.handoff import HANDED_OFF, may_hand_off
 from yachat.logging import get_logger
 from yachat.registry.core import REGISTRY, NodeResult
 from yachat.runtime.context import TurnContext
+from yachat.runtime.decide import rules
 from yachat.runtime.decide.intent_detector import DETECTOR_ERROR, GREETING_ONLY, ROUTE_NUDGE, ROUTE_PLANNER, ROUTE_REASK, step_fields
 from yachat.runtime.decide.planner import run_planner
 from yachat.runtime.understand.language_rules import NAMES
@@ -36,6 +38,8 @@ def system_prompt(ctx: TurnContext) -> str:
     public = [f"{m.item}: {m.value}" for m in ctx.memory if not m.sensitive]
     if public:
         parts.append("Known about the user: " + "; ".join(public))
+    if ctx.rules:
+        parts.append(rules.instructions(ctx.rules))
     return "\n".join(parts)
 
 
@@ -53,6 +57,8 @@ class Orchestrator:
         spec = REGISTRY.node(name)
         settings = ctx.policy.step(name).settings if any(s.name == name for s in ctx.policy.steps) else {}
         cfg = spec.config_model.model_validate(settings)
+        services = ctx.services
+        ctx.services = replace(services, models=rules.models_for(ctx, name))  # the step's tier, while it acts
         try:
             return await asyncio.wait_for(spec.cls().act(ctx, cfg), timeout=spec.cls.timeout_s)
         except Exception as e:  # isolation: a failing node yields a graceful reply
@@ -60,6 +66,8 @@ class Orchestrator:
             ctx.errors.append(f"node {name}: {e.__class__.__name__}")
             q = ctx.state.open_question
             return NodeResult("Something went wrong on my side. " + (q.ask if q else "Let's try again."))
+        finally:
+            ctx.services = services
 
     def _apply(self, ctx: TurnContext, graph: StepGraph, name: str, r: NodeResult) -> None:
         st = ctx.state

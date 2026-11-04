@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, AuditEvent, AuditSummary } from "./api";
 
-const KINDS = ["", "turn", "answer", "count", "step", "exit", "handoff", "guardrail", "tool"];
+const KINDS = ["", "turn", "answer", "count", "step", "exit", "handoff", "guardrail", "tool", "rule"];
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const top = (m: Record<string, number>) => Object.entries(m).sort((a, b) => b[1] - a[1]);
 

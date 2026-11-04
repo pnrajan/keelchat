@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -87,6 +87,8 @@ class TurnResult:
     tool_calls: int
     duplicate: bool = False
     route: str | None = None
+    #: names of the policy rules that matched this turn
+    rules: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -99,6 +101,7 @@ class TurnResult:
             "tool_calls": self.tool_calls,
             "duplicate": self.duplicate,
             "route": self.route,
+            "rules": self.rules,
         }
 
 
@@ -419,7 +422,10 @@ class Runtime:
                 task.add_done_callback(self._tasks.discard)
             log.info("turn done", llm_calls=ctx.llm_calls, tool_calls=ctx.tool_calls, route=ctx.route, exit_reason=ctx.exit_reason)
         assert ctx.outbound is not None
-        return TurnResult(ctx.turn_id, ctx.outbound, ctx.rendered, ctx.trace, ctx.state, ctx.errors, ctx.llm_calls, ctx.tool_calls, route=ctx.route)
+        matched = [r.name for r in ctx.rules]
+        return TurnResult(
+            ctx.turn_id, ctx.outbound, ctx.rendered, ctx.trace, ctx.state, ctx.errors, ctx.llm_calls, ctx.tool_calls, route=ctx.route, rules=matched
+        )
 
     async def _record(self, ctx: TurnContext, before: SessionState, ms: float, calls: list[Usage]) -> None:
         """Store the turn's decisions. A failed write is logged and counted; it never fails the user's turn."""
