@@ -43,7 +43,7 @@ components and contracts.
 | Registry extras | `yachat/registry/mcp.py`, `tenant_tools.py` | MCP servers' tools (`<alias>.<tool>`) and tenant-registered HTTP tools, both behind the Tool Gateway |
 | Knowledge | `yachat/knowledge/` | document store, embedder, vector index, indexing strategies, `KnowledgeService`, and its HTTP API |
 | API | `yachat/api/app.py` | FastAPI surface over the runtime; serves the built console |
-| Evals | `evals/` | replay sets, personas, DeepEval metric catalogue, thresholds gate, online outcome split |
+| Evals | `yachat/evals/`, sets in `evals/<agent>/` | replay sets (scripts and played personas) on the simulator's engine, DeepEval and Ragas metrics, rule checks, thresholds gate, online outcome split |
 | Console | `frontend/` | React test console: policy editor, chat, trace and state inspector |
 
 ## 2. The policy is the only product surface
@@ -187,8 +187,9 @@ fake backends for tools that have no URL.
   and stores, 3 workers in parallel (provider rate limits). `tests/helpers.py:RecordingLLM` records every request so tests assert on what the
   runtime asked (purpose, metadata, allowed tools), never on canned answers. The contract suite
   (`registry/contract.py`) is what a capability from another team must pass.
-- `evals/`: replay sets per agent with structural expectations, personas, DeepEval metrics with a litellm judge, a
-  thresholds gate for CI, and an online outcome split for production sessions. See `EVALS.md`.
+- `yachat/evals/` (sets in `evals/<agent>/`): replay sets of scripts and model-played personas, run on the simulator's
+  engine, with expectations checked in code; DeepEval, Ragas and rule metrics with a litellm judge; a thresholds gate
+  for CI; and an online outcome split for production sessions. See `EVALS.md`.
 
 ## 9. Extending
 

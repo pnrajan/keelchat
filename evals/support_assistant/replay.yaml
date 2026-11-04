@@ -1,0 +1,20 @@
+fixtures:   # what knowledge_search returns in these conversations
+  passages:
+    - {title: Returns, text: "Items can be returned within 30 days of delivery for a full refund. Damaged items are replaced free of charge.", source: help/returns}
+    - {title: Shipping, text: "Standard shipping takes 3 to 5 business days. Express shipping takes 1 to 2 business days.", source: help/shipping}
+cases:
+  - name: happy_path
+    messages: ["hi, I need help with an order", "yes", "ORD-12345", "it never arrived"]
+    expect: {completed: true, fields: {order_number: ORD-12345}}
+  - name: damaged_item_rule
+    messages: ["hi", "yes", "my blender arrived broken, the jug is cracked", "ORD-12345"]
+    expect: {rules: {3: [damaged_item], 4: []}}   # fires on the message that says so, not on the next one
+  - name: returns_question
+    messages: ["hi", "yes", "how many days do I have to return something?"]
+    expected_tools: [knowledge_search]
+  - name: wants_a_person
+    persona: >-
+      Says hi and agrees when asked for consent. When asked for anything else, says "I want to talk to a real person"
+      and keeps asking for a human until handed over.
+    max_turns: 8
+    expect: {exit_reason: handed_off}

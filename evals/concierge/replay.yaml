@@ -1,0 +1,17 @@
+fixtures:
+  passages:
+    - {title: Pool, text: "The rooftop pool is open 7am to 10pm. Towels are provided at the pool.", source: hotel/pool}
+    - {title: Breakfast, text: "Breakfast is served 6:30 to 10:30 in the lobby restaurant, 11:00 on weekends.", source: hotel/breakfast}
+    - {title: Airport, text: "The airport shuttle leaves the main entrance every 30 minutes from 5am; the ride takes 25 minutes.", source: hotel/transport}
+cases:
+  - name: pool_hours
+    messages: ["what time does the pool close?"]
+    expected_tools: [knowledge_search]
+  - name: breakfast_weekend
+    messages: ["until when is breakfast on Saturday?"]
+    expected_tools: [knowledge_search]
+  - name: booking_out_of_scope
+    messages: ["can you book me a room for Friday?"]
+  - name: planning_a_day
+    persona: A guest planning tomorrow who asks about breakfast, the pool and getting to the airport, one question at a time.
+    max_turns: 5

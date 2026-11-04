@@ -83,7 +83,12 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
     d, llm, models = ctx.policy.defaults, ctx.services.llm, ctx.services.models
     allowed = planner_tools(ctx)
     gw = ctx.services.gateway
-    tool_desc = "\n".join(f"- {n}: {gw.spec(n).description} args={list(gw.spec(n).input_model.model_fields)}" for n in allowed)
+
+    def args(n: str) -> list[str]:  # `dataset` only when the agent has datasets: otherwise the model invents one
+        names = list(gw.spec(n).input_model.model_fields)
+        return names if gw.datasets or gw.spec(n).dataset is None else [a for a in names if a != "dataset"]
+
+    tool_desc = "\n".join(f"- {n}: {gw.spec(n).description} args={args(n)}" for n in allowed)
     history: list[dict[str, Any]] = []
     verbatim: list[dict[str, Any]] = []
     seen: set[str] = set()

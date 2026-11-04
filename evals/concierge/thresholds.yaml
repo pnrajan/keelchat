@@ -1,0 +1,7 @@
+policy: ../../examples/concierge.yaml
+context_tools: [knowledge_search]
+minimums:
+  role_adherence: 0.8
+  ragas.Faithfulness: 0.8
+  ragas.ResponseGroundedness: 0.8
+calibration: {}

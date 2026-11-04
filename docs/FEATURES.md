@@ -120,7 +120,7 @@ answer is planned, checked and verified before it is shown; one that fails is ma
 
 ```bash
 uv run yachat simulate examples/hiring_agent.yaml examples/sim_script.yaml   # scripted conversations
-uv run yachat evals run evals/hiring_agent                                    # replay sets, personas, judged metrics
+uv run yachat evals run evals/support_assistant                               # scripts, played personas, rule and Ragas scores
 ```
 
 The console's **Simulate** tab plays model-driven personas against a policy on fake tools. For surveys,
