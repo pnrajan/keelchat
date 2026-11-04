@@ -151,6 +151,16 @@ class DatasetDB:
         db._seal()
         return db
 
+    @classmethod
+    def adopt(cls, con: duckdb.DuckDBPyConnection, tables: list[tuple[str, str, dict[str, str]]]) -> DatasetDB:
+        """A connection whose tables are already loaded: (name, description, column notes) each; locked the same way."""
+        db = cls.__new__(cls)
+        db.dataset, db.con, db.tables = None, con, []
+        for name, description, notes in tables:
+            db._describe(name, description, notes)
+        db._seal()
+        return db
+
     def _open(self, memory_limit: str | None, threads: int | None) -> None:
         self.con = duckdb.connect(":memory:")
         self.con.execute(f"SET memory_limit={_literal(memory_limit or os.getenv('ANALYTICS_MEMORY_LIMIT') or '2GB')}")

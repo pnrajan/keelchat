@@ -158,10 +158,6 @@ class MetricsQuestionIn(Body):
     agent: str | None = None
 
 
-#: records read for one summary; a longer window is summarized from the newest ones and marked truncated
-SUMMARY_LIMIT = 50_000
-
-
 class TurnIn(Body):
     text: str | None = Field(default=None, max_length=8_000)
     channel_message_id: str | None = None
@@ -913,12 +909,23 @@ def create_app(
         events = await rt.audit.query(tenant, agent=agent, session_id=session_id, kinds=kind, since=since, until=until, limit=limit)
         return [e.model_dump(mode="json") for e in events]
 
+    @asynccontextmanager
+    async def audit_window(
+        tenant: str, since: datetime, until: datetime | None = None, *, agent: str | None = None, kinds: list[AuditKind] | None = None
+    ) -> AsyncIterator[Any]:
+        """The tenant's records in [since, until) in a private DuckDB (`audit_db`), closed afterwards."""
+        db = await audit_db(rt.audit, tenant, since, until, agent=agent, kinds=kinds)
+        try:
+            yield db
+        finally:
+            db.close()
+
     @app.get("/v1/tenants/{tenant}/audit/summary")
     async def audit_summary(tenant: TenantId, agent: str | None = None, since: datetime | None = None, until: datetime | None = None) -> dict[str, Any]:
         """Outcomes over a window: completion and handoff rates, why conversations go to a person, which questions
         fail, guardrail blocks and tool failures."""
-        events = await rt.audit.query(tenant, agent=agent, since=since, until=until, limit=SUMMARY_LIMIT)
-        return summarize(events, since, until, truncated=len(events) >= SUMMARY_LIMIT).model_dump(mode="json")
+        async with audit_window(tenant, since or datetime(1970, 1, 1, tzinfo=UTC), until, agent=agent) as db:  # no since: every record kept
+            return (await asyncio.to_thread(summarize, db, since, until)).model_dump(mode="json")
 
     @app.get("/v1/tenants/{tenant}/dashboard")
     async def outcome_dashboard(tenant: TenantId, days: Annotated[int, Query(ge=1, le=90)] = 30, agent: str | None = None) -> dict[str, Any]:
@@ -926,21 +933,9 @@ def create_app(
         dropped, latency percentiles, model calls and errors per turn, and how fast people pick up handoffs."""
         until = datetime.now(UTC)
         since = (until - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        events = await rt.audit.query(tenant, agent=agent, since=since, limit=SUMMARY_LIMIT)
         open_n = len(await rt.handoffs.list(tenant, status="open", agent=agent, limit=500))
-        return dashboard(events, since, until, open_n, truncated=len(events) >= SUMMARY_LIMIT).model_dump(mode="json")
-
-    @asynccontextmanager
-    async def audit_window(tenant: str, since: datetime, *, agent: str | None = None, kinds: list[AuditKind] | None = None) -> AsyncIterator[Any]:
-        """The tenant's records since `since` in a private DuckDB (`audit_db`), closed afterwards."""
-        try:
-            db = await audit_db(rt.audit, tenant, since, agent=agent, kinds=kinds)
-        except ImportError as e:  # duckdb is in the api extra
-            raise HTTPException(501, "dashboards need DuckDB: uv sync --extra api") from e
-        try:
-            yield db
-        finally:
-            db.close()
+        async with audit_window(tenant, since, agent=agent) as db:
+            return (await asyncio.to_thread(dashboard, db, since, until, open_n)).model_dump(mode="json")
 
     @app.get("/v1/tenants/{tenant}/usage")
     async def usage(tenant: TenantId, days: Annotated[int, Query(ge=1, le=90)] = 30, agent: str | None = None) -> dict[str, Any]:
@@ -1037,24 +1032,27 @@ def create_app(
         """This tenant's audit records for the window, as locked read-only DuckDB tables."""
         try:
             from yachat.analytics.workspace_metrics import metrics_db
-        except ImportError as e:  # duckdb / pandas are in the analytics extra
+        except ImportError as e:  # vanna / pandas are in the analytics extra
             raise HTTPException(501, "key metrics need the analytics extra: uv sync --extra analytics") from e
         until = datetime.now(UTC)
         since = (until - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        events = await rt.audit.query(tenant, agent=agent, since=since, limit=SUMMARY_LIMIT)
-        return await asyncio.to_thread(metrics_db, events), len(events) >= SUMMARY_LIMIT
+        con = await audit_db(rt.audit, tenant, since, agent=agent)
+        try:
+            return await asyncio.to_thread(metrics_db, con)
+        except BaseException:
+            con.close()
+            raise
 
     @app.get("/v1/tenants/{tenant}/metrics")
     async def workspace_metrics(tenant: TenantId, days: Annotated[int, Query(ge=1, le=90)] = 30, agent: str | None = None) -> dict[str, Any]:
         """This workspace's key metrics, each with its SQL, and the tables a question can be asked against."""
         from yachat.analytics.workspace_metrics import key_metrics
 
-        db, truncated = await workspace_db(tenant, days, agent)
+        db = await workspace_db(tenant, days, agent)
         try:
             values = await key_metrics(db)
             return {
                 "days": days,
-                "truncated": truncated,
                 "metrics": [
                     {"name": m.name, "label": m.label, "unit": m.unit, "description": m.description, "sql": m.sql, "value": v.value}
                     for v in values
@@ -1072,7 +1070,7 @@ def create_app(
         from yachat.analytics.duck import AnalyticsError
         from yachat.analytics.workspace_metrics import ask
 
-        db, truncated = await workspace_db(tenant, body.days, body.agent)
+        db = await workspace_db(tenant, body.days, body.agent)
         try:
             async with spending(tenant) as models:
                 a = await ask(db, rt.llm, models.generate, body.question)
@@ -1091,7 +1089,6 @@ def create_app(
             "columns": [c.name for c in a.columns],
             "rows": a.rows,
             "truncated": a.truncated,
-            "window_truncated": truncated,
             "attempts": a.attempts,
         }
 

@@ -106,7 +106,9 @@ Dashboards add up in DuckDB, not in Python. `runtime/audit.py:audit_db` loads on
 in-memory DuckDB table through the audit store port (`AuditStore.copy_to`, every field but the words people wrote):
 Postgres streams it out with `COPY`, the Iceberg archive is read by DuckDB straight from its Parquet files on S3
 (only that tenant's day partitions), and the in-memory store inserts its rows. With the archive on, records before its
-cursor come from the archive and the rest from Postgres, so each is counted once. The reports are SQL over that table.
+cursor come from the archive and the rest from Postgres, so each is counted once. The cost page, the outcome dashboard,
+the audit summary and the key metrics are SQL over that table; for key-metric questions the five tables are built from
+it in SQL, `audit` is dropped and the database is locked before the model's query runs.
 
 ## 5. Knowledge Service
 
