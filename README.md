@@ -28,7 +28,7 @@ One runtime runs every bot, with the counting, safety checks and channel rules i
 - [How it works](#how-it-works)
 - [How-to guides](#how-to-guides): tools, MCP, flow steps, guardrails, channels, routing, memory, handoff, testing
 - [Use with Claude](#use-with-claude): the plugin, any MCP client, and Claude Code in this repo
-- [Reference](#reference): CLI, HTTP API, keys, model routing, configuration
+- [Reference](#reference): CLI, HTTP API, keys, model routing, dashboards, configuration
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
 - [Documentation](#documentation) · [Contributing](#contributing) · [Security](#security) · [License](#license)
@@ -473,6 +473,22 @@ time and cost, and summed by model, purpose, agent and day on the console's **Se
 - Prices come from `YACHAT_MODEL_PRICES`, then the gateway, then OpenRouter's public list, then litellm's.
 - A model client you write yourself gets all of this by decorating its provider call with `@metered`
   ([`runtime/usage.py`](yachat/runtime/usage.py)).
+
+### Dashboards and long-term metrics
+
+Every model call, turn, answer, exit and handoff is an audit record. The dashboards (cost, outcomes, the audit
+summary and key metrics) add those records up in **DuckDB** over the whole window you ask for; there is no row cap.
+
+| Where records are | How the dashboards read them | Set |
+|---|---|---|
+| In memory | inserted into DuckDB | nothing (development, tests) |
+| Postgres (recent) | `COPY` of one tenant's window into DuckDB | `DATABASE_URL` |
+| S3 archive (older) | DuckDB reads the Iceberg table's Parquet files on S3 directly, only that tenant's days | `AUDIT_ARCHIVE_WAREHOUSE=s3://bucket/prefix` |
+
+With the archive on, records are copied to S3 daily. Postgres keeps the last 7 days, the archive keeps everything
+up to `AUDIT_RETENTION_DAYS`, and each dashboard reads older days from S3 and recent ones from Postgres, counting
+each record once. S3 credentials come from the usual AWS variables (`AWS_ENDPOINT_URL_S3` for MinIO). Athena,
+Spark, Trino or your own DuckDB can read the same table. How it works: [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ### Configuration
 
