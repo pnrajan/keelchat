@@ -27,6 +27,7 @@ dependencies = [
     "sentry-sdk[fastapi]>=2.20",
     "mcp>=1.0", # the API serves /mcp, so the server cannot start without it
     "pyjwt[crypto]>=2.8", # scoped API tokens (yachat/api/keys)
+    "duckdb>=1.1", # the dashboards add up audit records in DuckDB (runtime/audit.py:audit_db)
 ]
 
 [project.optional-dependencies]

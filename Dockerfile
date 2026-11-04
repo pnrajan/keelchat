@@ -26,6 +26,9 @@ COPY yachat yachat
 COPY examples examples
 COPY README.md LICENSE ./
 RUN uv sync --frozen --no-dev $(for e in $EXTRAS; do printf -- "--extra %s " "$e"; done) && rm -rf /bin/uv /bin/uvx /root/.cache/uv
+# with the Iceberg audit archive, the dashboards' DuckDB reads it on S3: install its extensions now, not at runtime
+ENV YACHAT_DUCKDB_EXTENSIONS=/opt/duckdb-extensions
+RUN case " $EXTRAS " in *" audit "*) /app/.venv/bin/python -c "import duckdb, os; c = duckdb.connect(config={'extension_directory': os.environ['YACHAT_DUCKDB_EXTENSIONS']}); [c.install_extension(e) for e in ('iceberg', 'avro', 'httpfs', 'aws')]";; esac
 COPY --from=ui /ui/dist frontend/dist
 COPY deploy/entrypoint.sh /entrypoint.sh
 # the app only writes to /data; /app stays root-owned and readable (chown -R /app would copy every installed file into a new layer)

@@ -83,7 +83,7 @@ export type AuditEvent = {
 export type AuditSummary = {
   sessions: number; turns: number; outcomes: Record<string, number>; completion_rate: number; handoff_rate: number;
   handoff_reasons: Record<string, number>; handoff_actions: Record<string, number>; rejected_answers: Record<string, number>;
-  guardrails: Record<string, number>; tool_failures: Record<string, number>; truncated: boolean;
+  guardrails: Record<string, number>; tool_failures: Record<string, number>;
 };
 
 export type ModelOption = { model: string; name: string; input_per_mtok: number; output_per_mtok: number; context: number; cost_usd: number; saving: number | null };
@@ -132,8 +132,8 @@ export type AggregatesRec = {
 };
 export type FindingsRec = { agent: string; respondents: number; completed: number; days: number; questions: { key: string; prompt: string; kind: string; n_asked: number; counts: { key: string; label: string; n: number; share: number }[]; mean: number | null; median: number | null; nps: number | null; themes: { theme: string; summary: string; n: number; quotes: { response_id: string; text: string }[] }[]; themes_error: string }[] };
 export type KeyMetric = { name: string; label: string; unit: "count" | "rate" | "ms" | "usd" | "minutes" | "number"; description: string; sql: string; value: number | null };
-export type WorkspaceMetrics = { days: number; truncated: boolean; metrics: KeyMetric[]; tables: { name: string; rows: number; description: string; columns: string[] }[] };
-export type MetricsAnswer = { question: string; sql: string; columns: string[]; rows: unknown[][]; truncated: boolean; window_truncated: boolean; attempts: number };
+export type WorkspaceMetrics = { days: number; metrics: KeyMetric[]; tables: { name: string; rows: number; description: string; columns: string[] }[] };
+export type MetricsAnswer = { question: string; sql: string; columns: string[]; rows: unknown[][]; truncated: boolean; attempts: number };
 
 export type Dashboard = {
   since: string; until: string; summary: AuditSummary; p50_ms: number | null; p95_ms: number | null; llm_calls_per_turn: number; error_rate: number;

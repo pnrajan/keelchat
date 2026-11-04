@@ -12,6 +12,9 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 - Cost behind a LiteLLM gateway is that of the routed model (or the gateway's own cost), not unknown; Headroom's saved
   tokens are recorded and shown on the cost page.
 - The Analytics Service returns its model calls with each answer; they count toward the turn that asked.
+- Dashboards add up in DuckDB over the whole window: Postgres by `COPY`, the Iceberg archive read by DuckDB straight
+  from S3. The cost page, outcome dashboard, audit summary and key metrics no longer stop at the newest 50,000 records.
+  DuckDB is now a core dependency.
 
 ### Fixed
 - `./run.sh` no longer uninstalls extras installed with `uv sync --all-extras`.
