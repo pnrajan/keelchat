@@ -32,7 +32,6 @@ class LiteLLMClient(LLMClient):
             return await self._call_untraced(req, **extra)
 
     async def _call_untraced(self, req: LLMRequest, **extra: Any) -> Any:
-
         from yachat.runtime.llm_factory import litellm_settings  # per-request: generate and classify may be different providers
 
         settings = litellm_settings(req.model)

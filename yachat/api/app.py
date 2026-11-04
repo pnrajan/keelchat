@@ -1213,7 +1213,6 @@ def create_app(
         return embed_view(e, request)
 
     async def survey_questions(tenant: str, agent: str) -> list[SurveyQuestion]:
-
         policy = await rt.policies.latest(agent, tenant)
         if policy is None:
             raise NotFound(f"no policy for agent {agent!r}")
