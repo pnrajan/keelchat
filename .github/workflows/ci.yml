@@ -7,8 +7,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
         with: {python-version: "3.12"}
       - run: uv sync --all-extras --frozen
       - run: uv run ruff check .
@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: frontend}}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: {node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json}
       - run: npm ci
       - run: npm run build
@@ -36,8 +36,8 @@ jobs:
       YACHAT_MODEL_GENERATE: siliconflow/Qwen/Qwen3.5-35B-A3B
       YACHAT_MODEL_CLASSIFY: siliconflow/Qwen/Qwen3.5-35B-A3B
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
         with: {python-version: "3.12"}
       - run: uv sync --all-extras --frozen
       - name: sandbox image (analytics statistics tests)
@@ -57,7 +57,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t yachat:ci .
       - name: smoke the image as the non-root user
         run: |
