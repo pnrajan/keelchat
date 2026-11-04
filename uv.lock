@@ -4616,6 +4616,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "duckdb" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "mcp" },
@@ -4724,6 +4725,7 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'api'", specifier = ">=1.34" },
     { name = "boto3", marker = "extra == 'knowledge'", specifier = ">=1.34" },
     { name = "cryptography", marker = "extra == 'api'", specifier = ">=43" },
+    { name = "duckdb", specifier = ">=1.1" },
     { name = "duckdb", marker = "extra == 'analytics'", specifier = ">=1.1" },
     { name = "duckdb", marker = "extra == 'api'", specifier = ">=1.1" },
     { name = "fastapi", specifier = ">=0.115" },

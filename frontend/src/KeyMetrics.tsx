@@ -67,7 +67,6 @@ export default function KeyMetrics({ days, agent }: { days: number; agent: strin
             </table>
           </div>
         )}
-        {data?.truncated && <p className="muted small">This range has more records than one query reads; values cover the newest 50,000.</p>}
       </section>
 
       <section className="panel">

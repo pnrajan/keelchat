@@ -41,7 +41,7 @@ from yachat.policy.templates import builtin_templates, renamed
 from yachat.registry.contract import ContractViolation, check_tool
 from yachat.registry.core import REGISTRY, RegistryError
 from yachat.registry.tenant_tools import TenantToolIn, TenantToolRejected, check_public_url, tenant_tool_spec
-from yachat.runtime.audit import RETENTION_DAYS, dashboard, retention_cutoff, summarize, usage_report
+from yachat.runtime.audit import RETENTION_DAYS, audit_db, dashboard, retention_cutoff, summarize, usage_report
 from yachat.runtime.findings import csv_rows, findings
 from yachat.runtime.llm import LLMError, ModelConfig, small_only
 from yachat.runtime.llm_factory import fake_tools_from_env, llm_from_env
@@ -156,10 +156,6 @@ class MetricsQuestionIn(Body):
     question: str = Field(min_length=3, max_length=500)
     days: int = Field(default=30, ge=1, le=90)
     agent: str | None = None
-
-
-#: records read for one summary; a longer window is summarized from the newest ones and marked truncated
-SUMMARY_LIMIT = 50_000
 
 
 class TurnIn(Body):
@@ -913,12 +909,23 @@ def create_app(
         events = await rt.audit.query(tenant, agent=agent, session_id=session_id, kinds=kind, since=since, until=until, limit=limit)
         return [e.model_dump(mode="json") for e in events]
 
+    @asynccontextmanager
+    async def audit_window(
+        tenant: str, since: datetime, until: datetime | None = None, *, agent: str | None = None, kinds: list[AuditKind] | None = None
+    ) -> AsyncIterator[Any]:
+        """The tenant's records in [since, until) in a private DuckDB (`audit_db`), closed afterwards."""
+        db = await audit_db(rt.audit, tenant, since, until, agent=agent, kinds=kinds)
+        try:
+            yield db
+        finally:
+            db.close()
+
     @app.get("/v1/tenants/{tenant}/audit/summary")
     async def audit_summary(tenant: TenantId, agent: str | None = None, since: datetime | None = None, until: datetime | None = None) -> dict[str, Any]:
         """Outcomes over a window: completion and handoff rates, why conversations go to a person, which questions
         fail, guardrail blocks and tool failures."""
-        events = await rt.audit.query(tenant, agent=agent, since=since, until=until, limit=SUMMARY_LIMIT)
-        return summarize(events, since, until, truncated=len(events) >= SUMMARY_LIMIT).model_dump(mode="json")
+        async with audit_window(tenant, since or datetime(1970, 1, 1, tzinfo=UTC), until, agent=agent) as db:  # no since: every record kept
+            return (await asyncio.to_thread(summarize, db, since, until)).model_dump(mode="json")
 
     @app.get("/v1/tenants/{tenant}/dashboard")
     async def outcome_dashboard(tenant: TenantId, days: Annotated[int, Query(ge=1, le=90)] = 30, agent: str | None = None) -> dict[str, Any]:
@@ -926,9 +933,9 @@ def create_app(
         dropped, latency percentiles, model calls and errors per turn, and how fast people pick up handoffs."""
         until = datetime.now(UTC)
         since = (until - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        events = await rt.audit.query(tenant, agent=agent, since=since, limit=SUMMARY_LIMIT)
         open_n = len(await rt.handoffs.list(tenant, status="open", agent=agent, limit=500))
-        return dashboard(events, since, until, open_n, truncated=len(events) >= SUMMARY_LIMIT).model_dump(mode="json")
+        async with audit_window(tenant, since, agent=agent) as db:
+            return (await asyncio.to_thread(dashboard, db, since, until, open_n)).model_dump(mode="json")
 
     @app.get("/v1/tenants/{tenant}/usage")
     async def usage(tenant: TenantId, days: Annotated[int, Query(ge=1, le=90)] = 30, agent: str | None = None) -> dict[str, Any]:
@@ -938,8 +945,8 @@ def create_app(
 
         until = datetime.now(UTC)
         since = (until - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        events = await rt.audit.query(tenant, agent=agent, kinds=["llm", "turn"], since=since, limit=SUMMARY_LIMIT)
-        report = usage_report(events, since, until, truncated=len(events) >= SUMMARY_LIMIT)
+        async with audit_window(tenant, since, agent=agent, kinds=["llm", "turn"]) as db:
+            report = await asyncio.to_thread(usage_report, db, since, until)
         configured = {"generate": rt.models.generate, "classify": rt.models.classify, "verify": rt.models.verifier}
         used = {line.key for line in report.by_model} | set(configured.values())
         prices = {}
@@ -961,12 +968,14 @@ def create_app(
         from yachat.runtime.usage import cheaper, job_of, price, prices_fetched_at
 
         since = datetime.now(UTC) - timedelta(days=days)
-        calls = await rt.audit.query(tenant, kinds=["llm"], since=since, limit=SUMMARY_LIMIT)
+        sql = "SELECT reason, coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0) FROM audit GROUP BY reason"
+        async with audit_window(tenant, since, kinds=["llm"]) as db:
+            rows = await asyncio.to_thread(lambda: db.execute(sql).fetchall())
         tokens: dict[str, list[int]] = {"generate": [0, 0], "classify": [0, 0], "verify": [0, 0]}
-        for e in calls:
-            t = tokens[job_of(e.reason)]
-            t[0] += e.input_tokens or 0
-            t[1] += e.output_tokens or 0
+        for reason, tin, tout in rows:
+            t = tokens[job_of(reason or "")]
+            t[0] += tin
+            t[1] += tout
         jobs = {
             "generate": ("Writing replies", rt.models.generate, "YACHAT_MODEL_GENERATE"),
             "classify": ("Reading messages", rt.models.classify, "YACHAT_MODEL_CLASSIFY"),
@@ -1023,24 +1032,27 @@ def create_app(
         """This tenant's audit records for the window, as locked read-only DuckDB tables."""
         try:
             from yachat.analytics.workspace_metrics import metrics_db
-        except ImportError as e:  # duckdb / pandas are in the analytics extra
+        except ImportError as e:  # vanna / pandas are in the analytics extra
             raise HTTPException(501, "key metrics need the analytics extra: uv sync --extra analytics") from e
         until = datetime.now(UTC)
         since = (until - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        events = await rt.audit.query(tenant, agent=agent, since=since, limit=SUMMARY_LIMIT)
-        return await asyncio.to_thread(metrics_db, events), len(events) >= SUMMARY_LIMIT
+        con = await audit_db(rt.audit, tenant, since, agent=agent)
+        try:
+            return await asyncio.to_thread(metrics_db, con)
+        except BaseException:
+            con.close()
+            raise
 
     @app.get("/v1/tenants/{tenant}/metrics")
     async def workspace_metrics(tenant: TenantId, days: Annotated[int, Query(ge=1, le=90)] = 30, agent: str | None = None) -> dict[str, Any]:
         """This workspace's key metrics, each with its SQL, and the tables a question can be asked against."""
         from yachat.analytics.workspace_metrics import key_metrics
 
-        db, truncated = await workspace_db(tenant, days, agent)
+        db = await workspace_db(tenant, days, agent)
         try:
             values = await key_metrics(db)
             return {
                 "days": days,
-                "truncated": truncated,
                 "metrics": [
                     {"name": m.name, "label": m.label, "unit": m.unit, "description": m.description, "sql": m.sql, "value": v.value}
                     for v in values
@@ -1058,7 +1070,7 @@ def create_app(
         from yachat.analytics.duck import AnalyticsError
         from yachat.analytics.workspace_metrics import ask
 
-        db, truncated = await workspace_db(tenant, body.days, body.agent)
+        db = await workspace_db(tenant, body.days, body.agent)
         try:
             async with spending(tenant) as models:
                 a = await ask(db, rt.llm, models.generate, body.question)
@@ -1077,7 +1089,6 @@ def create_app(
             "columns": [c.name for c in a.columns],
             "rows": a.rows,
             "truncated": a.truncated,
-            "window_truncated": truncated,
             "attempts": a.attempts,
         }
 
@@ -1116,6 +1127,7 @@ def create_app(
                 output_tokens=c.output_tokens,
                 cached_tokens=c.cached_tokens,
                 cost_usd=c.cost_usd,
+                saved_tokens=c.saved_tokens or None,
             )
             for c in calls
         ]
@@ -1201,7 +1213,6 @@ def create_app(
         return embed_view(e, request)
 
     async def survey_questions(tenant: str, agent: str) -> list[SurveyQuestion]:
-
         policy = await rt.policies.latest(agent, tenant)
         if policy is None:
             raise NotFound(f"no policy for agent {agent!r}")

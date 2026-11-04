@@ -15,16 +15,17 @@ const PURPOSE: Record<string, string> = {
 };
 
 function Table({ title, rows, label }: { title: string; rows: UsageLine[]; label?: (k: string) => string }) {
+  const saved = rows.some((r) => r.saved_tokens > 0); // only behind a Headroom proxy
   return (
     <section className="panel">
       <h3>{title}</h3>
       {rows.length === 0 ? <p className="muted small">No model calls yet.</p> : (
         <div className="table-wrap">
           <table className="log">
-            <thead><tr><th></th><th className="r">Calls</th><th className="r">Input</th><th className="r">Cached</th><th className="r">Output</th><th className="r">Median time</th><th className="r">Cost</th></tr></thead>
+            <thead><tr><th></th><th className="r">Calls</th><th className="r">Input</th><th className="r">Cached</th>{saved && <th className="r" title="Input tokens Headroom removed before the call">Saved</th>}<th className="r">Output</th><th className="r">Median time</th><th className="r">Cost</th></tr></thead>
             <tbody>{rows.map((r) => (
               <tr key={r.key}><td><b>{label ? label(r.key) : r.key}</b></td><td className="r num">{r.calls}</td><td className="r num">{tok(r.input_tokens)}</td>
-                <td className="r num">{tok(r.cached_tokens)}</td><td className="r num">{tok(r.output_tokens)}</td>
+                <td className="r num">{tok(r.cached_tokens)}</td>{saved && <td className="r num">{tok(r.saved_tokens)}</td>}<td className="r num">{tok(r.output_tokens)}</td>
                 <td className="r num">{r.p50_ms == null ? "–" : `${(r.p50_ms / 1000).toFixed(1)} s`}</td>
                 <td className="r num">{usd(r.cost_usd)}{r.unpriced_calls > 0 && <span className="muted small" title="Calls to a model with no known price"> +{r.unpriced_calls} unpriced</span>}</td></tr>
             ))}</tbody>
@@ -133,7 +134,7 @@ export default function Usage({ workspace }: { workspace: string | null }) {
               {data.total.unpriced_calls > 0 && <span className="muted small">{data.total.unpriced_calls} calls without a price</span>}</div>
             <div><span className="muted small">Per conversation</span><span className="num big">{usd(data.cost_per_conversation)}</span><span className="muted small">{data.conversations} conversations</span></div>
             <div><span className="muted small">Model calls</span><span className="num big">{data.total.calls}</span></div>
-            <div><span className="muted small">Input tokens</span><span className="num big">{tok(data.total.input_tokens)}</span><span className="muted small">{tok(data.total.cached_tokens)} from cache</span></div>
+            <div><span className="muted small">Input tokens</span><span className="num big">{tok(data.total.input_tokens)}</span><span className="muted small">{tok(data.total.cached_tokens)} from cache{data.total.saved_tokens > 0 && <> · {tok(data.total.saved_tokens)} saved by Headroom</>}</span></div>
             <div><span className="muted small">Output tokens</span><span className="num big">{tok(data.total.output_tokens)}</span></div>
           </div>
           <section className="panel"><h3>Cost per day</h3>

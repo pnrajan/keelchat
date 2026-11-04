@@ -1,15 +1,15 @@
 """A workspace's key metrics as SQL, and plain-English questions about them answered with text-to-SQL.
 
-The tenant's audit records for a window are shaped into five tables in a locked, in-memory DuckDB (DatasetDB): only
-that tenant's rows are loaded, queries are one SELECT with a timeout, and nothing outside the tables is reachable.
+The tenant's audit records for a window (`runtime/audit.py:audit_db`) are shaped into five tables in SQL, then the
+database is locked (DatasetDB): only that tenant's rows are loaded, queries are one SELECT with a timeout, and nothing
+outside the tables is reachable.
 Each key metric is a named SQL query over those tables; the same definitions guide the model that writes SQL for a
 question, so an answer uses the dashboard's own meaning of "completed" or "cost per conversation"."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -18,7 +18,9 @@ from yachat.analytics.models import Column
 from yachat.analytics.vanna_sql import VannaSQL
 from yachat.logging import get_logger
 from yachat.runtime.llm import LLMClient
-from yachat.state.models import AuditEvent
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 log = get_logger("workspace_metrics")
 
@@ -133,27 +135,6 @@ TABLES: dict[str, tuple[str, dict[str, str]]] = {
     ),
 }
 
-COLUMNS = {
-    "conversations": ["session_id", "agent", "started_at", "day", "last_at", "turns", "outcome", "rejected_answers", "errors", "llm_calls", "cost_usd"],
-    "turns": ["at", "day", "agent", "session_id", "turn_id", "route", "ms", "llm_calls", "tool_calls", "errors"],
-    "model_calls": ["at", "day", "agent", "session_id", "model", "purpose", "input_tokens", "output_tokens", "cached_tokens", "cost_usd", "ms"],
-    "handoffs": [
-        "handoff_id",
-        "agent",
-        "session_id",
-        "opened_at",
-        "day",
-        "reason",
-        "status",
-        "claimed_at",
-        "resolved_at",
-        "assignee",
-        "minutes_to_claim",
-        "minutes_to_resolve",
-    ],
-    "decisions": ["at", "day", "agent", "session_id", "turn_id", "kind", "decision", "reason", "step", "field", "ok", "ref", "actor"],
-}
-
 GUIDELINES = (
     "Write one DuckDB SELECT over these tables only. Rates are fractions between 0 and 1. A conversation's outcome is in "
     "conversations.outcome; never recount it from decisions. Use the column `day` (a DATE) for daily breakdowns. "
@@ -174,161 +155,53 @@ EXAMPLES = [{"question": f"What is the {m.label.lower()}?", "sql": m.sql} for m 
 ]
 
 
-def _day(at: datetime) -> Any:
-    return at.date()
-
-
-def tables(events: list[AuditEvent]) -> list[tuple[str, pd.DataFrame, str, dict[str, str]]]:
-    """The five tables, from one tenant's audit records."""
-    turns = [e for e in events if e.kind == "turn" and e.session_id]
-    calls = [e for e in events if e.kind == "llm"]
-    exits = {e.session_id: e.decision for e in sorted(events, key=lambda e: e.at) if e.kind == "exit" and e.session_id}
-    rejected: dict[str, int] = {}
-    for e in events:
-        if e.kind == "answer" and e.decision == "rejected" and e.session_id:
-            rejected[e.session_id] = rejected.get(e.session_id, 0) + 1
-    cost: dict[str, float] = {}
-    for e in calls:
-        if e.session_id:
-            cost[e.session_id] = cost.get(e.session_id, 0.0) + (e.cost_usd or 0.0)
-
-    by_session: dict[str, list[AuditEvent]] = {}
-    for e in turns:
-        by_session.setdefault(str(e.session_id), []).append(e)
-    conversations = []
-    for sid, ts in by_session.items():
-        ts.sort(key=lambda e: e.at)
-        conversations.append(
-            {
-                "session_id": sid,
-                "agent": ts[0].agent,
-                "started_at": ts[0].at,
-                "day": _day(ts[0].at),
-                "last_at": ts[-1].at,
-                "turns": len(ts),
-                "outcome": exits.get(sid, "open"),
-                "rejected_answers": rejected.get(sid, 0),
-                "errors": sum(e.errors or 0 for e in ts),
-                "llm_calls": sum(e.llm_calls or 0 for e in ts),
-                "cost_usd": round(cost.get(sid, 0.0), 8),
-            }
-        )
-
-    turn_rows = [
-        {
-            "at": e.at,
-            "day": _day(e.at),
-            "agent": e.agent,
-            "session_id": e.session_id,
-            "turn_id": e.turn_id,
-            "route": e.decision,
-            "ms": e.ms,
-            "llm_calls": e.llm_calls or 0,
-            "tool_calls": e.tool_calls or 0,
-            "errors": e.errors or 0,
-        }
-        for e in turns
-    ]
-    call_rows = [
-        {
-            "at": e.at,
-            "day": _day(e.at),
-            "agent": e.agent,
-            "session_id": e.session_id,
-            "model": e.ref,
-            "purpose": e.reason,
-            "input_tokens": e.input_tokens or 0,
-            "output_tokens": e.output_tokens or 0,
-            "cached_tokens": e.cached_tokens or 0,
-            "cost_usd": e.cost_usd,
-            "ms": e.ms,
-        }
-        for e in calls
-    ]
-
-    handoffs: dict[str, dict[str, Any]] = {}
-    for e in sorted(events, key=lambda e: e.at):
-        if e.kind != "handoff" or not e.ref:
-            continue
-        if e.decision == "opened":
-            handoffs[e.ref] = {
-                "handoff_id": e.ref,
-                "agent": e.agent,
-                "session_id": e.session_id,
-                "opened_at": e.at,
-                "day": _day(e.at),
-                "reason": e.reason,
-                "status": "open",
-                "claimed_at": None,
-                "resolved_at": None,
-                "assignee": None,
-            }
-        elif (h := handoffs.get(e.ref)) is not None and e.decision in ("claimed", "resolved"):
-            if h[f"{e.decision}_at"] is None:
-                h[f"{e.decision}_at"] = e.at
-            h["status"] = e.decision
-            if e.decision == "claimed":
-                h["assignee"] = e.actor
-    for h in handoffs.values():
-        for k in ("claimed", "resolved"):
-            at = h[f"{k}_at"]
-            h[f"minutes_to_{'claim' if k == 'claimed' else 'resolve'}"] = round((at - h["opened_at"]).total_seconds() / 60, 1) if at else None
-
-    decision_rows = [
-        {
-            "at": e.at,
-            "day": _day(e.at),
-            "agent": e.agent,
-            "session_id": e.session_id,
-            "turn_id": e.turn_id,
-            "kind": e.kind,
-            "decision": e.decision,
-            "reason": e.reason,
-            "step": e.step,
-            "field": e.field,
-            "ok": e.ok,
-            "ref": e.ref,
-            "actor": e.actor,
-        }
-        for e in events
-    ]
-
-    def frame(rows: list[dict[str, Any]], columns: list[str]) -> pd.DataFrame:
-        return pd.DataFrame(rows, columns=columns)
-
-    rows = {"conversations": conversations, "turns": turn_rows, "model_calls": call_rows, "handoffs": list(handoffs.values()), "decisions": decision_rows}
-    return [(name, _typed(frame(rows[name], COLUMNS[name])), *TABLES[name]) for name in TABLES]
-
-
-_TYPES = {
-    "at": "datetime64[us, UTC]",
-    "started_at": "datetime64[us, UTC]",
-    "last_at": "datetime64[us, UTC]",
-    "opened_at": "datetime64[us, UTC]",
-    "claimed_at": "datetime64[us, UTC]",
-    "resolved_at": "datetime64[us, UTC]",
-    "ms": "float64",
-    "cost_usd": "float64",
-    "minutes_to_claim": "float64",
-    "minutes_to_resolve": "float64",
-    "ok": "boolean",
-    **dict.fromkeys(("turns", "rejected_answers", "errors", "llm_calls", "tool_calls", "input_tokens", "output_tokens", "cached_tokens"), "int64"),
+#: each table from the window's `audit` rows; a conversation's outcome is its last exit, "open" without one
+SQL = {
+    "conversations": """
+        WITH t AS (SELECT * FROM audit WHERE kind = 'turn' AND session_id <> ''),
+        ex AS (SELECT session_id, arg_max(decision, "at") AS outcome FROM audit WHERE kind = 'exit' AND session_id <> '' GROUP BY 1),
+        rj AS (SELECT session_id, count(*) AS n FROM audit WHERE kind = 'answer' AND decision = 'rejected' AND session_id <> '' GROUP BY 1),
+        c AS (SELECT session_id, sum(coalesce(cost_usd, 0)) AS cost FROM audit WHERE kind = 'llm' AND session_id <> '' GROUP BY 1)
+        SELECT t.session_id, arg_min(t.agent, t."at") AS agent, min(t."at") AS started_at, CAST(min(t."at") AS DATE) AS day,
+            max(t."at") AS last_at, count(*) AS turns, coalesce(any_value(ex.outcome), 'open') AS outcome,
+            coalesce(any_value(rj.n), 0) AS rejected_answers, coalesce(sum(t.errors), 0) AS errors, coalesce(sum(t.llm_calls), 0) AS llm_calls,
+            round(coalesce(any_value(c.cost), 0), 8) AS cost_usd
+        FROM t LEFT JOIN ex USING (session_id) LEFT JOIN rj USING (session_id) LEFT JOIN c USING (session_id) GROUP BY t.session_id
+    """,
+    "turns": """
+        SELECT "at", CAST("at" AS DATE) AS day, agent, session_id, turn_id, decision AS route, ms, coalesce(llm_calls, 0) AS llm_calls,
+            coalesce(tool_calls, 0) AS tool_calls, coalesce(errors, 0) AS errors
+        FROM audit WHERE kind = 'turn' AND session_id <> ''
+    """,
+    "model_calls": """
+        SELECT "at", CAST("at" AS DATE) AS day, agent, session_id, ref AS model, reason AS purpose, coalesce(input_tokens, 0) AS input_tokens,
+            coalesce(output_tokens, 0) AS output_tokens, coalesce(cached_tokens, 0) AS cached_tokens, cost_usd, ms
+        FROM audit WHERE kind = 'llm'
+    """,
+    "handoffs": """
+        WITH h AS (SELECT * FROM audit WHERE kind = 'handoff' AND ref <> ''),
+        o AS (SELECT ref, arg_max(agent, "at") AS agent, arg_max(session_id, "at") AS session_id, max("at") AS opened_at,
+            arg_max(reason, "at") AS reason FROM h WHERE decision = 'opened' GROUP BY 1),
+        d AS (SELECT o.ref, min(h."at") FILTER (h.decision = 'claimed') AS claimed_at, min(h."at") FILTER (h.decision = 'resolved') AS resolved_at,
+            arg_max(h.decision, h."at") AS status, arg_max(h.actor, h."at") FILTER (h.decision = 'claimed') AS assignee
+            FROM o JOIN h ON h.ref = o.ref AND h.decision IN ('claimed', 'resolved') AND h."at" >= o.opened_at GROUP BY 1)
+        SELECT o.ref AS handoff_id, o.agent, o.session_id, o.opened_at, CAST(o.opened_at AS DATE) AS day, o.reason,
+            coalesce(d.status, 'open') AS status, d.claimed_at, d.resolved_at, d.assignee,
+            round(epoch(d.claimed_at - o.opened_at) / 60, 1) AS minutes_to_claim, round(epoch(d.resolved_at - o.opened_at) / 60, 1) AS minutes_to_resolve
+        FROM o LEFT JOIN d USING (ref)
+    """,
+    "decisions": """
+        SELECT "at", CAST("at" AS DATE) AS day, agent, session_id, turn_id, kind, decision, reason, step, field, ok, ref, actor FROM audit
+    """,
 }
 
 
-def _typed(df: pd.DataFrame) -> pd.DataFrame:
-    """Column types that hold for an empty table too, so a query on an empty window still runs."""
-    df = df.astype({c: t for c, t in _TYPES.items() if c in df.columns})
-    if "day" in df.columns:
-        df["day"] = pd.to_datetime(df["day"]).dt.date if len(df) else pd.Series([], dtype="object")
-    for col in df.columns:
-        if df[col].dtype == object and col != "day":
-            df[col] = df[col].astype("string")
-    return df
-
-
-def metrics_db(events: list[AuditEvent]) -> DatasetDB:
-    return DatasetDB.from_frames(tables(events), memory_limit="256MB")
+def metrics_db(con: DuckDBPyConnection) -> DatasetDB:
+    """The five tables from the window in `con` (`audit_db`), which is then locked; the raw `audit` table is dropped."""
+    for name, sql in SQL.items():
+        con.execute(f"CREATE TABLE {name} AS {sql}")
+    con.execute("DROP TABLE audit")
+    return DatasetDB.adopt(con, [(name, *TABLES[name]) for name in TABLES])
 
 
 @dataclass

@@ -3,9 +3,9 @@ verdict, tool outcomes) plus what stages recorded themselves. Plus the summary t
 
 from __future__ import annotations
 
-from collections import Counter
-from collections.abc import Callable
+import os
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -14,6 +14,10 @@ from yachat.runtime.context import TurnContext
 from yachat.runtime.redaction import redact_pii
 from yachat.runtime.usage import Usage
 from yachat.state.models import AuditEvent, AuditKind, SessionState, subject_of
+from yachat.state.store import CREATE_AUDIT, AuditStore
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 #: characters of user text an audit record keeps
 SNIPPET_CHARS = 160
@@ -109,40 +113,40 @@ class AuditSummary(BaseModel):
     rejected_answers: dict[str, int]
     guardrails: dict[str, int]
     tool_failures: dict[str, int]
-    #: true when the window held more records than were read
-    truncated: bool = False
 
 
-def summarize(events: list[AuditEvent], since: datetime | None, until: datetime | None, truncated: bool = False) -> AuditSummary:
-    sessions = {e.session_id for e in events if e.kind == "turn" and e.session_id}
-    outcomes = Counter(e.decision for e in events if e.kind == "exit")
-    n = len(sessions)
+def _counts(db: DuckDBPyConnection, key: str, where: str) -> dict[str, int]:
+    return {str(k): int(n) for k, n in db.execute(f"SELECT {key}, count(*) FROM audit WHERE {where} GROUP BY 1 ORDER BY 2 DESC, 1").fetchall()}
+
+
+def _one(db: DuckDBPyConnection, sql: str) -> tuple[Any, ...]:
+    row = db.execute(sql).fetchone()
+    assert row is not None  # an aggregate without GROUP BY always returns a row
+    return tuple(row)
+
+
+def summarize(db: DuckDBPyConnection, since: datetime | None, until: datetime | None) -> AuditSummary:
+    """Outcomes over the window loaded in `db` (`audit_db`), counted in SQL."""
+    n, turns = _one(db, "SELECT count(DISTINCT session_id) FILTER (session_id <> ''), count(*) FROM audit WHERE kind = 'turn'")
+    outcomes = _counts(db, "decision", "kind = 'exit'")
     return AuditSummary(
         since=since,
         until=until,
         sessions=n,
-        turns=sum(1 for e in events if e.kind == "turn"),
-        outcomes=dict(outcomes),
+        turns=turns,
+        outcomes=outcomes,
         completion_rate=round(outcomes.get("completed", 0) / n, 3) if n else 0.0,
         handoff_rate=round(outcomes.get("handed_off", 0) / n, 3) if n else 0.0,
-        handoff_reasons=dict(Counter(e.reason for e in events if e.kind == "handoff" and e.decision == "opened")),
-        handoff_actions=dict(Counter(e.decision for e in events if e.kind == "handoff" and e.actor != "runtime")),
-        rejected_answers=dict(Counter(e.field or "?" for e in events if e.kind == "answer" and e.decision == "rejected")),
-        guardrails=dict(Counter(e.ref or "?" for e in events if e.kind == "guardrail")),
-        tool_failures=dict(Counter(e.ref or "?" for e in events if e.kind == "tool" and e.ok is False)),
-        truncated=truncated,
+        handoff_reasons=_counts(db, "reason", "kind = 'handoff' AND decision = 'opened'"),
+        handoff_actions=_counts(db, "decision", "kind = 'handoff' AND actor <> 'runtime'"),
+        rejected_answers=_counts(db, "coalesce(nullif(field, ''), '?')", "kind = 'answer' AND decision = 'rejected'"),
+        guardrails=_counts(db, "coalesce(nullif(ref, ''), '?')", "kind = 'guardrail'"),
+        tool_failures=_counts(db, "coalesce(nullif(ref, ''), '?')", "kind = 'tool' AND ok = false"),
     )
 
 
 def retention_cutoff(days: int = RETENTION_DAYS) -> datetime:
     return datetime.now(UTC) - timedelta(days=days)
-
-
-def _pct(xs: list[float], p: float) -> float | None:
-    if not xs:
-        return None
-    s = sorted(xs)
-    return round(s[max(0, min(len(s) - 1, round(p / 100 * (len(s) - 1))))], 1)
 
 
 class DayPoint(BaseModel):
@@ -188,76 +192,101 @@ class Dashboard(BaseModel):
     open_handoffs: int = 0
 
 
-def dashboard(events: list[AuditEvent], since: datetime, until: datetime, open_handoffs: int = 0, truncated: bool = False) -> Dashboard:
-    turns = [e for e in events if e.kind == "turn"]
-    exits = {e.session_id: e.decision for e in events if e.kind == "exit" and e.session_id}
-    first_day: dict[str, str] = {}
-    for e in sorted(turns, key=lambda e: e.at):
-        if e.session_id and e.session_id not in first_day:
-            first_day[e.session_id] = e.at.date().isoformat()
-    n_days = max(1, (until.date() - since.date()).days + 1)
+#: per conversation (a session with a turn): its agent, the day of its first turn and how it ended (its last exit)
+_CONVERSATIONS = """
+WITH ex AS (SELECT session_id, arg_max(decision, "at") AS outcome FROM audit WHERE kind = 'exit' AND session_id <> '' GROUP BY 1)
+SELECT DISTINCT t.session_id, t.agent, min(t."at") OVER (PARTITION BY t.session_id) AS first_at, ex.outcome
+FROM audit t LEFT JOIN ex USING (session_id) WHERE t.kind = 'turn' AND t.session_id <> ''
+"""
+_ENDED = """count(*) FILTER (outcome = 'completed') AS completed, count(*) FILTER (outcome = 'handed_off') AS handed_off,
+count(*) FILTER (outcome NOT IN ('completed', 'handed_off')) AS dropped"""
+
+
+def _p(v: float | None) -> float | None:
+    return None if v is None else round(float(v), 1)
+
+
+def dashboard(db: DuckDBPyConnection, since: datetime, until: datetime, open_handoffs: int = 0) -> Dashboard:
+    """Outcomes and service health over the window loaded in `db` (`audit_db`), per day and per agent, in SQL."""
+    convs = {str(d): r for d, *r in db.execute(f"SELECT CAST(first_at AS DATE), count(*), {_ENDED} FROM ({_CONVERSATIONS}) GROUP BY 1").fetchall()}
+    turn_days = {
+        str(d): r
+        for d, *r in db.execute(
+            'SELECT CAST("at" AS DATE), count(*), quantile_disc(ms, 0.5), quantile_disc(ms, 0.95), count(*) FILTER (errors > 0) '
+            "FROM audit WHERE kind = 'turn' GROUP BY 1"
+        ).fetchall()
+    }
     days = []
-    for i in range(n_days):
+    for i in range(max(1, (until.date() - since.date()).days + 1)):
         d = (since + timedelta(days=i)).date().isoformat()
-        sids = [s for s, fd in first_day.items() if fd == d]
-        day_turns = [e for e in turns if e.at.date().isoformat() == d]
-        ms = [e.ms for e in day_turns if e.ms is not None]
-        outs = [exits.get(s) for s in sids]
+        conversations, completed, handed_off, dropped = convs.get(d, (0, 0, 0, 0))
+        turns, p50, p95, errors = turn_days.get(d, (0, None, None, 0))
         days.append(
             DayPoint(
                 day=d,
-                conversations=len(sids),
-                completed=outs.count("completed"),
-                handed_off=outs.count("handed_off"),
-                dropped=sum(1 for o in outs if o not in (None, "completed", "handed_off")),
-                turns=len(day_turns),
-                p50_ms=_pct(ms, 50),
-                p95_ms=_pct(ms, 95),
-                error_turns=sum(1 for e in day_turns if e.errors),
+                conversations=conversations,
+                completed=completed,
+                handed_off=handed_off,
+                dropped=dropped,
+                turns=turns,
+                p50_ms=_p(p50),
+                p95_ms=_p(p95),
+                error_turns=errors,
             )
         )
     agents = []
-    for a in sorted({e.agent for e in turns}):
-        agent_sids = {e.session_id for e in turns if e.agent == a and e.session_id}
-        a_turns = [e for e in turns if e.agent == a]
-        outs = [exits.get(s) for s in agent_sids]
-        n = len(agent_sids) or 1
-        rejected = Counter(e.field for e in events if e.agent == a and e.kind == "answer" and e.decision == "rejected" and e.field)
+    for agent, n, completed, handed_off, dropped, turns, p95, llm, top in db.execute(
+        f"""
+        WITH c AS (SELECT agent, count(*) AS n, {_ENDED} FROM ({_CONVERSATIONS}) GROUP BY 1),
+        t AS (SELECT agent, count(*) AS turns, quantile_disc(ms, 0.95) AS p95, coalesce(sum(llm_calls), 0) AS llm FROM audit WHERE kind = 'turn' GROUP BY 1),
+        r AS (SELECT agent, arg_max(field, n) AS top FROM (
+            SELECT agent, field, count(*) AS n FROM audit WHERE kind = 'answer' AND decision = 'rejected' AND field <> '' GROUP BY 1, 2) GROUP BY 1)
+        SELECT t.agent, coalesce(c.n, 0), coalesce(c.completed, 0), coalesce(c.handed_off, 0), coalesce(c.dropped, 0), t.turns, t.p95, t.llm, r.top
+        FROM t LEFT JOIN c USING (agent) LEFT JOIN r USING (agent) ORDER BY t.agent
+        """
+    ).fetchall():
+        per = n or 1
         agents.append(
             AgentRow(
-                agent=a,
-                conversations=len(agent_sids),
-                completion_rate=round(outs.count("completed") / n, 3),
-                handoff_rate=round(outs.count("handed_off") / n, 3),
-                drop_rate=round(sum(1 for o in outs if o not in (None, "completed", "handed_off")) / n, 3),
-                turns_per_conversation=round(len(a_turns) / n, 1),
-                p95_ms=_pct([e.ms for e in a_turns if e.ms is not None], 95),
-                llm_calls_per_turn=round(sum(e.llm_calls or 0 for e in a_turns) / (len(a_turns) or 1), 2),
-                top_rejected_field=rejected.most_common(1)[0][0] if rejected else None,
+                agent=agent,
+                conversations=n,
+                completion_rate=round(completed / per, 3),
+                handoff_rate=round(handed_off / per, 3),
+                drop_rate=round(dropped / per, 3),
+                turns_per_conversation=round(turns / per, 1),
+                p95_ms=_p(p95),
+                llm_calls_per_turn=round(llm / (turns or 1), 2),
+                top_rejected_field=top,
             )
         )
-    opened = {e.ref: e.at for e in events if e.kind == "handoff" and e.decision == "opened" and e.ref}
+    turns, p50, p95, llm, errors = _one(
+        db,
+        "SELECT count(*), quantile_disc(ms, 0.5), quantile_disc(ms, 0.95), coalesce(sum(llm_calls), 0), count(*) FILTER (errors > 0) "
+        "FROM audit WHERE kind = 'turn'",
+    )
 
-    def waits(decision: str) -> list[float]:
-        first: dict[str, datetime] = {}
-        for e in sorted(events, key=lambda e: e.at):
-            if e.kind == "handoff" and e.decision == decision and e.ref in opened and e.ref not in first:
-                first[e.ref] = e.at
-        return [(t - opened[r]).total_seconds() / 60 for r, t in first.items()]
+    def wait(decision: str) -> float | None:
+        """Median minutes from each handoff opening to its first `decision`."""
+        (v,) = _one(
+            db,
+            f"""WITH o AS (SELECT ref, min("at") AS opened FROM audit WHERE kind = 'handoff' AND decision = 'opened' AND ref <> '' GROUP BY 1),
+            d AS (SELECT ref, min("at") AS done FROM audit WHERE kind = 'handoff' AND decision = '{decision}' GROUP BY 1)
+            SELECT quantile_disc(epoch(done - opened) / 60, 0.5) FROM o JOIN d USING (ref)""",
+        )
+        return _p(v)
 
-    ms_all = [e.ms for e in turns if e.ms is not None]
     return Dashboard(
         since=since,
         until=until,
-        summary=summarize(events, since, until, truncated),
+        summary=summarize(db, since, until),
         days=days,
         agents=agents,
-        p50_ms=_pct(ms_all, 50),
-        p95_ms=_pct(ms_all, 95),
-        llm_calls_per_turn=round(sum(e.llm_calls or 0 for e in turns) / (len(turns) or 1), 2),
-        error_rate=round(sum(1 for e in turns if e.errors) / (len(turns) or 1), 3),
-        claim_p50_min=_pct(waits("claimed"), 50),
-        resolve_p50_min=_pct(waits("resolved"), 50),
+        p50_ms=_p(p50),
+        p95_ms=_p(p95),
+        llm_calls_per_turn=round(llm / (turns or 1), 2),
+        error_rate=round(errors / (turns or 1), 3),
+        claim_p50_min=wait("claimed"),
+        resolve_p50_min=wait("resolved"),
         open_handoffs=open_handoffs,
     )
 
@@ -280,6 +309,7 @@ def llm_events(policy: CompiledPolicy, session_id: str, turn_id: str, calls: lis
             output_tokens=c.output_tokens,
             cached_tokens=c.cached_tokens,
             cost_usd=c.cost_usd,
+            saved_tokens=c.saved_tokens or None,
         )
         for c in calls
     ]
@@ -291,6 +321,8 @@ class UsageLine(BaseModel):
     input_tokens: int
     output_tokens: int
     cached_tokens: int
+    #: input tokens a Headroom proxy removed before the calls (not billed)
+    saved_tokens: int = 0
     #: None when no call in the group had a known price
     cost_usd: float | None
     #: calls with no known price (their tokens are counted, their cost is not)
@@ -310,45 +342,64 @@ class UsageReport(BaseModel):
     by_day: list[UsageLine]
     conversations: int
     cost_per_conversation: float | None
-    truncated: bool = False
 
 
-def _line(key: str, xs: list[AuditEvent]) -> UsageLine:
-    priced = [e.cost_usd for e in xs if e.cost_usd is not None]
-    return UsageLine(
-        key=key,
-        calls=len(xs),
-        input_tokens=sum(e.input_tokens or 0 for e in xs),
-        output_tokens=sum(e.output_tokens or 0 for e in xs),
-        cached_tokens=sum(e.cached_tokens or 0 for e in xs),
-        cost_usd=round(sum(priced), 6) if priced else None,
-        unpriced_calls=len(xs) - len(priced),
-        p50_ms=_pct([e.ms for e in xs if e.ms is not None], 50),
-    )
+#: DuckDB memory for one dashboard query (it spills to a temporary file beyond this)
+AUDIT_DB_MEMORY = "1GB"
 
 
-def usage_report(events: list[AuditEvent], since: datetime, until: datetime, truncated: bool = False) -> UsageReport:
-    calls = [e for e in events if e.kind == "llm"]
+async def audit_db(
+    store: AuditStore, tenant: str, since: datetime, until: datetime | None = None, *, agent: str | None = None, kinds: list[AuditKind] | None = None
+) -> DuckDBPyConnection:
+    """A tenant's records for a window as the table `audit` in a private in-memory DuckDB, for the dashboards. The
+    store loads it: Postgres by COPY, the Iceberg archive by DuckDB reading the files on S3. The caller closes it."""
+    import duckdb
 
-    def group(key: Callable[[AuditEvent], str]) -> list[UsageLine]:
-        buckets: dict[str, list[AuditEvent]] = {}
-        for e in calls:
-            buckets.setdefault(key(e), []).append(e)
-        return sorted((_line(k, v) for k, v in buckets.items()), key=lambda u: (-(u.cost_usd or 0), -u.input_tokens))
+    config: dict[str, Any] = {"TimeZone": "UTC", "memory_limit": AUDIT_DB_MEMORY}
+    if ext := os.getenv("YACHAT_DUCKDB_EXTENSIONS"):  # where the image installed iceberg / httpfs / aws (no download)
+        config["extension_directory"] = ext
+    db = duckdb.connect(config=config)
+    try:
+        db.execute(CREATE_AUDIT)
+        await store.copy_to(db, tenant, since=since, until=until, agent=agent, kinds=kinds)
+    except BaseException:
+        db.close()
+        raise
+    return db
 
-    total = _line("total", calls)
+
+_USAGE = """
+SELECT {key} AS key, count(*) AS calls, coalesce(sum(input_tokens), 0) AS input_tokens, coalesce(sum(output_tokens), 0) AS output_tokens,
+       coalesce(sum(cached_tokens), 0) AS cached_tokens, coalesce(sum(saved_tokens), 0) AS saved_tokens, round(sum(cost_usd), 6) AS cost_usd,
+       count(*) - count(cost_usd) AS unpriced_calls, round(quantile_disc(ms, 0.5), 1) AS p50_ms
+FROM audit WHERE kind = 'llm' {group}
+"""
+
+
+def _lines(db: DuckDBPyConnection, key: str, grouped: bool = True) -> list[UsageLine]:
+    cur = db.execute(_USAGE.format(key=key, group="GROUP BY 1 ORDER BY 1" if grouped else ""))
+    names = [d[0] for d in cur.description or []]
+    lines = [UsageLine(**dict(zip(names, row, strict=True))) for row in cur.fetchall()]
+    return sorted(lines, key=lambda u: (-(u.cost_usd or 0), -u.input_tokens)) if grouped else lines
+
+
+def usage_report(db: DuckDBPyConnection, since: datetime, until: datetime) -> UsageReport:
+    """Totals in DuckDB over the window's `llm` and `turn` records (see `audit_db`): no row reaches Python."""
+    (total,) = _lines(db, "'total'", grouped=False)
+    found = {u.key: u for u in _lines(db, "strftime(CAST(\"at\" AS DATE), '%Y-%m-%d')")}
     n_days = max(1, (until.date() - since.date()).days + 1)
-    by_day = [_line(d, [e for e in calls if e.at.date().isoformat() == d]) for d in ((since + timedelta(days=i)).date().isoformat() for i in range(n_days))]
-    sessions = {e.session_id for e in events if e.kind == "turn" and e.session_id}
+    days = [(since + timedelta(days=i)).date().isoformat() for i in range(n_days)]
+    empty: dict[str, Any] = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "cost_usd": None, "unpriced_calls": 0, "p50_ms": None}
+    row = db.execute("SELECT count(DISTINCT session_id) FROM audit WHERE kind = 'turn'").fetchone()
+    sessions = int(row[0]) if row else 0
     return UsageReport(
         since=since,
         until=until,
         total=total,
-        by_model=group(lambda e: e.ref or "?"),
-        by_purpose=group(lambda e: e.reason or "?"),
-        by_agent=group(lambda e: e.agent),
-        by_day=by_day,
-        conversations=len(sessions),
-        cost_per_conversation=round(total.cost_usd / len(sessions), 6) if total.cost_usd is not None and sessions else None,
-        truncated=truncated,
+        by_model=_lines(db, "coalesce(nullif(ref, ''), '?')"),
+        by_purpose=_lines(db, "coalesce(nullif(reason, ''), '?')"),
+        by_agent=_lines(db, "agent"),
+        by_day=[found.get(d) or UsageLine(key=d, **empty) for d in days],
+        conversations=sessions,
+        cost_per_conversation=round(total.cost_usd / sessions, 6) if total.cost_usd is not None and sessions else None,
     )

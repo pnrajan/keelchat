@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from typing import Any
 
 from yachat.runtime.llm import LLMClient, LLMError, LLMRequest
+from yachat.runtime.usage import metered
+
+
+def _provider_model(req: LLMRequest) -> str:
+    """The model litellm is asked for (priced when no gateway names the one it routed to)."""
+    from yachat.runtime.llm_factory import litellm_settings
+
+    return str(litellm_settings(req.model)["model_name"])
 
 
 class LiteLLMClient(LLMClient):
@@ -25,8 +32,6 @@ class LiteLLMClient(LLMClient):
             return await self._call_untraced(req, **extra)
 
     async def _call_untraced(self, req: LLMRequest, **extra: Any) -> Any:
-        import litellm
-
         from yachat.runtime.llm_factory import litellm_settings  # per-request: generate and classify may be different providers
 
         settings = litellm_settings(req.model)
@@ -49,16 +54,16 @@ class LiteLLMClient(LLMClient):
             kwargs["api_key"] = self.api_key or settings["api_key"]
         if self.api_base or settings["api_base"]:
             kwargs["api_base"] = self.api_base or settings["api_base"]
-        from yachat.runtime.usage import record, usage_of
+        return await self._send(req, **kwargs)
 
-        t0 = time.perf_counter()
+    @metered(provider_model=_provider_model)
+    async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+        import litellm
+
         try:
-            resp = await litellm.acompletion(**kwargs)
+            return await litellm.acompletion(**kwargs)
         except Exception as e:  # litellm raises provider-specific subclasses of its own exceptions
             raise LLMError(f"{e.__class__.__name__}: {str(e)[:160]}") from e
-        tin, tout, cached = usage_of(resp)
-        record(req.model, req.purpose, tin, tout, cached_tokens=cached, ms=(time.perf_counter() - t0) * 1000, provider_model=model)
-        return resp
 
     async def complete(self, req: LLMRequest) -> str:
         resp = await self._call(req)

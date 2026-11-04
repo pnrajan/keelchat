@@ -7,6 +7,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
+from pydantic import Field
 
 from yachat.analytics.duck import AnalyticsError
 from yachat.analytics.models import AnalysisResult, AnalyzeIn
@@ -16,8 +17,14 @@ from yachat.datasets.models import Dataset
 from yachat.datasets.sources import SourceRejected
 from yachat.logging import configure, get_logger
 from yachat.runtime.llm import ModelConfig
+from yachat.runtime.usage import Usage, metering
 
 log = get_logger("analytics.api")
+
+
+class AnalyzeOut(AnalysisResult):
+    #: the model calls this answer made, priced here; the runtime adds them to the cost of the turn that asked
+    usage: list[Usage] = Field(default_factory=list)
 
 
 def _reason(e: Exception) -> str:
@@ -54,10 +61,12 @@ def create_app(service: AnalyticsService | None = None) -> FastAPI:
             raise HTTPException(422, _reason(e)) from None
         return {"dataset": body.ref, "version": body.version, "tables": [{"name": t.name, "rows": t.rows, "columns": dict(t.columns)} for t in tables]}
 
-    @app.post("/analyze", response_model=AnalysisResult)
-    async def analyze(body: AnalyzeIn) -> AnalysisResult:
+    @app.post("/analyze", response_model=AnalyzeOut)
+    async def analyze(body: AnalyzeIn) -> AnalyzeOut:
         try:
-            return await svc.analyze(body)
+            with metering() as calls:
+                result = await svc.analyze(body)
+            return AnalyzeOut.model_validate(result.model_dump() | {"usage": calls})
         except (AnalyticsError, SourceRejected, OSError) as e:
             log.error("dataset load failed", dataset=body.dataset.ref, error=f"{e.__class__.__name__}: {e}")
             raise HTTPException(422, _reason(e)) from None

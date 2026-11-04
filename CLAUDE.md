@@ -107,6 +107,7 @@ yachat/
   api/app.py     FastAPI; serves frontend/dist when built; tenant keys; mcp_server.py (/mcp for Claude and MCP clients)
   sim/harness.py simulated users: scripted replays and model-played personas, on fake tools; sim/refine.py (survey self-test: pretend customers, confidence score, revise)
   testing/fakes.py  FakeTools (tool backends only; the model is never faked)
+  scaffold.py    `yachat new agent|package` starter files; __init__.py re-exports the extension API (`from yachat import tool, node, ...`)
   logging.py     JSON logs (session_id, turn_id, policy_hash, stage, latency_ms), Metrics; tracing.py (Sentry spans); voice.py (speech in/out ports)
 evals/           replay, personas, metrics (DeepEval catalogue + thresholds gate), judge (litellm), run, online; <agent>/ sets
 examples/        policies (support, booking, concierge, hiring, surveys, analyst, coach), data/, sim_script.yaml, contrib_tool/,
@@ -131,7 +132,10 @@ See `docs/ADDING_A_CAPABILITY.md`.
 | `docs/BUILDING_AN_AGENT_END_TO_END.md` | one complex agent from plan to launch, in the console, the API and Claude |
 | `docs/DEVELOPER_GUIDE.md` | run modes, an API walkthrough, where code lives, debugging and troubleshooting |
 | `docs/ADDING_A_CAPABILITY.md` | how another team registers a node/tool/guardrail/channel |
-| `README.md` | quickstart, CLI, API, env vars |
+| `README.md` | what yachat is, quickstart, one example, links into the docs (keep it short) |
+| `docs/FEATURES.md` | the console, channels, routing, memory, handoff, documents, data, testing, Claude |
+| `docs/REFERENCE.md` | CLI, HTTP API, keys, model routing and cost, dashboards, env vars, deployment, troubleshooting |
+| `docs/COMPARISON.md` | yachat against Rasa Pro, Parlant, LangGraph and Botpress |
 | `docs/ARCHITECTURE.md` | components, life of a message, deployment topology |
 | `docs/WRITING_AN_AGENT.md` | how a team writes a goal-oriented policy; pre-launch checklist |
 | `CONTRIBUTING.md`, `SECURITY.md` | PR checks and review rules; vulnerability reporting and runtime protections |

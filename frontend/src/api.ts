@@ -83,7 +83,7 @@ export type AuditEvent = {
 export type AuditSummary = {
   sessions: number; turns: number; outcomes: Record<string, number>; completion_rate: number; handoff_rate: number;
   handoff_reasons: Record<string, number>; handoff_actions: Record<string, number>; rejected_answers: Record<string, number>;
-  guardrails: Record<string, number>; tool_failures: Record<string, number>; truncated: boolean;
+  guardrails: Record<string, number>; tool_failures: Record<string, number>;
 };
 
 export type ModelOption = { model: string; name: string; input_per_mtok: number; output_per_mtok: number; context: number; cost_usd: number; saving: number | null };
@@ -132,8 +132,8 @@ export type AggregatesRec = {
 };
 export type FindingsRec = { agent: string; respondents: number; completed: number; days: number; questions: { key: string; prompt: string; kind: string; n_asked: number; counts: { key: string; label: string; n: number; share: number }[]; mean: number | null; median: number | null; nps: number | null; themes: { theme: string; summary: string; n: number; quotes: { response_id: string; text: string }[] }[]; themes_error: string }[] };
 export type KeyMetric = { name: string; label: string; unit: "count" | "rate" | "ms" | "usd" | "minutes" | "number"; description: string; sql: string; value: number | null };
-export type WorkspaceMetrics = { days: number; truncated: boolean; metrics: KeyMetric[]; tables: { name: string; rows: number; description: string; columns: string[] }[] };
-export type MetricsAnswer = { question: string; sql: string; columns: string[]; rows: unknown[][]; truncated: boolean; window_truncated: boolean; attempts: number };
+export type WorkspaceMetrics = { days: number; metrics: KeyMetric[]; tables: { name: string; rows: number; description: string; columns: string[] }[] };
+export type MetricsAnswer = { question: string; sql: string; columns: string[]; rows: unknown[][]; truncated: boolean; attempts: number };
 
 export type Dashboard = {
   since: string; until: string; summary: AuditSummary; p50_ms: number | null; p95_ms: number | null; llm_calls_per_turn: number; error_rate: number;
@@ -141,7 +141,7 @@ export type Dashboard = {
   days: { day: string; conversations: number; completed: number; handed_off: number; dropped: number; turns: number; p50_ms: number | null; p95_ms: number | null; error_turns: number }[];
   agents: { agent: string; conversations: number; completion_rate: number; handoff_rate: number; drop_rate: number; turns_per_conversation: number; p95_ms: number | null; llm_calls_per_turn: number; top_rejected_field: string | null }[];
 };
-export type UsageLine = { key: string; calls: number; input_tokens: number; output_tokens: number; cached_tokens: number; cost_usd: number | null; unpriced_calls: number; p50_ms: number | null };
+export type UsageLine = { key: string; calls: number; input_tokens: number; output_tokens: number; cached_tokens: number; saved_tokens: number; cost_usd: number | null; unpriced_calls: number; p50_ms: number | null };
 export type UsageReport = {
   total: UsageLine; by_model: UsageLine[]; by_purpose: UsageLine[]; by_agent: UsageLine[]; by_day: UsageLine[]; conversations: number; cost_per_conversation: number | null;
   models: { generate: string; classify: string; verify: string };

@@ -1,11 +1,42 @@
 # Adding a capability
 
-One decorated function or class. No runtime change.
+One decorated function or class. No runtime change. Everything an extension needs imports from the top level:
+`from yachat import tool, node, Node, NodeResult, guardrail, ...`.
+
+## Start here: your first step in ten minutes
+
+```bash
+uv run yachat new package acme_caps --out my_bot      # a tool, a step, a guardrail, an agent and a contract test
+cd my_bot
+PYTHONPATH=. YACHAT_CAPABILITY_PACKAGES=acme_caps uv run --project <yachat checkout> yachat build acme-caps-agent.yaml
+PYTHONPATH=. uv run --project <yachat checkout> pytest test_acme_caps.py
+```
+
+The files build and pass the contract suite as written. Read them in this order:
+
+1. **`acme_caps/tools.py`: the tool.** An async function. Its type hints become the schema, and its docstring is what
+   the model reads. It talks to your system; here a dictionary stands in.
+2. **`acme_caps/steps.py`: the step.** The core idea of yachat is that **code decides and the model phrases**. Each
+   turn the runtime calls `act()`, and you return one `NodeResult`:
+   - **Need something from the user?** Return `ask=(field, sample wording, expect)`. The model words the question
+     to fit the conversation. The answer is checked against `expect` before it reaches you.
+   - **Got the answer?** Next turn, `answers_for(ctx, "<step name>")` holds the checked value.
+   - **Call the tool** through `ctx.services.gateway.call(...)`, never directly. The gateway applies the allow list,
+     timeout, retries and scrubbing.
+   - **Done?** Return `outputs={...}, complete=True`. The flow moves to the next step in the same turn.
+   - `text` is the plain reply with the facts, and `goal` is what the reply must achieve. The model rewrites `text`
+     to meet `goal`, and a checker makes sure nothing is invented.
+3. **`acme_caps/guardrails.py`: the guardrail.** It runs on every reply, flags what it finds and supplies a
+   replacement.
+4. **`acme-caps-agent.yaml`: the agent.** It uses the step by name in `flow:` and the guardrail by name in
+   `guardrails:`.
+
+Then change the tool to call your system, and run the build and the test again. The sections below cover every option.
 
 ## Tool
 
 ```python
-from yachat.registry.core import tool
+from yachat import tool
 
 
 @tool("salary_lookup", timeout_s=3.0, retries=1)  # translate=False, side_effects="write" as needed
@@ -65,7 +96,7 @@ so treat that table like any other secret store.
 ## Node
 
 ```python
-from yachat.registry.core import CapabilityConfig, Node, NodeResult, node
+from yachat import CapabilityConfig, Node, NodeResult, node
 
 
 class MyConfig(CapabilityConfig):
@@ -117,7 +148,7 @@ calls a tool, offers choices and completes on the user's pick:
 ## Candidate-only action
 
 ```python
-from yachat.registry.core import action
+from yachat import action
 
 
 @action("withdraw_application", by="candidate")
@@ -130,7 +161,7 @@ candidate's own action proves it (`InboundMessage.action` from the channel, or a
 ## Pre-processor
 
 ```python
-from yachat.registry.core import PreProcessor, preprocessor
+from yachat import PreProcessor, preprocessor
 
 
 @preprocessor("spam_filter", order=45)  # built-ins: receiver 10, opt_out 15, language 20, shorthand 30, entity_normalization 40, input_guardrails 50
@@ -144,7 +175,7 @@ class SpamFilter(PreProcessor):
 ## Guardrail
 
 ```python
-from yachat.registry.core import Guardrail, GuardResult, guardrail
+from yachat import Guardrail, GuardResult, guardrail
 
 
 @guardrail("no_competitors", stage="output")
@@ -201,7 +232,7 @@ salary_lookup = "contrib_tool.salary:register"
 ## Pass the contract suite
 
 ```python
-from yachat.registry.contract import check_capability
+from yachat import check_capability
 
 await check_capability("tool", "salary_lookup", fake_impl)
 ```

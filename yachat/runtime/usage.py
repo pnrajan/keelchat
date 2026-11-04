@@ -1,7 +1,10 @@
-"""Model usage and cost. Each LLM client reports every call (model, purpose, tokens, time) to the meter of the turn it
-runs in; the runtime stores them in the tenant's audit log. Prices come from YACHAT_MODEL_PRICES, else from
-OpenRouter's public model list (refreshed daily), else litellm's price list; a model with no known price is recorded
-with tokens and no cost."""
+"""Model usage and cost. Each LLM client's provider call is wrapped in `@metered`, which records the call (model,
+purpose, tokens, time) to the meter of the turn it runs in; the runtime stores them in the tenant's audit log.
+
+Prices come from YACHAT_MODEL_PRICES, else the cost a LiteLLM gateway reports for the call, else OpenRouter's public
+model list (refreshed daily), else litellm's price list. Behind a gateway, the model it actually routed to is priced,
+not its alias. A Headroom proxy's saved tokens are recorded too. A model with no known price is recorded with tokens
+and no cost."""
 
 from __future__ import annotations
 
@@ -9,12 +12,17 @@ import json
 import os
 import re
 import time
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import Any
+from functools import lru_cache, wraps
+from typing import TYPE_CHECKING, Any, cast
 
 from yachat.logging import get_logger
+
+if TYPE_CHECKING:
+    from yachat.runtime.llm import LLMRequest
 
 log = get_logger("usage")
 
@@ -29,6 +37,8 @@ class Usage:
     cached_tokens: int = 0
     ms: float = 0.0
     cost_usd: float | None = None
+    #: input tokens a Headroom proxy removed before the call (not billed)
+    saved_tokens: int = 0
 
 
 #: the reply when a tenant's spending limit is reached (no model is called)
@@ -235,14 +245,98 @@ def price(model: str, input_tokens: int, output_tokens: int, provider_model: str
 
 
 def record(
-    model: str, purpose: str, input_tokens: int, output_tokens: int, *, cached_tokens: int = 0, ms: float = 0.0, provider_model: str | None = None
+    model: str,
+    purpose: str,
+    input_tokens: int,
+    output_tokens: int,
+    *,
+    cached_tokens: int = 0,
+    ms: float = 0.0,
+    provider_model: str | None = None,
+    reported_cost: float | None = None,
+    saved_tokens: int = 0,
 ) -> None:
-    """Called by the LLM clients after each successful call."""
+    """One successful model call, on the meter of the turn running now. `reported_cost` is what a gateway billed; it is
+    used unless YACHAT_MODEL_PRICES names the model. Prefer `@metered`, which calls this."""
     meter = METER.get()
     if meter is None:
         return
-    cost, _ = price(model, input_tokens, output_tokens, provider_model, cached_tokens)
-    meter.append(Usage(model, purpose, input_tokens, output_tokens, cached_tokens, round(ms, 1), cost))
+    if reported_cost is not None and not any(n in price_overrides() for n in (model, provider_model) if n):
+        cost: float | None = round(reported_cost, 8)
+    else:
+        cost, _ = price(model, input_tokens, output_tokens, provider_model, cached_tokens)
+    meter.append(Usage(model, purpose, input_tokens, output_tokens, cached_tokens, round(ms, 1), cost, saved_tokens))
+
+
+def add(calls: list[Usage]) -> None:
+    """Calls another service made and priced for this turn (the Analytics Service), added to its meter."""
+    meter = METER.get()
+    if meter is not None:
+        meter.extend(calls)
+
+
+@contextmanager
+def metering() -> Iterator[list[Usage]]:
+    """Collect the model calls made inside the block (a service's own request), whatever turn is running."""
+    calls: list[Usage] = []
+    token = METER.set(calls)
+    try:
+        yield calls
+    finally:
+        METER.reset(token)
+
+
+def proxy_report(resp: Any) -> tuple[str | None, float | None, int]:
+    """(model routed to, cost billed, tokens saved) from the headers a LiteLLM gateway and a Headroom proxy add to a
+    response, as litellm exposes them. A cost of 0 is "not priced by the gateway", not free."""
+    hidden = getattr(resp, "_hidden_params", None)
+    headers = (hidden.get("additional_headers") if isinstance(hidden, dict) else None) or {}
+
+    def header(name: str) -> str | None:
+        v = headers.get("llm_provider-" + name)
+        return str(v) if v not in (None, "") else None
+
+    routed = header("x-litellm-model-name")
+    try:
+        cost = float(header("x-litellm-response-cost") or header("x-litellm-response-cost-original") or 0) or None
+    except ValueError:
+        cost = None
+    try:
+        saved = max(0, int(header("x-headroom-tokens-saved") or 0))
+    except ValueError:
+        saved = 0
+    return routed, cost, saved
+
+
+def metered[F: Callable[..., Awaitable[Any]]](provider_model: Callable[[LLMRequest], str | None] | None = None) -> Callable[[F], F]:
+    """Decorate an LLM client's provider call, `async def _send(self, req, ...) -> response`: each successful call is
+    recorded with its tokens in and out (Anthropic or OpenAI-style usage), time and cost. Behind a LiteLLM gateway or a
+    Headroom proxy it records the routed model, the gateway's cost and the tokens saved. `provider_model(req)` names the
+    model to price when the request's model is an alias. A custom `LLMClient` gets cost tracking from this alone."""
+
+    def wrap(call: F) -> F:
+        @wraps(call)
+        async def run(self: Any, req: LLMRequest, *args: Any, **kwargs: Any) -> Any:
+            t0 = time.perf_counter()
+            resp = await call(self, req, *args, **kwargs)
+            tin, tout, cached = usage_of(resp)
+            routed, cost, saved = proxy_report(resp)
+            record(
+                req.model,
+                req.purpose,
+                tin,
+                tout,
+                cached_tokens=cached,
+                ms=(time.perf_counter() - t0) * 1000,
+                provider_model=routed or (provider_model(req) if provider_model else None),
+                reported_cost=cost,
+                saved_tokens=saved,
+            )
+            return resp
+
+        return cast(F, run)
+
+    return wrap
 
 
 def usage_of(resp: Any) -> tuple[int, int, int]:

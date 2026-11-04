@@ -8,7 +8,8 @@ import pytest
 
 pytest.importorskip("duckdb")
 
-from yachat.analytics.duck import AnalyticsError  # noqa: E402
+from tests.helpers import audit_window  # noqa: E402
+from yachat.analytics.duck import AnalyticsError, DatasetDB  # noqa: E402
 from yachat.analytics.workspace_metrics import ask, key_metrics, metrics_db  # noqa: E402
 from yachat.runtime.llm import ModelConfig  # noqa: E402
 from yachat.runtime.llm_factory import llm_from_env  # noqa: E402
@@ -45,8 +46,12 @@ def workspace() -> list[AuditEvent]:
     ]
 
 
+async def tables(events: list[AuditEvent]) -> DatasetDB:
+    return metrics_db(await audit_window(events, "acme"))
+
+
 async def test_key_metrics_are_computed_from_the_audit_records():
-    db = metrics_db(workspace())
+    db = await tables([*workspace(), *(e.model_copy(update={"tenant": "globex"}) for e in workspace())])
     got = {v.metric.name: v.value for v in await key_metrics(db)}
     assert got["conversations"] == 4
     assert got["completion_rate"] == 0.25 and got["handoff_rate"] == 0.25 and got["drop_rate"] == 0.25
@@ -57,19 +62,19 @@ async def test_key_metrics_are_computed_from_the_audit_records():
 
 
 async def test_an_empty_workspace_has_no_values_and_no_errors():
-    got = {v.metric.name: v.value for v in await key_metrics(metrics_db([]))}
+    got = {v.metric.name: v.value for v in await key_metrics(await tables([]))}
     assert got["conversations"] == 0 and got["completion_rate"] is None and got["p95_reply_ms"] is None
 
 
 async def test_the_database_only_reads_its_own_tables():
-    db = metrics_db(workspace())
+    db = await tables(workspace())
     for sql in ("SELECT * FROM read_csv_auto('/etc/passwd')", "DROP TABLE conversations", "SELECT 1; SELECT 2"):
         with pytest.raises(AnalyticsError):
             await db.query(sql)
 
 
 async def test_a_question_in_plain_english_is_answered_with_sql():
-    db = metrics_db(workspace())
+    db = await tables(workspace())
     a = await ask(db, llm_from_env(), ModelConfig.from_env().generate, "Which agent handed the most conversations to a person?")
     assert "conversations" in a.sql.lower() or "handoffs" in a.sql.lower()
     assert a.rows and a.rows[0][0] == "hiring", (a.sql, a.rows)

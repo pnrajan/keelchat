@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from tests.helpers import make_runtime, reach_form, say
+from tests.helpers import audit_window, make_runtime, reach_form, say
 from yachat.runtime.audit import summarize
 from yachat.state.models import AuditEvent, subject_of
 from yachat.state.store import InMemoryAuditStore
@@ -28,7 +28,7 @@ async def test_the_store_filters_newest_first_and_purges_old_records():
     assert await store.purge(now - timedelta(days=90)) == 1 and len(await store.query("t1")) == 2
 
 
-def test_the_summary_counts_outcomes_and_where_conversations_struggle():
+async def test_the_summary_counts_outcomes_and_where_conversations_struggle():
     events = [
         ev(session_id="s1"),
         ev(session_id="s1", kind="exit", decision="completed", ok=True),
@@ -41,7 +41,9 @@ def test_the_summary_counts_outcomes_and_where_conversations_struggle():
         ev(session_id="s3", kind="guardrail", decision="blocked_input", ref="prompt_injection"),
         ev(session_id="s3", kind="tool", decision="timeout", ok=False, ref="job_search"),
     ]
-    s = summarize(events, None, None)
+    db = await audit_window([*events, ev(tenant="t2", session_id="x", kind="exit", decision="completed")], "t1")
+    s = summarize(db, None, None)
+    db.close()
     assert s.sessions == 3 and s.turns == 3
     assert s.outcomes == {"completed": 1, "handed_off": 1} and s.completion_rate == 0.333 and s.handoff_rate == 0.333
     assert s.handoff_reasons == {"max_reasks": 1} and s.handoff_actions == {"claimed": 1}
@@ -113,7 +115,7 @@ async def test_people_work_the_inbox_and_see_outcomes_over_the_api(policy_yaml):
         assert s["handoff_reasons"] == {"user_request": 1} and s["handoff_actions"] == {"claimed": 1, "resolved": 1}
 
 
-def test_the_dashboard_has_daily_outcomes_per_agent_latency_and_handoff_wait():
+async def test_the_dashboard_has_daily_outcomes_per_agent_latency_and_handoff_wait():
     from yachat.runtime.audit import dashboard
 
     now = datetime.now(UTC).replace(hour=12)
@@ -129,7 +131,9 @@ def test_the_dashboard_has_daily_outcomes_per_agent_latency_and_handoff_wait():
         ev(session_id="s3", at=now, ms=1000.0, llm_calls=3, errors=0),
         ev(session_id="s3", kind="exit", decision="max_reasks", at=now),
     ]
-    d = dashboard(events, y.replace(hour=0), now, open_handoffs=2)
+    db = await audit_window(events, "t1")
+    d = dashboard(db, y.replace(hour=0), now, open_handoffs=2)
+    db.close()
     assert [(p.conversations, p.completed, p.handed_off, p.dropped) for p in d.days] == [(1, 1, 0, 0), (2, 0, 1, 1)]
     assert d.days[1].p95_ms == 2000.0 and d.days[1].error_turns == 1
     by = {a.agent: a for a in d.agents}

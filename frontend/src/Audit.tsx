@@ -47,7 +47,7 @@ export default function Audit({ agent, session }: { agent: string | null; sessio
             <div><span className="num big">{pct(summary.completion_rate)}</span><span className="muted small">completed</span></div>
             <div><span className="num big">{pct(summary.handoff_rate)}</span><span className="muted small">handed to a person</span></div>
           </div>
-          <p className="muted small">{agent ? <>Agent <code>{agent}</code></> : "All agents"}, last 90 days{summary.truncated ? " (newest 50,000 records)" : ""}.</p>
+          <p className="muted small">{agent ? <>Agent <code>{agent}</code></> : "All agents"}, last 90 days.</p>
           <div className="counts-grid">
             <Counts title="How conversations ended" data={summary.outcomes} empty="None finished yet." />
             <Counts title="Why they went to a person" data={summary.handoff_reasons} empty="No handoffs." />

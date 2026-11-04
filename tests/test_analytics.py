@@ -226,6 +226,8 @@ async def test_api(root, service):
         assert r.status_code == 422 and "outside YACHAT_DATA_ROOT" in r.text  # the caller's own URI, never file content
         r = await c.post("/analyze", json={"question": "How many orders are there?", "dataset": ds})
         assert r.status_code == 200 and r.json()["schema_version"] == 1 and "576" in r.text
+        calls = r.json()["usage"]  # the service's own model calls, for the caller's cost page
+        assert calls and all(c["model"] and c["purpose"] and c["input_tokens"] > 0 and c["output_tokens"] > 0 for c in calls)
 
 
 async def test_a_folder_of_parquet_files_is_one_table(root, tmp_path):

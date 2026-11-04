@@ -19,6 +19,10 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("build", help="validate and compile an agent.yaml")
     b.add_argument("path")
     b.add_argument("--tenant", default="default")
+    nw = sub.add_parser("new", help="starter files: an agent, or a capability package with a tool, step and guardrail")
+    nw.add_argument("kind", choices=["agent", "package"])
+    nw.add_argument("name", help="agent: returns-desk; package: acme_caps")
+    nw.add_argument("--out", default=".", help="directory to write into (default: here)")
     sub.add_parser("schema", help="JSON Schema of the policy, generated from the registry")
     sub.add_parser("registry", help="print the registry manifest")
     s = sub.add_parser("serve", help="run the runtime API")
@@ -59,6 +63,23 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {err.path}: {err.message}", file=sys.stderr)
             return 1
         print(json.dumps(compiled.model_dump(mode="json"), indent=2))
+        return 0
+    if args.cmd == "new":
+        from pathlib import Path
+
+        from yachat.scaffold import ScaffoldError, new_agent, new_package
+
+        try:
+            written = (new_agent if args.kind == "agent" else new_package)(args.name, Path(args.out))
+        except ScaffoldError as e:
+            print(e, file=sys.stderr)
+            return 1
+        for path in written:
+            print("created", path)
+        if args.kind == "agent":
+            print(f"next: yachat build {written[0]}")
+        else:
+            print(f"next: cd {args.out} && PYTHONPATH=. YACHAT_CAPABILITY_PACKAGES={args.name} yachat build {written[4].name}")
         return 0
     if args.cmd == "schema":
         print(json.dumps(policy_json_schema(), indent=2))

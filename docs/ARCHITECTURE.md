@@ -56,6 +56,8 @@ charter text, which every prompt receives.
 
 ## 3. Life of a message
 
+<p align="center"><img src="assets/pipeline.svg" alt="channel payload → Understand → Decide → Respond → reply; Decide calls tools through the Tool Gateway; memory is written after the reply" width="900"></p>
+
 1. **Channel adapter** turns the raw payload into `InboundMessage{text, user_id, channel_message_id, action?}`. SMS
    `STOP` is answered by the channel before the pipeline runs.
 2. **Runtime.turn** takes the per-session lock, drops duplicates by `channel_message_id`, loads state and the pinned
@@ -95,6 +97,20 @@ context compression). Model tiers are pinned per build in `CompiledPolicy.models
 `generate` (replies, knowledge answers, planner drafts) and `verify` (reply and reasoning checks; the generate model
 when `YACHAT_MODEL_VERIFY` is unset). There is no fake model anywhere: tests, simulations and
 evals call the configured provider.
+
+Usage and cost: each client's provider call is decorated with `runtime/usage.py:metered`. It records model, purpose,
+tokens in, out and cached, time and cost to the turn's meter (a context variable), and the runtime writes them to the
+audit log. Behind a LiteLLM gateway it reads the routed model and the gateway's cost from the response headers;
+behind Headroom, the tokens saved. A service that makes its own model calls (the Analytics Service) collects them with
+`metering()` and returns them in its response, and the runtime adds them to the turn that called it.
+
+Dashboards add up in DuckDB, not in Python. `runtime/audit.py:audit_db` loads one tenant's window into a private
+in-memory DuckDB table through the audit store port (`AuditStore.copy_to`, every field but the words people wrote):
+Postgres streams it out with `COPY`, the Iceberg archive is read by DuckDB straight from its Parquet files on S3
+(only that tenant's day partitions), and the in-memory store inserts its rows. With the archive on, records before its
+cursor come from the archive and the rest from Postgres, so each is counted once. The cost page, the outcome dashboard,
+the audit summary and the key metrics are SQL over that table; for key-metric questions the five tables are built from
+it in SQL, `audit` is dropped and the database is locked before the model's query runs.
 
 ## 5. Knowledge Service
 

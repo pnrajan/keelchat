@@ -9,7 +9,8 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 import pyarrow as pa
 from pyiceberg.catalog import Catalog
@@ -24,7 +25,10 @@ from pyiceberg.types import BooleanType, DoubleType, IcebergType, LongType, Nest
 
 from yachat.logging import get_logger
 from yachat.state.models import AuditEvent, AuditKind, now
-from yachat.state.store import ArchiveConflict, AuditArchive
+from yachat.state.store import AUDIT_COLUMNS, ArchiveConflict, AuditArchive
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 log = get_logger("audit_archive")
 
@@ -56,6 +60,7 @@ FIELDS: list[tuple[str, IcebergType, bool]] = [
     ("cost_usd", DoubleType(), False),
     ("subject", StringType(), False),  # added later: optional, so existing tables gain the column
     ("reply", StringType(), False),
+    ("saved_tokens", LongType(), False),  # added later: optional
 ]
 SCHEMA = Schema(*(NestedField(i, name, t, required=req) for i, (name, t, req) in enumerate(FIELDS, start=1)))
 SPEC = PartitionSpec(
@@ -150,6 +155,37 @@ class IcebergAuditArchive(AuditArchive):
         rows = rows.sort_by([("at", "descending"), ("id", "descending")]).slice(0, limit)
         return [AuditEvent.model_validate({k: v for k, v in r.items() if v is not None}) for r in rows.to_pylist()]
 
+    async def copy_to(
+        self,
+        db: DuckDBPyConnection,
+        tenant: str,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent: str | None = None,
+        kinds: list[AuditKind] | None = None,
+    ) -> None:
+        await asyncio.to_thread(self._copy_to, db, tenant, since, until, agent, kinds)
+
+    def _copy_to(self, db: DuckDBPyConnection, tenant: str, since: datetime, until: datetime | None, agent: str | None, kinds: list[AuditKind] | None) -> None:
+        """DuckDB reads the table's files itself; the tenant and day filters skip the other partitions' files."""
+        location = self.table().metadata_location
+        db.execute("LOAD iceberg")
+        if location.startswith("s3"):
+            _s3_secret(db, self.catalog.properties)
+        where, params = ["tenant = ?", '"at" >= ?'], list[Any]([tenant, since])
+        if until is not None:
+            where.append('"at" < ?')
+            params.append(until)
+        if agent is not None:
+            where.append("agent = ?")
+            params.append(agent)
+        if kinds:
+            where.append("list_contains(?, kind)")
+            params.append(list(kinds))
+        cols = ", ".join(f'"{c}"' for c in AUDIT_COLUMNS)
+        db.execute(f"INSERT INTO audit SELECT {cols} FROM iceberg_scan({_lit(location)}) WHERE {' AND '.join(where)}", params)
+
     async def purge(self, before: datetime) -> None:
         await asyncio.to_thread(self._purge, before)
 
@@ -167,6 +203,21 @@ class IcebergAuditArchive(AuditArchive):
             t.io.delete(path)
         if unused:
             log.info("audit archive files deleted", files=len(unused))
+
+
+def _lit(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _s3_secret(db: DuckDBPyConnection, props: dict[str, str]) -> None:
+    """DuckDB's S3 access: the AWS credential chain (env, profile, instance role) and the catalog's region and endpoint."""
+    opts = ["TYPE s3", "PROVIDER credential_chain"]
+    if region := props.get("s3.region"):
+        opts.append(f"REGION {_lit(region)}")
+    if endpoint := props.get("s3.endpoint"):  # MinIO, LocalStack: path-style URLs on the given host
+        url = urlparse(endpoint)
+        opts += [f"ENDPOINT {_lit(url.netloc)}", "URL_STYLE 'path'", f"USE_SSL {str(url.scheme == 'https').lower()}"]
+    db.execute(f"CREATE OR REPLACE TEMPORARY SECRET yachat_audit_archive ({', '.join(opts)})")
 
 
 def sql_catalog(uri: str, warehouse: str, **props: str) -> SqlCatalog:

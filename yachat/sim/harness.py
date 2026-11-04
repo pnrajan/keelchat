@@ -6,13 +6,14 @@ from __future__ import annotations
 import asyncio
 from dataclasses import asdict, dataclass
 from dataclasses import field as dc_field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from yachat.policy.compiler import CompiledPolicy, build
-from yachat.runtime.audit import AuditSummary, summarize
+from yachat.runtime.audit import AuditSummary, audit_db, summarize
 from yachat.runtime.context import InboundMessage
 from yachat.runtime.llm import LLMClient, LLMRequest, ModelConfig
 from yachat.runtime.llm_factory import llm_from_env
@@ -174,8 +175,11 @@ async def simulate(rt: Runtime, policy: CompiledPolicy, conversations: list[dict
 
     reports = list(await asyncio.gather(*(one(c) for c in conversations)))
     await rt.drain()
-    events = await rt.audit.query(policy.tenant, agent=policy.agent, limit=100_000)
-    return SimReport(reports, summarize(events, None, None))
+    db = await audit_db(rt.audit, policy.tenant, datetime(1970, 1, 1, tzinfo=UTC), agent=policy.agent)
+    try:
+        return SimReport(reports, summarize(db, None, None))
+    finally:
+        db.close()
 
 
 async def run_script(policy_text: str, script: dict[str, Any], llm: LLMClient | None = None) -> SimReport:

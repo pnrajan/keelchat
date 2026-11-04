@@ -9,10 +9,13 @@ import os
 from typing import Any
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from yachat.datasets.models import Dataset
 from yachat.registry.core import action, tool
+from yachat.runtime import usage
+
+_CALLS = TypeAdapter(list[usage.Usage])
 
 
 class ToolError(Exception):
@@ -89,6 +92,7 @@ async def analytics_query(
     several model calls."""
     payload = {"question": question, "dataset": dataset.model_dump(mode="json"), "history": history or [], "repairs": repairs or {}}
     data: dict[str, Any] = await _post("analytics_query", "ANALYTICS_URL", "/analyze", payload, 240.0)
+    usage.add(_CALLS.validate_python(data.pop("usage", [])))  # the service's model calls, on this turn's cost
     return data
 
 
