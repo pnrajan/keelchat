@@ -22,7 +22,7 @@ Tests call the real model; verification means running the services and driving t
 - `PUT /v1/tenants/{t}/datasets/{name}`, then `POST /v1/agents {yaml, tenant}`, `POST /v1/sessions`,
   `POST /v1/sessions/{id}/turns`. `examples/sales_analyst.yaml` is the analytics agent; its known answers:
   US 30,990 / APAC 14,620 / EU 10,450 revenue; EU monthly trend p≈0.0086.
-- Console: http://localhost:8000/console/ (landing page at /) — templates dropdown, Build policy, New session, Analysis tab.
+- Console: http://localhost:8000/console/ (landing page at /) — templates dropdown, Build & try, New session, Analysis tab.
 - Bubblewrap sandbox only runs on Linux; in Docker it needs `--security-opt systempaths=unconfined
   --security-opt seccomp=unconfined`.
 

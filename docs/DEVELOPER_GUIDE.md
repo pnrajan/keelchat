@@ -98,7 +98,7 @@ curl -s localhost:8000/v1/sessions/$SID/turns -H 'content-type: application/json
 
 An analytics answer also carries the full `AnalysisResult` as an item:
 `jq '.outbound.items[] | select(.type == "analysis_result") | .result'`. Its fields (input, data, assumptions,
-findings, summary, recommendations) are described in the [README](../README.md#datasets-and-the-analytics-service).
+findings, summary, recommendations) are described in [`ARCHITECTURE.md`](ARCHITECTURE.md#datasets-and-the-analytics-service).
 
 **5. Inspect and clean up.**
 
@@ -166,12 +166,8 @@ before they reach a log line or a tool.
 
 ## Checks before a pull request
 
-```bash
-uv run ruff check . && uv run ruff format --check . && uv run mypy
-uv run pytest                      # real model; -k <name> for one area, e.g. -k analytics
-cd frontend && npm run build       # when the console changed
-uv run yachat evals run           # when a policy, prompt or example agent changed
-```
+The commands are in [`CONTRIBUTING.md`](../CONTRIBUTING.md#before-opening-a-pull-request). Use `uv run pytest -k <name>`
+for one area (e.g. `-k analytics`), and `--offline` to run only the tests that don't call the model.
 
 Tests run in parallel against your provider, which may rate-limit them; run the live console and the test suite at
 different times. Capability changes must also pass `tests/test_registry.py` (the contract suite). PR rules:

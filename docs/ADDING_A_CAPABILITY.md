@@ -15,8 +15,11 @@ async def salary_lookup(title: str, location: str = "") -> dict[str, str]:
 ```
 
 Input schema comes from the type hints, output schema from the return hint. Raise `ToolError(name, kind, message)`
-for failures. `retries` is how many times the gateway retries after a timeout or error (default 1). Never open
-sockets outside the function the gateway calls.
+for failures. `retries` is how many times the gateway retries after a timeout or error (default 1); after that a
+circuit breaker opens for the tool. Never open sockets outside the function the gateway calls. Tool output goes into
+prompts as data, never as instructions. Anything that changes something (book, pay, submit) is an
+[action](#candidate-only-action), not a tool. Allow it in a policy with `tools: [salary_lookup]`. Full example:
+[`examples/extensions/booking_caps/tools.py`](../examples/extensions/booking_caps/tools.py).
 
 ## MCP server
 
@@ -77,7 +80,12 @@ class MyStep(Node[MyConfig]):
         return NodeResult("…", ask=("field", "Ask…", "expect…"))  # or outputs={...}, complete=True
 ```
 
-`produces` are the outputs that make the step complete; `tools` join the agent's allow list.
+`produces` are the outputs that make the step complete; `tools` join the agent's allow list; `requires:` on a flow
+entry orders steps by those outputs. Use it in a policy as `- my_step: {greeting: Hello}`. A worked example that
+calls a tool, offers choices and completes on the user's pick:
+[`examples/extensions/booking_caps/steps.py`](../examples/extensions/booking_caps/steps.py). The built-in steps are
+`greet_consent`, `form_fill`, `survey`, `conversation_survey`, `knowledge`, `analytics`, `job_search`, `handoff` and
+`exit`; [`form_fill.py`](../yachat/capabilities/nodes/form_fill.py) is a good one to read first.
 
 - **Datasets.** A config field typed `StructuredRef` or `UnstructuredRef` (`yachat.datasets.models`) names a
   dataset; the build checks it exists with that kind. A tool that reads one declares `@tool(..., dataset="structured")`
@@ -144,6 +152,39 @@ class NoCompetitors(Guardrail):
     async def check(self, text, ctx):
         return GuardResult(flagged=True, reason="…", redacted=text.replace("Globex", "another company"))
 ```
+
+List it in a policy: `guardrails: {output: [pii, no_competitors]}`. `prompt_injection` and `pii` always run. Input
+guardrails can stop a turn; output guardrails redact or replace the reply. Flagged turns are never written to memory.
+Full example: [`examples/extensions/booking_caps/guardrails.py`](../examples/extensions/booking_caps/guardrails.py).
+
+## Channel
+
+A channel turns its platform's payload into an `InboundMessage`, and a channel-neutral reply into its own messages
+within its limits.
+
+```python
+from yachat.channels import CHANNELS
+from yachat.channels.base import Channel, split_text
+from yachat.runtime.context import ChannelMessage, InboundMessage
+
+
+class Telegram(Channel):
+    name = "telegram"
+
+    def normalize(self, payload):
+        m = payload["message"]
+        return InboundMessage(text=m.get("text", ""), channel="telegram", user_id=f"tg:{m['chat']['id']}", channel_message_id=str(m["message_id"]))
+
+    def render(self, message):
+        return [ChannelMessage(chunk) for chunk in split_text(message.text, 4096)]
+
+
+CHANNELS.setdefault("telegram", Telegram())
+```
+
+Open sessions with `"channel": "telegram"` and post the raw update as the turn's `payload`; your webhook sends the
+rendered messages back. Override `compliance()` for opt-out words the platform requires (see `channels/sms.py`). Full
+example: [`examples/extensions/booking_caps/telegram.py`](../examples/extensions/booking_caps/telegram.py).
 
 ## Make it discoverable
 
