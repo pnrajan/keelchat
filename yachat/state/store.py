@@ -11,7 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,9 @@ from yachat.state.models import (
     new_id,
     now,
 )
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 
 class VersionConflict(Exception):
@@ -292,6 +295,38 @@ class InMemoryMemoryStore(MemoryStore):
         return len(keys)
 
 
+#: the columns `copy_to` fills in a DuckDB table `audit`, for the dashboards: every AuditEvent field but the words
+#: people wrote and read (text, reply) and who they are (subject)
+AUDIT_COLUMNS: dict[str, str] = {
+    "id": "VARCHAR",
+    "at": "TIMESTAMPTZ",
+    "tenant": "VARCHAR",
+    "agent": "VARCHAR",
+    "policy_hash": "VARCHAR",
+    "session_id": "VARCHAR",
+    "turn_id": "VARCHAR",
+    "kind": "VARCHAR",
+    "decision": "VARCHAR",
+    "reason": "VARCHAR",
+    "step": "VARCHAR",
+    "field": "VARCHAR",
+    "ok": "BOOLEAN",
+    "ref": "VARCHAR",
+    "actor": "VARCHAR",
+    "ms": "DOUBLE",
+    "llm_calls": "BIGINT",
+    "tool_calls": "BIGINT",
+    "errors": "BIGINT",
+    "input_tokens": "BIGINT",
+    "output_tokens": "BIGINT",
+    "cached_tokens": "BIGINT",
+    "cost_usd": "DOUBLE",
+    "saved_tokens": "BIGINT",
+}
+INSERT_AUDIT = f"INSERT INTO audit VALUES ({', '.join('?' * len(AUDIT_COLUMNS))})"
+CREATE_AUDIT = "CREATE TABLE audit (" + ", ".join(f'"{c}" {t}' for c, t in AUDIT_COLUMNS.items()) + ")"
+
+
 class AuditStore(ABC):
     """The audit log: append-only decision records per tenant, newest first on read."""
 
@@ -323,6 +358,19 @@ class AuditStore(ABC):
     @abstractmethod
     async def between(self, after: datetime, until: datetime) -> list[AuditEvent]:
         """Every tenant's records with after <= at < until, oldest first (the archive export reads these)."""
+
+    @abstractmethod
+    async def copy_to(
+        self,
+        db: DuckDBPyConnection,
+        tenant: str,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent: str | None = None,
+        kinds: list[AuditKind] | None = None,
+    ) -> None:
+        """Insert this tenant's records with since <= at < until into the DuckDB table `audit` (AUDIT_COLUMNS)."""
 
 
 class InMemoryAuditStore(AuditStore):
@@ -373,6 +421,20 @@ class InMemoryAuditStore(AuditStore):
     async def between(self, after: datetime, until: datetime) -> list[AuditEvent]:
         return sorted((e.model_copy() for e in self._e if after <= e.at < until), key=lambda e: (e.at, e.id))
 
+    async def copy_to(
+        self,
+        db: DuckDBPyConnection,
+        tenant: str,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent: str | None = None,
+        kinds: list[AuditKind] | None = None,
+    ) -> None:
+        events = await self.query(tenant, agent=agent, kinds=kinds, since=since, until=until, limit=len(self._e))
+        if events:
+            db.executemany(INSERT_AUDIT, [tuple(getattr(e, c) for c in AUDIT_COLUMNS) for e in events])
+
 
 class ArchiveConflict(Exception):
     """Another writer moved the archive's cursor first; the export runs again later from the new cursor."""
@@ -407,6 +469,19 @@ class AuditArchive(ABC):
     async def purge(self, before: datetime) -> None:
         """Delete records older than `before`, from storage as well as from the table."""
 
+    @abstractmethod
+    async def copy_to(
+        self,
+        db: DuckDBPyConnection,
+        tenant: str,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent: str | None = None,
+        kinds: list[AuditKind] | None = None,
+    ) -> None:
+        """Insert this tenant's records with since <= at < until into the DuckDB table `audit` (AUDIT_COLUMNS)."""
+
 
 class InMemoryAuditArchive(AuditArchive):
     def __init__(self) -> None:
@@ -437,6 +512,18 @@ class InMemoryAuditArchive(AuditArchive):
 
     async def purge(self, before: datetime) -> None:
         await self._events.purge(before)
+
+    async def copy_to(
+        self,
+        db: DuckDBPyConnection,
+        tenant: str,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent: str | None = None,
+        kinds: list[AuditKind] | None = None,
+    ) -> None:
+        await self._events.copy_to(db, tenant, since=since, until=until, agent=agent, kinds=kinds)
 
 
 class ArchivedAuditStore(AuditStore):
@@ -493,6 +580,23 @@ class ArchivedAuditStore(AuditStore):
 
     async def between(self, after: datetime, until: datetime) -> list[AuditEvent]:
         return await self.hot.between(after, until)
+
+    async def copy_to(
+        self,
+        db: DuckDBPyConnection,
+        tenant: str,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent: str | None = None,
+        kinds: list[AuditKind] | None = None,
+    ) -> None:
+        """Records before the archive's cursor from the archive, the rest from the hot store: each record once."""
+        cur = await self.archive.cursor()
+        if cur is not None and since < cur:
+            await self.archive.copy_to(db, tenant, since=since, until=min(until, cur) if until else cur, agent=agent, kinds=kinds)
+        if cur is None or until is None or until > cur:
+            await self.hot.copy_to(db, tenant, since=max(since, cur) if cur else since, until=until, agent=agent, kinds=kinds)
 
     async def export(self, first: datetime) -> int:
         """Copy the hot records the archive does not have yet, up to LAG ago; `first`: where a new archive starts.

@@ -496,6 +496,7 @@ the model provider is required; everything else runs in memory when unset.
 | `HANDOFF_URL`, `HANDOFF_TOKEN` | where `handoff_webhook` sends each handoff |
 | `MEM0_API_KEY` or `MEM0_QDRANT_URL` | user memory in mem0 instead of Postgres |
 | `AUDIT_RETENTION_DAYS`, `AUDIT_ARCHIVE_WAREHOUSE` | audit retention; an archive in an Apache Iceberg table on S3 |
+| `YACHAT_DUCKDB_EXTENSIONS` | where DuckDB's iceberg, httpfs and aws extensions are installed (the Docker image sets it), so dashboards read the archive without a download |
 | `SENTRY_DSN` | errors and traces per stage and model call; no message text is sent |
 | `YACHAT_TOOLS=fake` | development only: fake backends for tools whose URL is unset |
 

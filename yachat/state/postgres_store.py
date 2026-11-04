@@ -7,8 +7,9 @@ import asyncio
 import builtins
 import json
 import os
+import tempfile
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from yachat.api.keys import ApiKey, ApiKeyStore
 from yachat.datasets.models import Dataset
@@ -30,6 +31,7 @@ from yachat.state.models import (
     now,
 )
 from yachat.state.store import (
+    AUDIT_COLUMNS,
     AgentVersionStore,
     AuditStore,
     BudgetStore,
@@ -47,6 +49,9 @@ from yachat.state.store import (
     TurnLocks,
     VersionConflict,
 )
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 try:  # optional extra
     import asyncpg
@@ -692,6 +697,33 @@ class PostgresApiKeyStore(_Pooled, ApiKeyStore):
             await con.execute("UPDATE api_keys SET last_used_at=now() WHERE id=$1", key_id)
 
 
+def _audit_where(
+    tenant: str, agent: str | None, session_id: str | None, kinds: builtins.list[AuditKind] | None, since: datetime | None, until: datetime | None
+) -> tuple[str, builtins.list[Any]]:
+    where, args = ["tenant=$1"], builtins.list[Any]([tenant])
+    for col, val in (("agent", agent), ("session_id", session_id)):
+        if val is not None:
+            args.append(val)
+            where.append(f"{col}=${len(args)}")
+    if kinds:
+        args.append(builtins.list(kinds))
+        where.append(f"kind = ANY(${len(args)})")
+    if since is not None:
+        args.append(since)
+        where.append(f"at >= ${len(args)}")
+    if until is not None:
+        args.append(until)
+        where.append(f"at < ${len(args)}")
+    return " AND ".join(where), args
+
+
+_PG_TYPES = {"VARCHAR": "text", "BIGINT": "bigint", "DOUBLE": "float8", "BOOLEAN": "boolean"}
+#: AUDIT_COLUMNS from the row: its own columns where it has them, else the record JSON
+_AUDIT_SELECT = ", ".join(
+    c if c in ("id", "tenant", "agent", "session_id", "kind", "at") else f"(event->>'{c}')::{_PG_TYPES[t]}" for c, t in AUDIT_COLUMNS.items()
+)
+
+
 class PostgresAuditStore(_Pooled, AuditStore):
     """The audit log in Postgres: one row per decision, the record as JSON plus the columns it is filtered by."""
 
@@ -715,22 +747,9 @@ class PostgresAuditStore(_Pooled, AuditStore):
         until: datetime | None = None,
         limit: int = 200,
     ) -> list[AuditEvent]:
-        where, args = ["tenant=$1"], list[Any]([tenant])
-        for col, val in (("agent", agent), ("session_id", session_id)):
-            if val is not None:
-                args.append(val)
-                where.append(f"{col}=${len(args)}")
-        if kinds:
-            args.append(list(kinds))
-            where.append(f"kind = ANY(${len(args)})")
-        if since is not None:
-            args.append(since)
-            where.append(f"at >= ${len(args)}")
-        if until is not None:
-            args.append(until)
-            where.append(f"at < ${len(args)}")
+        where, args = _audit_where(tenant, agent, session_id, kinds, since, until)
         args.append(limit)
-        sql = f"SELECT event FROM audit_events WHERE {' AND '.join(where)} ORDER BY at DESC, id DESC LIMIT ${len(args)}"
+        sql = f"SELECT event FROM audit_events WHERE {where} ORDER BY at DESC, id DESC LIMIT ${len(args)}"
         async with (await self.pool).acquire() as con:
             rows = await con.fetch(sql, *args)
         return [AuditEvent.model_validate_json(r["event"]) for r in rows]
@@ -756,6 +775,27 @@ class PostgresAuditStore(_Pooled, AuditStore):
         async with (await self.pool).acquire() as con:
             rows = await con.fetch("SELECT event FROM audit_events WHERE at >= $1 AND at < $2 ORDER BY at, id", after, until)
         return [AuditEvent.model_validate_json(r["event"]) for r in rows]
+
+    async def copy_to(
+        self,
+        db: DuckDBPyConnection,
+        tenant: str,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent: str | None = None,
+        kinds: builtins.list[AuditKind] | None = None,
+    ) -> None:
+        """COPY streams the window out as CSV (no row objects in Python); DuckDB reads the file."""
+        where, args = _audit_where(tenant, agent, None, kinds, since, until)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "audit.csv")
+            async with (await self.pool).acquire() as con:
+                await con.copy_from_query(f"SELECT {_AUDIT_SELECT} FROM audit_events WHERE {where}", *args, output=path, format="csv")
+            columns = "{" + ", ".join(f"'{c}': '{t}'" for c, t in AUDIT_COLUMNS.items()) + "}"
+            # an unquoted empty field is NULL, a quoted one ("") an empty string, as Postgres wrote them
+            sql = f"INSERT INTO audit SELECT * FROM read_csv(?, header = false, allow_quoted_nulls = false, columns = {columns})"
+            await asyncio.to_thread(db.execute, sql, [path])
 
 
 class PostgresResponseStore(_Pooled, ResponseStore):

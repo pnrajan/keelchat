@@ -48,6 +48,34 @@ async def test_export_moves_settled_records_and_reads_span_both(make: str, tmp_p
     assert len(await store.query("t1")) == 3
 
 
+@pytest.mark.parametrize("make", ["memory", "iceberg"])
+async def test_dashboards_read_each_record_once_across_hot_store_and_archive(make: str, tmp_path: Path) -> None:
+    """The archive answers before its cursor, the hot store after it; the hot store's archived copies are not counted."""
+    from yachat.runtime.audit import audit_db
+
+    hot = InMemoryAuditStore()
+    archive = InMemoryAuditArchive() if make == "memory" else iceberg(tmp_path)
+    store = ArchivedAuditStore(hot, archive, hot_days=7)
+    call = {"kind": "llm", "decision": "call"}
+    old = [ev("t1", 50, input_tokens=10).model_copy(update=call), ev("t1", 30, ms=12.5, ok=True), ev("t2", 30), ev("t1", 30).model_copy(update={"agent": "b"})]
+    fresh = ev("t1", 0, input_tokens=5).model_copy(update=call)
+    await store.append([*old, fresh])
+    await store.export(first=datetime.now(UTC) - timedelta(days=90))
+    assert len(await hot.query("t1")) == 4  # archived records are still in the hot store
+
+    db = await audit_db(store, "t1", datetime.now(UTC) - timedelta(days=3))
+    try:
+        assert sorted(r[0] for r in db.execute("SELECT id FROM audit").fetchall()) == sorted(e.id for e in [*old, fresh] if e.tenant == "t1")
+        assert db.execute("SELECT ms, ok FROM audit WHERE ms IS NOT NULL").fetchall() == [(12.5, True)]
+    finally:
+        db.close()
+    db = await audit_db(store, "t1", datetime.now(UTC) - timedelta(hours=40), agent="a", kinds=["llm", "turn"])
+    try:
+        assert sorted(r[0] for r in db.execute("SELECT id FROM audit").fetchall()) == sorted([old[1].id, fresh.id])
+    finally:
+        db.close()
+
+
 async def test_a_second_exporter_cannot_archive_the_same_records_twice(tmp_path: Path) -> None:
     a, b = iceberg(tmp_path), iceberg(tmp_path)
     end = datetime.now(UTC)

@@ -41,7 +41,7 @@ from yachat.policy.templates import builtin_templates, renamed
 from yachat.registry.contract import ContractViolation, check_tool
 from yachat.registry.core import REGISTRY, RegistryError
 from yachat.registry.tenant_tools import TenantToolIn, TenantToolRejected, check_public_url, tenant_tool_spec
-from yachat.runtime.audit import RETENTION_DAYS, dashboard, retention_cutoff, summarize, usage_report
+from yachat.runtime.audit import RETENTION_DAYS, audit_db, dashboard, retention_cutoff, summarize, usage_report
 from yachat.runtime.findings import csv_rows, findings
 from yachat.runtime.llm import LLMError, ModelConfig, small_only
 from yachat.runtime.llm_factory import fake_tools_from_env, llm_from_env
@@ -930,6 +930,18 @@ def create_app(
         open_n = len(await rt.handoffs.list(tenant, status="open", agent=agent, limit=500))
         return dashboard(events, since, until, open_n, truncated=len(events) >= SUMMARY_LIMIT).model_dump(mode="json")
 
+    @asynccontextmanager
+    async def audit_window(tenant: str, since: datetime, *, agent: str | None = None, kinds: list[AuditKind] | None = None) -> AsyncIterator[Any]:
+        """The tenant's records since `since` in a private DuckDB (`audit_db`), closed afterwards."""
+        try:
+            db = await audit_db(rt.audit, tenant, since, agent=agent, kinds=kinds)
+        except ImportError as e:  # duckdb is in the api extra
+            raise HTTPException(501, "dashboards need DuckDB: uv sync --extra api") from e
+        try:
+            yield db
+        finally:
+            db.close()
+
     @app.get("/v1/tenants/{tenant}/usage")
     async def usage(tenant: TenantId, days: Annotated[int, Query(ge=1, le=90)] = 30, agent: str | None = None) -> dict[str, Any]:
         """This tenant's model usage and cost: calls, input / output / cached tokens and USD, by model, purpose, agent
@@ -938,8 +950,8 @@ def create_app(
 
         until = datetime.now(UTC)
         since = (until - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        events = await rt.audit.query(tenant, agent=agent, kinds=["llm", "turn"], since=since, limit=SUMMARY_LIMIT)
-        report = usage_report(events, since, until, truncated=len(events) >= SUMMARY_LIMIT)
+        async with audit_window(tenant, since, agent=agent, kinds=["llm", "turn"]) as db:
+            report = await asyncio.to_thread(usage_report, db, since, until)
         configured = {"generate": rt.models.generate, "classify": rt.models.classify, "verify": rt.models.verifier}
         used = {line.key for line in report.by_model} | set(configured.values())
         prices = {}
@@ -961,12 +973,14 @@ def create_app(
         from yachat.runtime.usage import cheaper, job_of, price, prices_fetched_at
 
         since = datetime.now(UTC) - timedelta(days=days)
-        calls = await rt.audit.query(tenant, kinds=["llm"], since=since, limit=SUMMARY_LIMIT)
+        sql = "SELECT reason, coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0) FROM audit GROUP BY reason"
+        async with audit_window(tenant, since, kinds=["llm"]) as db:
+            rows = await asyncio.to_thread(lambda: db.execute(sql).fetchall())
         tokens: dict[str, list[int]] = {"generate": [0, 0], "classify": [0, 0], "verify": [0, 0]}
-        for e in calls:
-            t = tokens[job_of(e.reason)]
-            t[0] += e.input_tokens or 0
-            t[1] += e.output_tokens or 0
+        for reason, tin, tout in rows:
+            t = tokens[job_of(reason or "")]
+            t[0] += tin
+            t[1] += tout
         jobs = {
             "generate": ("Writing replies", rt.models.generate, "YACHAT_MODEL_GENERATE"),
             "classify": ("Reading messages", rt.models.classify, "YACHAT_MODEL_CLASSIFY"),

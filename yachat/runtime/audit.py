@@ -3,9 +3,10 @@ verdict, tool outcomes) plus what stages recorded themselves. Plus the summary t
 
 from __future__ import annotations
 
+import os
 from collections import Counter
-from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -14,6 +15,10 @@ from yachat.runtime.context import TurnContext
 from yachat.runtime.redaction import redact_pii
 from yachat.runtime.usage import Usage
 from yachat.state.models import AuditEvent, AuditKind, SessionState, subject_of
+from yachat.state.store import CREATE_AUDIT, AuditStore
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 #: characters of user text an audit record keeps
 SNIPPET_CHARS = 160
@@ -313,46 +318,64 @@ class UsageReport(BaseModel):
     by_day: list[UsageLine]
     conversations: int
     cost_per_conversation: float | None
-    truncated: bool = False
 
 
-def _line(key: str, xs: list[AuditEvent]) -> UsageLine:
-    priced = [e.cost_usd for e in xs if e.cost_usd is not None]
-    return UsageLine(
-        key=key,
-        calls=len(xs),
-        input_tokens=sum(e.input_tokens or 0 for e in xs),
-        output_tokens=sum(e.output_tokens or 0 for e in xs),
-        cached_tokens=sum(e.cached_tokens or 0 for e in xs),
-        saved_tokens=sum(e.saved_tokens or 0 for e in xs),
-        cost_usd=round(sum(priced), 6) if priced else None,
-        unpriced_calls=len(xs) - len(priced),
-        p50_ms=_pct([e.ms for e in xs if e.ms is not None], 50),
-    )
+#: DuckDB memory for one dashboard query (it spills to a temporary file beyond this)
+AUDIT_DB_MEMORY = "1GB"
 
 
-def usage_report(events: list[AuditEvent], since: datetime, until: datetime, truncated: bool = False) -> UsageReport:
-    calls = [e for e in events if e.kind == "llm"]
+async def audit_db(
+    store: AuditStore, tenant: str, since: datetime, until: datetime | None = None, *, agent: str | None = None, kinds: list[AuditKind] | None = None
+) -> DuckDBPyConnection:
+    """A tenant's records for a window as the table `audit` in a private in-memory DuckDB, for the dashboards. The
+    store loads it: Postgres by COPY, the Iceberg archive by DuckDB reading the files on S3. The caller closes it."""
+    import duckdb
 
-    def group(key: Callable[[AuditEvent], str]) -> list[UsageLine]:
-        buckets: dict[str, list[AuditEvent]] = {}
-        for e in calls:
-            buckets.setdefault(key(e), []).append(e)
-        return sorted((_line(k, v) for k, v in buckets.items()), key=lambda u: (-(u.cost_usd or 0), -u.input_tokens))
+    config: dict[str, Any] = {"TimeZone": "UTC", "memory_limit": AUDIT_DB_MEMORY}
+    if ext := os.getenv("YACHAT_DUCKDB_EXTENSIONS"):  # where the image installed iceberg / httpfs / aws (no download)
+        config["extension_directory"] = ext
+    db = duckdb.connect(config=config)
+    try:
+        db.execute(CREATE_AUDIT)
+        await store.copy_to(db, tenant, since=since, until=until, agent=agent, kinds=kinds)
+    except BaseException:
+        db.close()
+        raise
+    return db
 
-    total = _line("total", calls)
+
+_USAGE = """
+SELECT {key} AS key, count(*) AS calls, coalesce(sum(input_tokens), 0) AS input_tokens, coalesce(sum(output_tokens), 0) AS output_tokens,
+       coalesce(sum(cached_tokens), 0) AS cached_tokens, coalesce(sum(saved_tokens), 0) AS saved_tokens, round(sum(cost_usd), 6) AS cost_usd,
+       count(*) - count(cost_usd) AS unpriced_calls, round(quantile_disc(ms, 0.5), 1) AS p50_ms
+FROM audit WHERE kind = 'llm' {group}
+"""
+
+
+def _lines(db: DuckDBPyConnection, key: str, grouped: bool = True) -> list[UsageLine]:
+    cur = db.execute(_USAGE.format(key=key, group="GROUP BY 1 ORDER BY 1" if grouped else ""))
+    names = [d[0] for d in cur.description or []]
+    lines = [UsageLine(**dict(zip(names, row, strict=True))) for row in cur.fetchall()]
+    return sorted(lines, key=lambda u: (-(u.cost_usd or 0), -u.input_tokens)) if grouped else lines
+
+
+def usage_report(db: DuckDBPyConnection, since: datetime, until: datetime) -> UsageReport:
+    """Totals in DuckDB over the window's `llm` and `turn` records (see `audit_db`): no row reaches Python."""
+    (total,) = _lines(db, "'total'", grouped=False)
+    found = {u.key: u for u in _lines(db, "strftime(CAST(\"at\" AS DATE), '%Y-%m-%d')")}
     n_days = max(1, (until.date() - since.date()).days + 1)
-    by_day = [_line(d, [e for e in calls if e.at.date().isoformat() == d]) for d in ((since + timedelta(days=i)).date().isoformat() for i in range(n_days))]
-    sessions = {e.session_id for e in events if e.kind == "turn" and e.session_id}
+    days = [(since + timedelta(days=i)).date().isoformat() for i in range(n_days)]
+    empty: dict[str, Any] = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "cost_usd": None, "unpriced_calls": 0, "p50_ms": None}
+    row = db.execute("SELECT count(DISTINCT session_id) FROM audit WHERE kind = 'turn'").fetchone()
+    sessions = int(row[0]) if row else 0
     return UsageReport(
         since=since,
         until=until,
         total=total,
-        by_model=group(lambda e: e.ref or "?"),
-        by_purpose=group(lambda e: e.reason or "?"),
-        by_agent=group(lambda e: e.agent),
-        by_day=by_day,
-        conversations=len(sessions),
-        cost_per_conversation=round(total.cost_usd / len(sessions), 6) if total.cost_usd is not None and sessions else None,
-        truncated=truncated,
+        by_model=_lines(db, "coalesce(nullif(ref, ''), '?')"),
+        by_purpose=_lines(db, "coalesce(nullif(reason, ''), '?')"),
+        by_agent=_lines(db, "agent"),
+        by_day=[found.get(d) or UsageLine(key=d, **empty) for d in days],
+        conversations=sessions,
+        cost_per_conversation=round(total.cost_usd / sessions, 6) if total.cost_usd is not None and sessions else None,
     )

@@ -130,6 +130,45 @@ async def test_postgres_audit_between_reads_every_tenant_oldest_first():
 
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
+async def test_postgres_audit_copies_a_tenants_window_into_duckdb():
+    import uuid
+    from datetime import UTC, datetime, timedelta
+
+    import asyncpg
+
+    from yachat.runtime.audit import audit_db
+    from yachat.state.models import AuditEvent
+    from yachat.state.postgres_store import PostgresAuditStore, ensure_schema
+
+    try:
+        pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
+    except Exception as e:  # database down or missing: environment, not code
+        pytest.skip(f"postgres unreachable: {e.__class__.__name__}")
+    await ensure_schema(pool)
+    store, tenant = PostgresAuditStore(pool), "t-" + uuid.uuid4().hex[:8]
+    t0 = datetime(2001, 1, 1, tzinfo=UTC)
+    call = AuditEvent(tenant=tenant, agent="a", kind="llm", decision="call", reason="", ref="m", input_tokens=7, cost_usd=0.5, ms=1.5, at=t0)
+    turn = AuditEvent(tenant=tenant, agent="a", session_id="s1", kind="turn", decision="ask", ok=False, text="hi, it's me", at=t0 + timedelta(hours=1))
+    await store.append(
+        [
+            call,
+            turn,
+            call.model_copy(update={"id": "x" + tenant, "tenant": tenant + "x"}),
+            call.model_copy(update={"id": "y" + tenant, "at": t0 - timedelta(days=1)}),
+        ]
+    )
+    db = await audit_db(store, tenant, t0)
+    try:
+        rows = db.execute('SELECT id, "at", kind, reason, ref, ok, input_tokens, cost_usd, ms, saved_tokens FROM audit ORDER BY "at"').fetchall()
+        assert rows == [(call.id, t0, "llm", "", "m", None, 7, 0.5, 1.5, None), (turn.id, turn.at, "turn", "", None, False, None, None, None, None)]
+    finally:
+        db.close()
+        async with pool.acquire() as con:
+            await con.execute("DELETE FROM audit_events WHERE tenant LIKE $1", f"{tenant}%")
+        await pool.close()
+
+
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_every_postgres_store_shares_one_pool():
     from yachat.api.app import embed_store_from_env, key_store_from_env, stores_from_env, tool_store_from_env
 

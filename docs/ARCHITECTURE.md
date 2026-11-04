@@ -102,6 +102,12 @@ audit log. Behind a LiteLLM gateway it reads the routed model and the gateway's 
 behind Headroom, the tokens saved. A service that makes its own model calls (the Analytics Service) collects them with
 `metering()` and returns them in its response, and the runtime adds them to the turn that called it.
 
+Dashboards add up in DuckDB, not in Python. `runtime/audit.py:audit_db` loads one tenant's window into a private
+in-memory DuckDB table through the audit store port (`AuditStore.copy_to`, every field but the words people wrote):
+Postgres streams it out with `COPY`, the Iceberg archive is read by DuckDB straight from its Parquet files on S3
+(only that tenant's day partitions), and the in-memory store inserts its rows. With the archive on, records before its
+cursor come from the archive and the rest from Postgres, so each is counted once. The reports are SQL over that table.
+
 ## 5. Knowledge Service
 
 Runs as its own process (`yachat knowledge serve`) and owns its sources. The runtime's

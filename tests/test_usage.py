@@ -6,8 +6,19 @@ import pytest
 
 from tests.helpers import make_runtime, say
 from yachat.runtime import usage
-from yachat.runtime.audit import usage_report
+from yachat.runtime.audit import UsageReport, audit_db, usage_report
 from yachat.state.models import AuditEvent
+from yachat.state.store import InMemoryAuditStore
+
+
+async def report(events: list[AuditEvent], since: datetime, until: datetime) -> UsageReport:
+    store = InMemoryAuditStore()
+    await store.append(events)
+    db = await audit_db(store, "t", since)
+    try:
+        return usage_report(db, since, until)
+    finally:
+        db.close()
 
 
 def test_config_prices_win_and_unknown_models_have_no_cost(monkeypatch):
@@ -20,7 +31,7 @@ def test_config_prices_win_and_unknown_models_have_no_cost(monkeypatch):
         usage.price_overrides.cache_clear()
 
 
-def test_the_report_groups_tokens_and_cost():
+async def test_the_report_groups_tokens_and_cost():
     now = datetime.now(UTC)
 
     def call(model: str, purpose: str, cost: float | None, agent: str = "a", sid: str = "s1") -> AuditEvent:
@@ -46,8 +57,10 @@ def test_the_report_groups_tokens_and_cost():
         call("m1", "intent", 0.01),
         call("m1", "rewrite", 0.03),
         call("m2", "intent", None, agent="b", sid="s2"),
+        call("m1", "intent", 9.0, sid="s0").model_copy(update={"at": now - timedelta(days=3)}),  # before the window
+        call("m1", "intent", 9.0).model_copy(update={"tenant": "other"}),  # another tenant
     ]
-    r = usage_report(events, now - timedelta(days=1), now)
+    r = await report(events, now - timedelta(days=1), now)
     assert r.total.calls == 3 and r.total.input_tokens == 3000 and r.total.output_tokens == 300 and r.total.cached_tokens == 600
     assert r.total.cost_usd == 0.04 and r.total.unpriced_calls == 1 and r.cost_per_conversation == 0.02
     assert [(x.key, x.cost_usd) for x in r.by_model] == [("m1", 0.04), ("m2", None)]
@@ -205,13 +218,13 @@ async def test_metered_records_any_clients_calls_with_the_gateways_cost(monkeypa
     assert usage.METER.get() is None  # metering() leaves the turn's meter as it was
 
 
-def test_the_report_counts_tokens_saved_by_headroom():
+async def test_the_report_counts_tokens_saved_by_headroom():
     now = datetime.now(UTC)
     ev = [
         AuditEvent(tenant="t", agent="a", kind="llm", decision="call", ref="m", reason="r", input_tokens=10, output_tokens=1, saved_tokens=s, at=now)
         for s in (5, None)
     ]
-    assert usage_report(ev, now - timedelta(days=1), now).total.saved_tokens == 5
+    assert (await report(ev, now - timedelta(days=1), now)).total.saved_tokens == 5
 
 
 @pytest.mark.skipif(not __import__("os").getenv("LITELLM_PROXY_URL"), reason="needs a running LiteLLM gateway (docker compose --profile gateway)")
