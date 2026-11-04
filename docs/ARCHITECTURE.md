@@ -56,6 +56,8 @@ charter text, which every prompt receives.
 
 ## 3. Life of a message
 
+<p align="center"><img src="assets/pipeline.svg" alt="channel payload → Understand → Decide → Respond → reply; Decide calls tools through the Tool Gateway; memory is written after the reply" width="900"></p>
+
 1. **Channel adapter** turns the raw payload into `InboundMessage{text, user_id, channel_message_id, action?}`. SMS
    `STOP` is answered by the channel before the pipeline runs.
 2. **Runtime.turn** takes the per-session lock, drops duplicates by `channel_message_id`, loads state and the pinned
