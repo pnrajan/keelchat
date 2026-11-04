@@ -30,7 +30,7 @@ from yachat.runtime.respond.rewriter import Rewriter
 from yachat.runtime.understand.stage import UnderstandStage
 from yachat.runtime.usage import LIMIT_REACHED, METER, Usage, charge_usd
 from yachat.state.memory_writer import MemorySnapshot, MemoryWriter
-from yachat.state.models import PolicyVersion, SessionState
+from yachat.state.models import AuditEvent, Handoff, HandoffStatus, PolicyVersion, SessionState
 from yachat.state.store import (
     AgentVersionStore,
     AuditStore,
@@ -268,6 +268,71 @@ class Runtime:
         )
         return await self.sessions.save(state)
 
+    async def report_handoff(
+        self,
+        tenant: str,
+        handoff_id: str,
+        *,
+        status: HandoffStatus,
+        resume: bool = True,
+        fields: dict[str, str] | None = None,
+        assignee: str | None = None,
+        note: str | None = None,
+        actor: str = "runtime",
+        handoff: Handoff | None = None,
+    ) -> tuple[Handoff, bool] | None:
+        """Whoever works a handoff (a person in the inbox, or a helpdesk through the callback) reports back here.
+        `resolved` gives the conversation back to the assistant (`resume`, the default) or ends it; `fields` are answers
+        they collected. Returns (ticket, whether the conversation changed); None for an unknown ticket. ValueError for
+        fields the agent's flow does not have. `handoff`: the ticket, when the caller has already read it."""
+        from yachat.capabilities.nodes.handoff import take_back
+
+        h = handoff or await self.handoffs.get(tenant, handoff_id)
+        if h is None:
+            return None
+        if h.status == "resolved":  # final: a repeated or late report changes nothing
+            return h, False
+        changed = False
+        if status == "resolved":
+            async with self.locks.hold(h.session_id):
+                st = await self.sessions.load(h.session_id)  # None: the conversation expired; the ticket still closes
+                policy = await self._pinned(st) if st is not None else None
+                if st is not None and (st.data.get("handoff") or {}).get("ticket_id") == h.id and policy is not None:
+                    changed = take_back(st, policy.fields, resume=resume, fields=fields)  # ValueError: nothing saved
+                    if changed:
+                        await self.sessions.save(st)
+        updated = await self.handoffs.update(tenant, handoff_id, status=status, assignee=assignee, note=note)
+        assert updated is not None
+
+        def event(decision: str, reason: str, by: str) -> AuditEvent:
+            return AuditEvent(
+                tenant=h.tenant,
+                agent=h.agent,
+                policy_hash=h.policy_hash,
+                session_id=h.session_id,
+                kind="handoff",
+                decision=decision,
+                reason=reason,
+                ref=h.id,
+                actor=by,
+            )
+
+        done = [event(status, "note" if note else "", actor)]
+        if changed:  # what the platform did in response: the person's action is the report above
+            done.append(event("resumed" if resume else "ended", f"after {actor}", "runtime"))
+        await self.audit_quietly(done)
+        log.info("handoff reported", handoff=h.id, status=status, resumed=changed and resume, ended=changed and not resume)
+        return updated, changed
+
+    async def audit_quietly(self, events: list[AuditEvent]) -> None:
+        """Append to the audit log; a failed write is logged and counted (`audit_write_failed`), never raised: what it
+        records has already happened."""
+        try:
+            await self.audit.append(events)
+        except Exception as e:
+            self.metrics.incr("audit_write_failed")
+            log.error("audit write failed", error=f"{e.__class__.__name__}: {e}")
+
     async def label_session(self, session_id: str, segment: dict[str, str]) -> SessionState:
         """Labels a conversation's survey results are split by (campaign, channel, product, first or repeat buyer). Set
         once, when the conversation starts from an invite; labels already there are kept."""
@@ -429,11 +494,7 @@ class Runtime:
 
     async def _record(self, ctx: TurnContext, before: SessionState, ms: float, calls: list[Usage]) -> None:
         """Store the turn's decisions. A failed write is logged and counted; it never fails the user's turn."""
-        try:
-            await self.audit.append(events_for(ctx, before, ms) + llm_events(ctx.policy, ctx.state.id, ctx.turn_id, calls))
-        except Exception as e:  # the reply is already decided and saved
-            self.metrics.incr("audit_write_failed")
-            log.error("audit write failed", error=f"{e.__class__.__name__}: {e}")
+        await self.audit_quietly(events_for(ctx, before, ms) + llm_events(ctx.policy, ctx.state.id, ctx.turn_id, calls))
 
     async def charge(self, tenant: str, calls: list[Usage], turns: int = 0) -> None:
         """Add the calls' cost (and answered turns) to the tenant's plan usage. A failed write is logged; it never fails the
@@ -454,11 +515,7 @@ class Runtime:
             except Exception as e:  # best effort; never affects the reply
                 log.error("memory writer failed", error=f"{e.__class__.__name__}: {e}")
             await self.charge(snap.policy.tenant, meter)
-            try:
-                await self.audit.append(llm_events(snap.policy, session_id, snap.turn_id, meter))
-            except Exception as e:  # never affects the reply
-                self.metrics.incr("audit_write_failed")
-                log.error("audit write failed", error=f"{e.__class__.__name__}: {e}")
+            await self.audit_quietly(llm_events(snap.policy, session_id, snap.turn_id, meter))
 
     async def drain(self) -> None:
         """Wait for background memory writes (tests, shutdown)."""

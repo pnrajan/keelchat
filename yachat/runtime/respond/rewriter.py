@@ -19,7 +19,7 @@ from yachat.logging import get_logger
 from yachat.registry.core import REGISTRY
 from yachat.runtime.context import TurnContext
 from yachat.runtime.decide import rules
-from yachat.runtime.llm import LLMRequest, untrusted
+from yachat.runtime.llm import LLMRequest, ModelConfig, untrusted
 
 log = get_logger("rewriter")
 
@@ -101,8 +101,7 @@ def verifies(ctx: TurnContext, step: str | None) -> bool:
 class Rewriter:
     name = "rewriter"
 
-    async def _write(self, ctx: TurnContext, system: str, body: str, text: str, step: str | None = None) -> str | None:
-        models = rules.models_for(ctx, step)
+    async def _write(self, ctx: TurnContext, models: ModelConfig, system: str, body: str, text: str) -> str | None:
         req = LLMRequest(
             "render",
             models.generate,
@@ -120,11 +119,11 @@ class Rewriter:
         ctx.llm_calls += 1
         return out
 
-    async def _problems(self, ctx: TurnContext, brief: str, reply: str, step: str | None = None) -> list[str]:
+    async def _problems(self, ctx: TurnContext, models: ModelConfig, brief: str, reply: str) -> list[str]:
         body = brief + "\n\n" + untrusted("reply", reply)
         req = LLMRequest(
             "reply_verify",
-            rules.models_for(ctx, step).verifier,
+            models.verifier,
             VERIFY_SYSTEM,
             [{"role": "user", "content": body}],
             max_tokens=300,
@@ -156,10 +155,11 @@ class Rewriter:
         brief += f"\nPlain version:\n{r.text}" + approved(ctx)
         system = ctx.system_prompt + "\n" + SYSTEM.format(language=language)
         check = verifies(ctx, step) or rules.high_stakes(ctx, step)
+        models = rules.models_for(ctx, step)
         body = brief
         # a matched rule asks more of the reply, and the plain version cannot carry it: one more try before falling back
         for attempt in range(REPLY_REPAIRS + 1 + bool(ctx.rules)):
-            out = await self._write(ctx, system, body, r.text, step)
+            out = await self._write(ctx, models, system, body, r.text)
             if out is None:
                 return ctx
             if not kept(r.text, out, asks, listed=bool(r.verbatim)):
@@ -169,14 +169,14 @@ class Rewriter:
                 r.text = out  # this step passes its replies through
                 return ctx
             else:
-                problems = await self._problems(ctx, brief, out, step)
+                problems = await self._problems(ctx, models, brief, out)
                 if not problems:
                     r.text = out
                     return ctx
                 log.info("reply verifier found problems", attempt=attempt + 1, problems=len(problems))
             body = brief + f"\n\nYour previous reply:\n{out}\nA reviewer found these problems; fix them:\n- " + "\n- ".join(problems)
         if not english:  # the plain version is English: a literal translation keeps the session's language
-            translated = await self._write(ctx, TRANSLATE.format(language=ctx.language), untrusted("text", r.text), r.text)
+            translated = await self._write(ctx, models, TRANSLATE.format(language=ctx.language), untrusted("text", r.text), r.text)
             if translated and kept(r.text, translated, asks, listed=bool(r.verbatim)):
                 log.info("sending the plain version, translated", step=step)
                 r.text = translated

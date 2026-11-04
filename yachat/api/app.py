@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 import os
 import re
@@ -128,6 +129,22 @@ class HandoffUpdate(Body):
     status: HandoffStatus | None = None
     assignee: str | None = Field(default=None, min_length=1, max_length=120)
     note: str | None = Field(default=None, max_length=4_000)
+    #: on `resolved`: give the conversation back to the assistant (default), or end it
+    resume: bool = True
+    #: on `resolved`: answers the person collected, by field name; the assistant will not ask for them again
+    fields: dict[str, str] | None = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def _claimed_by_someone(self) -> HandoffUpdate:
+        if self.status == "claimed" and not self.assignee:
+            raise ValueError("claiming a handoff needs an assignee")
+        return self
+
+
+class HandoffCallback(HandoffUpdate):
+    """What a helpdesk reports on its callback_url: `claimed` (optional), then `resolved` once."""
+
+    status: Literal["claimed", "resolved"]  # narrower than the inbox's
 
 
 class SimConversationIn(Body):
@@ -1142,45 +1159,73 @@ def create_app(
         tenant: TenantId, status: HandoffStatus | None = None, agent: str | None = None, limit: Annotated[int, Query(ge=1, le=500)] = 100
     ) -> list[dict[str, Any]]:
         """The handoff inbox, newest first: conversations waiting for (or with) a person."""
-        return [h.model_dump(mode="json") for h in await rt.handoffs.list(tenant, status=status, agent=agent, limit=limit)]
+        return [h.public() for h in await rt.handoffs.list(tenant, status=status, agent=agent, limit=limit)]
 
     @app.get("/v1/tenants/{tenant}/handoffs/{handoff_id}")
     async def get_handoff(tenant: TenantId, handoff_id: str) -> dict[str, Any]:
         h = await rt.handoffs.get(tenant, handoff_id)
         if h is None:
             raise NotFound(f"handoff {handoff_id!r}")
-        return h.model_dump(mode="json")
+        return h.public()
 
     @app.post("/v1/tenants/{tenant}/handoffs/{handoff_id}")
     async def update_handoff(tenant: TenantId, handoff_id: str, body: HandoffUpdate, request: Request) -> dict[str, Any]:
         """Claim, resolve or annotate a handoff. Every change is in the audit log with who made it (a failed audit write is
-        logged and counted as `audit_write_failed`; the change stands)."""
-        if body.status == "claimed" and not body.assignee:
-            raise HTTPException(422, "claiming a handoff needs an assignee")
-        h = await rt.handoffs.update(tenant, handoff_id, status=body.status, assignee=body.assignee, note=body.note)
-        if h is None:
+        logged and counted as `audit_write_failed`; the change stands). Resolving gives the conversation back to the
+        assistant unless `resume` is false."""
+        actor = body.assignee or caller(request).key_id or "admin"
+        if body.status is not None:
+            h, _ = await report(tenant, handoff_id, body, actor=actor)
+        elif (noted := await rt.handoffs.update(tenant, handoff_id, note=body.note)) is None:
             raise NotFound(f"handoff {handoff_id!r}")
-        try:
-            await rt.audit.append([handoff_event(h, body, request)])
-        except Exception as e:  # the change is made; a retry would repeat it
-            rt.metrics.incr("audit_write_failed")
-            log.error("audit write failed", tenant=tenant, handoff=handoff_id, error=f"{e.__class__.__name__}: {e}")
+        else:
+            h = noted
+            event = AuditEvent(
+                tenant=h.tenant,
+                agent=h.agent,
+                policy_hash=h.policy_hash,
+                session_id=h.session_id,
+                kind="handoff",
+                decision="noted",
+                reason="note",
+                ref=h.id,
+                actor=actor,
+            )
+            await rt.audit_quietly([event])
         log.info("handoff updated", tenant=tenant, handoff=handoff_id, status=h.status)
-        return h.model_dump(mode="json")
+        return h.public()
 
-    def handoff_event(h: Handoff, body: HandoffUpdate, request: Request) -> AuditEvent:
-        who = caller(request)
-        return AuditEvent(
-            tenant=h.tenant,
-            agent=h.agent,
-            policy_hash=h.policy_hash,
-            session_id=h.session_id,
-            kind="handoff",
-            decision=body.status or "noted",
-            reason="note" if body.note else "",
-            ref=h.id,
-            actor=body.assignee or who.key_id or "admin",
-        )
+    async def report(tenant: str, handoff_id: str, body: HandoffUpdate, *, actor: str, handoff: Handoff | None = None) -> tuple[Handoff, bool]:
+        assert body.status is not None
+        try:
+            out = await rt.report_handoff(
+                tenant,
+                handoff_id,
+                status=body.status,
+                resume=body.resume,
+                fields=body.fields,
+                assignee=body.assignee,
+                note=body.note,
+                actor=actor,
+                handoff=handoff,
+            )
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
+        if out is None:
+            raise NotFound(f"handoff {handoff_id!r}")
+        return out
+
+    @app.post("/v1/public/handoffs/{tenant}/{handoff_id}/callback")
+    async def handoff_callback(tenant: str, handoff_id: str, body: HandoffCallback, token: str = "") -> dict[str, Any]:
+        """The receiver of a handoff reports back on the `callback_url` it was given (the token in it is the only
+        credential, and opens only this handoff). `resolved` resumes the conversation unless `resume` is false."""
+        from yachat.capabilities.nodes.handoff import token_hash
+
+        h = await rt.handoffs.get(tenant, handoff_id)
+        if h is None or not h.callback_hash or not token or not hmac.compare_digest(token_hash(token), h.callback_hash):
+            raise NotFound(f"handoff {handoff_id!r}")  # same answer for a wrong token: nothing to probe
+        updated, changed = await report(tenant, handoff_id, body, actor=body.assignee or "callback", handoff=h)
+        return {"id": updated.id, "status": updated.status, "conversation": ("resumed" if body.resume else "ended") if changed else "unchanged"}
 
     @app.get("/v1/metrics")
     async def metrics(request: Request) -> dict[str, Any]:

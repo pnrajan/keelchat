@@ -109,16 +109,25 @@ class HandoffReceipt(BaseModel):
 
 @tool("handoff_webhook", timeout_s=10.0, retries=0, side_effects="write")
 async def handoff_webhook(
-    reason: str, session_id: str, agent: str, fields: dict[str, str], transcript: list[dict[str, str]], ticket_id: str | None = None
+    reason: str,
+    session_id: str,
+    agent: str,
+    fields: dict[str, str],
+    transcript: list[dict[str, str]],
+    ticket_id: str | None = None,
+    callback_url: str | None = None,
 ) -> HandoffReceipt:
     """Pass a conversation to a person: POST a ticket (or, with `ticket_id`, a follow-up message) to HANDOFF_URL, which
-    returns {"ticket_id": ...}. HANDOFF_TOKEN, when set, is sent as a bearer token. Not retried: a retry could open a
-    second ticket."""
+    returns {"ticket_id": ...}. HANDOFF_TOKEN, when set, is sent as a bearer token. A new ticket carries `callback_url`:
+    POST {"status": "resolved"} there when done and the conversation resumes. Not retried: a retry could open a second
+    ticket."""
     url = os.getenv("HANDOFF_URL")
     if not url:
         raise ToolError("handoff_webhook", "config", "HANDOFF_URL is not configured")
     headers = {"authorization": f"Bearer {k}"} if (k := os.getenv("HANDOFF_TOKEN")) else {}
     payload = {"reason": reason, "session_id": session_id, "agent": agent, "fields": fields, "transcript": transcript, "ticket_id": ticket_id}
+    if callback_url:
+        payload["callback_url"] = callback_url
     return HandoffReceipt.model_validate(await post_json("handoff_webhook", url, payload, 10.0, headers))
 
 

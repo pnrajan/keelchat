@@ -14,7 +14,7 @@ from dataclasses import replace
 from yachat.policy.compiler import CompiledStep
 from yachat.policy.models import Rule, Tier
 from yachat.runtime.context import TurnContext
-from yachat.runtime.llm import ModelConfig
+from yachat.runtime.llm import ModelConfig, small_only
 
 
 def asking_step(ctx: TurnContext) -> CompiledStep | None:
@@ -60,7 +60,7 @@ def instructions(rules: list[Rule]) -> str:
 def tier(m: ModelConfig, choice: Tier | None) -> ModelConfig:
     """Every job on one tier: small uses the classify model, large the generate model."""
     if choice == "small":
-        return replace(m, generate=m.classify, verify=m.classify)
+        return small_only(m)
     if choice == "large":
         return replace(m, classify=m.generate)
     return m

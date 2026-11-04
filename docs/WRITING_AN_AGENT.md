@@ -86,22 +86,37 @@ limitations, and a knowledge answer is replaced by "I couldn't confirm an answer
 ```yaml
 handoff:
   when: [user_request, max_reasks]         # default [user_request]; also disengaged, tool_unavailable
-  notify: handoff_webhook                  # optional: also tell your helpdesk (any registered write tool taking the handoff arguments)
+  notify: handoff_webhook                  # optional: also send it to your helpdesk
+  timeout: 24h                             # optional: no report back by then, the assistant takes over again
 ```
 
-`user_request` passes the conversation to a person when the user asks for one ("talk to a human", "hablar con una
-persona", or a subtler ask the Intent Detector flags). The other triggers turn that dead end into a handoff instead of
-an exit. Every handoff lands in the platform's handoff inbox (console **Handoffs** tab, `GET /v1/tenants/{t}/handoffs`)
-with the reason, the answers so far and the recent transcript; sensitive values are scrubbed and flagged turns left
-out. Your team claims it, reads it and resolves it with a note (`POST .../handoffs/{id}`); each action is in the audit
-log with who took it. After a handoff the session is `handed_off`: the bot stops working the flow and adds each later
-message to the same handoff (a resolved one opens again).
+A handoff goes out to a person and comes back when they are done:
 
-With `notify`, the tool is also called with `reason`, `session_id`, `agent`, `fields`, `transcript` and the inbox's
-`ticket_id` (later messages: `reason: follow_up`). `handoff_webhook` POSTs that to `HANDOFF_URL`; a `ticket_id` it
-returns is kept as the helpdesk id. A failed notify never blocks the handoff. No handoff happens before consent when
-the flow asks for it; a message that both consents and asks for a person ("yes, and let me talk to someone") hands
-off. If the inbox itself cannot be reached, the user is told and the conversation carries on.
+1. **Triggered.** The user asks for a person ("talk to a human", or a subtler ask the Intent Detector flags), or the
+   bot reaches a dead end listed in `when`. No handoff before consent when the flow asks for it.
+2. **Sent.** A ticket opens in the handoff inbox (console **Handoffs** tab, `GET /v1/tenants/{t}/handoffs`) with the
+   reason, the answers so far and the recent transcript (sensitive values scrubbed, flagged turns left out). With
+   `notify`, the tool also receives `reason`, `session_id`, `agent`, `fields`, `transcript`, `ticket_id` and a
+   `callback_url`; `handoff_webhook` POSTs them to `HANDOFF_URL`. A failed notify never blocks the handoff.
+3. **Waiting.** The session is `handed_off`: each later message joins the same ticket.
+4. **Reported back.** Whoever worked it reports once. A helpdesk POSTs to its `callback_url` (the token in it opens
+   only that ticket; no API key needed); a person in the inbox presses **Resolve and resume** or **Resolve and end**.
+
+```bash
+curl -X POST "$CALLBACK_URL" -H 'content-type: application/json' \
+  -d '{"status": "resolved", "fields": {"address": "12 Elm St, Austin TX"}, "note": "confirmed by phone"}'
+```
+
+   `resolved` gives the conversation back to the assistant by default; `"resume": false` ends it. `fields` are answers
+   the person collected: the assistant offers each back for the user to confirm instead of asking from scratch.
+   `claimed` (with an `assignee`) only marks the ticket. `resolved` is final: later reports change nothing. Set
+   `YACHAT_PUBLIC_URL` so the `callback_url` is a full address an outside helpdesk can call.
+5. **Resumed.** At the user's next message the assistant says they are back with it and carries on from the next open
+   question. The counts that led to the handoff (re-asks, digressions) start over, so it does not hand straight off
+   again. With `timeout`, the same happens when nobody reported back in time; the ticket stays open for the team.
+
+Every step is in the audit log with who took it (`opened`, `follow_up`, `claimed`, `resolved`, `resumed`, `ended`,
+`timed_out`).
 
 ### Audit log
 
