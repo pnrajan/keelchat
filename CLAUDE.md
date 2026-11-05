@@ -109,8 +109,8 @@ yachat/
   testing/fakes.py  FakeTools (tool backends only; the model is never faked)
   scaffold.py    `yachat new agent|package` starter files; __init__.py re-exports the extension API (`from yachat import tool, node, ...`)
   logging.py     JSON logs (session_id, turn_id, policy_hash, stage, latency_ms), Metrics; tracing.py (Sentry spans); voice.py (speech in/out ports)
-  evals/         replay (scripts + played personas on sim/harness), metrics (DeepEval, Ragas, rule_followed, thresholds gate), judge (litellm), run, online
-evals/           <agent>/ sets: replay.yaml (fixtures, cases, expect), thresholds.yaml (policy, minimums, rubrics)
+  evals/         replay (scripts + played personas on sim/harness), metrics (DeepEval, Ragas, rule_followed, thresholds gate), judge (litellm), checks (every conversation), generate (sets from the policy), run, online
+evals/           <agent>/ sets: replay.yaml (fixtures, cases, expect), generated.yaml, thresholds.yaml (policy, minimums, rubrics)
 examples/        policies (support, booking, concierge, hiring, surveys, analyst, coach), data/, sim_script.yaml, contrib_tool/,
                  extensions/booking_caps (example tool, guardrail and channel package)
 frontend/        React test console (policy editor, chat, trace/state inspector, simulate, versions, channels, results, handoff inbox)

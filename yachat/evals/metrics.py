@@ -111,11 +111,22 @@ def rule_metric(then: str, threshold: float, model: Any) -> Any:
 
     return GEval(
         name=RULE_FOLLOWED,
-        criteria=f"The assistant's reply to this message does what this rule asks: {then}",
-        evaluation_params=[SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT],
+        evaluation_steps=[  # fixed steps: left to itself the judge grades things the rule does not ask for
+            f"The rule says the reply should: {then}",
+            "Check each thing the rule asks for. A part that depends on a condition (for example 'if it is not known "
+            "yet') passes when the condition does not hold; the context (the conversation so far) decides that.",
+            "Ignore everything the rule does not ask for: other questions, repeated questions, extra information, tone, length.",
+            "Give the highest score when the reply does everything the rule asks, the lowest when it does none of it.",
+        ],
+        evaluation_params=[SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.CONTEXT],
         threshold=threshold,
         model=model,
     )
+
+
+def earlier(turns: list[Any], i: int) -> list[str]:
+    """The conversation before turn `i` (0-based), as context for a judged turn; never empty (DeepEval requires it)."""
+    return [f"User: {t.user}\nAssistant: {t.agent}" for t in turns[:i]] or ["(this is the first message)"]
 
 
 def ragas_metric(name: str, llm: Any) -> Any:

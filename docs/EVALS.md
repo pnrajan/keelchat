@@ -38,9 +38,51 @@ cases:
 - A case has `messages` or `persona`, not both. Also: `channel`, `user_id` (a returning user), `expected_tools`
   (tools that must be called at some point), `chatbot_role` (for role metrics).
 - `expect` keys, all checked in code without a judge: `exit_reason`, `completed`, `steps`, `fields`, `digressions`,
-  `nudges`, `reasks`, `language`, `rules`. For `steps`, `fields` and `reasks`, only the keys you give are checked.
-  Unknown keys are rejected.
+  `nudges`, `reasks`, `language`, `rules`, `rules_fired` and `rules_not_fired` (on any turn). For `steps`, `fields` and
+  `reasks`, only the keys you give are checked. Unknown keys are rejected. `note` says why a case exists.
 - Persona cases vary between runs: keep their expectations to outcomes (`exit_reason`), not exact fields.
+
+### Checks every conversation must pass
+
+Besides its own `expect`, every case is held to checks that come from the policy (`yachat/evals/checks.py`), so a
+conversation needs no expected answers to be a test:
+
+| Check | Fails when | How |
+|---|---|---|
+| `no_errors` | a stage failed and the reply fell back | code |
+| `no_empty_reply` | the agent sent nothing | code |
+| `no_loop` | the same reply three turns in a row | code |
+| `within_limits` | re-asks, digressions or nudges went past the policy's limits | code |
+| `language_allowed` | the conversation ended in a language the policy does not list | code |
+| `in_scope` | a reply does work the charter puts out of scope; the judge must quote the sentence, and a quote not in the reply does not count | judge |
+| `rule_followed:<rule>` | on a turn where the rule matched, the reply does not do its `then` (earlier turns count as known) | judge |
+
+`yachat evals run` applies the code checks. `yachat evals check` applies the judged ones too (when
+`EVALS_JUDGE_MODEL` is set) instead of scoring the thresholds' metrics:
+
+```bash
+uv run yachat evals check evals/support_assistant
+```
+
+### Generating a set
+
+```bash
+uv run yachat evals generate examples/support_assistant.yaml           # writes evals/support_assistant/generated.yaml
+uv run yachat evals generate examples/support_assistant.yaml --only rule: handed_off
+```
+
+1. **Targets come from the policy, in code**: finishing the flow, giving up, a bad answer to each form field, each
+   rule and a near miss of it, an out-of-scope request, asking for a person (when `handoff.when` has
+   `user_request`), each extra language, and for agents without a flow, ordinary questions that need its tools.
+2. **The model plays a user aiming at each target**, on the simulator, with the set's `fixtures`. It writes only what
+   the user says; what a case must achieve (`expect`) comes from the target.
+3. **Every conversation goes through the checks.** One that fails is shortened: messages are dropped while the replayed
+   script still fails, so it becomes a short script. One that reaches its target is replayed once as a script; it keeps its `expect` only if the script reaches the target on its own. One that misses
+   it is tried again, then reported with the reason (the played user may not have done it, or the agent did not
+   respond to it).
+4. **Output**: `generated.yaml` next to `replay.yaml`, replaced on each run, so review it as a diff and commit what you
+   keep. `evals run` and `evals check` read both files. A `thresholds.yaml` naming the policy is written if the folder
+   has none. The command exits 1 when a generated case fails.
 
 ### `thresholds.yaml`
 
