@@ -52,7 +52,7 @@ uv sync --all-extras
 ```
 
 Open http://127.0.0.1:5173, pick **Support assistant**, press **Build & try**, then **New session**, and chat. The
-**Inspector** shows why each reply was chosen, and the **Review** tab lets you rate the conversation.
+**Inspector** shows why each reply was chosen; the **Test** tab saves the chat as a test, and **Review** rates it.
 
 Prefer the terminal? `uv run yachat build examples/support_assistant.yaml` validates a policy and
 `uv run yachat serve` starts the API, with interactive docs at `/docs`. The
@@ -71,7 +71,7 @@ flow:
   - greet_consent
   - form_fill:
       fields:
-        - {name: order_number, ask: "What is your order number?", expect: "An order number such as ORD-12345"}
+        - {name: order_number, ask: "What is your order number?", expect: "An order number in any format, such as ORD-12345 or #98765"}
         - {name: issue, ask: "What went wrong?", expect: "A short description", optional: true}
 guardrails: {input: [prompt_injection], output: [pii, no_legal_advice]}
 limits: {reasks: 3, digressions: 3}
@@ -134,8 +134,9 @@ uv run yachat evals calibrate                                  # how often the j
   near miss, out of scope, asking for a person, each language). The model only plays the user.
 - **Judged checks** (staying in scope, following rules) need `EVALS_JUDGE_MODEL`, any litellm model id. The judge
   quotes the reply for every verdict, and code decides pass or fail.
-- **People rating**: in the console's **Review** tab, mark replies pass or fail and score whole conversations. The
-  ratings download as `labels.yaml` for `calibrate`, and failed conversations as replay cases.
+- **In the console**: the **Test** tab keeps tests with the agent: save a chat as a test, draft them from the
+  policy, run them all on each build. In the **Review** tab people mark replies pass or fail and score conversations;
+  the ratings feed `calibrate`, and **Suggest policy changes** revises the policy to fix what they failed.
 - **In CI**, run both `evals run` and `evals check`.
 
 [Evals](docs/EVALS.md) has the details.

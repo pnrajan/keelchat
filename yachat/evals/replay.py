@@ -9,57 +9,15 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
+from yachat.evals.case import Expect as Expect
+from yachat.evals.case import ReplayCase as ReplayCase
 from yachat.policy.compiler import CompiledPolicy, build
 from yachat.runtime.llm import LLMClient, ModelConfig
 from yachat.runtime.llm_factory import llm_from_env
 from yachat.sim.harness import TurnLog, run_conversation, run_persona, sim_runtime
 from yachat.testing.fakes import FakeTools
-
-
-class Expect(BaseModel):
-    """What must hold when the conversation ends. Unset keys are not checked; dict values check only the keys given."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    exit_reason: str | None = None
-    completed: bool | None = None
-    steps: dict[str, str] | None = None
-    fields: dict[str, str] | None = None
-    digressions: int | None = None
-    nudges: int | None = None
-    reasks: dict[str, int] | None = None
-    language: str | None = None
-    #: turn number (from 1) → the rules that must match on it, exactly; `[]` means none may
-    rules: dict[int, list[str]] | None = None
-    #: rules that must match on some turn / on no turn (when the turn is not known, e.g. a played persona)
-    rules_fired: list[str] | None = None
-    rules_not_fired: list[str] | None = None
-
-
-class ReplayCase(BaseModel):
-    """`messages` replays a script; `persona` has the model play that user for up to `max_turns`."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    name: str
-    messages: list[str] = Field(default_factory=list)
-    persona: str = ""
-    max_turns: int = Field(default=12, ge=1, le=20)
-    channel: str = "web"
-    user_id: str | None = None
-    expected_tools: list[str] = Field(default_factory=list)
-    expect: Expect = Field(default_factory=Expect)
-    chatbot_role: str = ""
-    #: why the case exists, e.g. what a generated case covers or the check it failed
-    note: str = ""
-
-    @model_validator(mode="after")
-    def _one_kind(self) -> ReplayCase:
-        if bool(self.messages) == bool(self.persona):
-            raise ValueError("give either messages or persona")
-        return self
 
 
 class Fixtures(BaseModel):
@@ -174,9 +132,11 @@ def load_cases(path: str | Path) -> list[ReplayCase]:
 PARALLEL = 3
 
 
-async def run_case(policy: CompiledPolicy | str, case: ReplayCase, llm: LLMClient | None = None, fixtures: Fixtures | None = None) -> ReplayResult:
+async def run_case(
+    policy: CompiledPolicy | str, case: ReplayCase, llm: LLMClient | None = None, fixtures: Fixtures | None = None, models: ModelConfig | None = None
+) -> ReplayResult:
     policy = build(policy) if isinstance(policy, str) else policy
-    rt = sim_runtime(llm or llm_from_env(), ModelConfig.from_env(), (fixtures or Fixtures()).tools())
+    rt = sim_runtime(llm or llm_from_env(), models or ModelConfig.from_env(), (fixtures or Fixtures()).tools())
     await rt.register_policy(policy)
     if case.persona:
         report = await run_persona(rt, policy, case.name, case.persona, case.max_turns, case.channel, case.user_id)

@@ -144,7 +144,8 @@ class GenerateReport:
         return "\n".join(lines)
 
 
-def _name(target_id: str) -> str:
+def case_name(target_id: str) -> str:
+    """The case a target's test is saved as."""
     return "gen_" + re.sub(r"[^a-z0-9]+", "_", target_id.lower()).strip("_")
 
 
@@ -165,12 +166,12 @@ async def generate(
 
     async def fails(t: Target, messages: list[str], names: set[str]) -> bool:
         """The script, replayed, fails one of the same checks."""
-        r = await run_case(policy, ReplayCase(name=_name(t.id), messages=messages, expect=t.expect), fixtures=fixtures)
+        r = await run_case(policy, ReplayCase(name=case_name(t.id), messages=messages, expect=t.expect), fixtures=fixtures)
         return bool(await check(policy, r, judge, only=names))
 
     async def attempt(t: Target) -> str | None:
         """One try: None when the target is settled (kept or failing), else why it was missed."""
-        persona = ReplayCase(name=_name(t.id), persona=t.goal + STYLE, max_turns=TARGET_TURNS, expect=t.expect)
+        persona = ReplayCase(name=case_name(t.id), persona=t.goal + STYLE, max_turns=TARGET_TURNS, expect=t.expect)
         r = await run_case(policy, persona, fixtures=fixtures)
         # an unmet expectation may be the played user's doing: only the checks mark the agent as failing
         found = [v for v in await check(policy, r, judge) if v.check != "expect"]
@@ -182,17 +183,17 @@ async def generate(
             short, reproduced = await shrink(script, partial(fails, t, names=names))
             note = f"fails {', '.join(sorted(names))}" + ("" if reproduced else " (as played; did not reproduce as a script)")
             # the target's expectation is dropped: a shortened script no longer plays the whole target
-            report.cases.append(ReplayCase(name=_name(t.id), messages=short, note=note))
-            report.failures[_name(t.id)] = [str(v) for v in found]
+            report.cases.append(ReplayCase(name=case_name(t.id), messages=short, note=note))
+            report.failures[case_name(t.id)] = [str(v) for v in found]
             if progress:
                 progress(f"FAIL {t.id}: {', '.join(sorted(names))} ({len(short)} messages)")
             return None
         if not r.expectation_failures and _reached(t, r, cov):
             # the script must reach the target without the played user steering, and still pass: replay it once
-            replay = await run_case(policy, ReplayCase(name=_name(t.id), messages=script, expect=t.expect), fixtures=fixtures)
+            replay = await run_case(policy, ReplayCase(name=case_name(t.id), messages=script, expect=t.expect), fixtures=fixtures)
             stable = not await check(policy, replay, judge) and _reached(t, replay, covered(policy, replay))
             note = f"covers {t.id}" if stable else f"covered {t.id} as played; the script alone does not, so nothing is expected"
-            report.cases.append(ReplayCase(name=_name(t.id), messages=script, expect=t.expect if stable else Expect(), note=note))
+            report.cases.append(ReplayCase(name=case_name(t.id), messages=script, expect=t.expect if stable else Expect(), note=note))
             if progress:
                 progress(f"ok   {t.id} ({len(script)} messages)")
             return None
@@ -215,7 +216,7 @@ async def generate(
             progress(f"miss {t.id}: {why}")
 
     await asyncio.gather(*(one(t) for t in todo))
-    order = {_name(t): i for i, t in enumerate(report.targets)}
+    order = {case_name(t): i for i, t in enumerate(report.targets)}
     report.cases.sort(key=lambda c: order[c.name])
     report.not_reached = {t: report.not_reached[t] for t in report.targets if t in report.not_reached}
     return report
@@ -228,7 +229,7 @@ def write(agent_dir: str | Path, policy_path: str | Path, report: GenerateReport
     d = Path(agent_dir)
     d.mkdir(parents=True, exist_ok=True)
     out = d / GENERATED
-    redone = {_name(t) for t in report.targets}
+    redone = {case_name(t) for t in report.targets}
     kept = [c for c in load_set(out).cases if c.name not in redone] if out.is_file() else []
     cases = [c.model_dump(mode="json", exclude_defaults=True) for c in [*kept, *report.cases]]
     out.write_text(f"# yachat evals generate: {report.summary().splitlines()[0]}\n" + yaml.safe_dump({"cases": cases}, sort_keys=False, allow_unicode=True))

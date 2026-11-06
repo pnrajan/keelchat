@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, ReplyRating, Review as Saved, ReviewTurn } from "./api";
+import { api, ReplyRating, Review as Saved, ReviewTurn, Suggestion } from "./api";
 
-export type Conversation = { source: "chat" | "simulate"; id: string; label: string; policy_hash: string; turns: ReviewTurn[] };
+/** `outcome`: how it ended, when known (a saved test can expect the same) */
+export type Conversation = {
+  source: "chat" | "simulate"; id: string; label: string; policy_hash: string; turns: ReviewTurn[];
+  outcome?: { completed: boolean; exit_reason: string | null };
+};
 
 type Verdicts = Record<string, boolean>; // `${turn}|${check}` → pass
 const key = (turn: number, check: string) => `${turn}|${check}`;
@@ -11,7 +15,9 @@ const remember = (k: string, v?: string) => { try { if (v === undefined) return 
 
 // Rate a conversation from the test chat or a simulation: each reply in scope or not, each matched rule followed or
 // not, and an overall score. Ratings become labels for the judge (labels.yaml) and replay cases for what failed.
-export default function Review({ agent, conversations }: { agent: string | null; conversations: Conversation[] }) {
+type Props = { agent: string | null; conversations: Conversation[]; policy: string; onRevised: (yaml: string) => void };
+
+export default function Review({ agent, conversations, policy, onRevised }: Props) {
   const [pick, setPick] = useState<string>("");
   const [verdicts, setVerdicts] = useState<Verdicts>({});
   const [notes, setNotes] = useState<Record<number, string>>({});
@@ -22,6 +28,8 @@ export default function Review({ agent, conversations }: { agent: string | null;
   // the agent whose ratings `saved` holds: a slow answer for an agent no longer shown is dropped
   const [saved, setSaved] = useState<{ agent: string; reviews: Saved[] } | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [suggestion, setSuggestion] = useState<{ agent: string; s: Suggestion } | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const current = useRef(agent);
   current.current = agent;
 
@@ -78,6 +86,13 @@ export default function Review({ agent, conversations }: { agent: string | null;
       setId(r.id); setMsg({ kind: "ok", text: `Saved: ${replies.length} replies rated${score ? `, ${score}/5` : ""}.` }); load();
     } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
   }
+
+  async function suggest() {
+    if (!agent) return;
+    setSuggesting(true); setMsg(null);
+    try { setSuggestion({ agent, s: await api.suggest(agent, policy) }); } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); } finally { setSuggesting(false); }
+  }
+  const revised = suggestion && suggestion.agent === agent ? suggestion.s : null;
 
   async function download(kind: "labels" | "replay") {
     if (!agent) return;
@@ -154,6 +169,24 @@ export default function Review({ agent, conversations }: { agent: string | null;
             </tbody></table>
           )}
           <p className="muted small">Failures that repeat point to the policy: reword a rule's <code>then</code>, tighten the charter's scope, or add a rule for what the notes describe.</p>
+          <div className="field-row">
+            <button onClick={suggest} disabled={suggesting} title="The model revises the policy in the editor to answer the failed replies and low scores; the build checks it">
+              {suggesting ? "Suggesting…" : "Suggest policy changes"}</button>
+          </div>
+          {revised && (
+            <div className={`callout ${revised.errors.length ? "err" : "ok"}`}>
+              <strong>{revised.changes.length ? `${revised.changes.length} suggested change${revised.changes.length === 1 ? "" : "s"}` : "No change suggested"}</strong>
+              {revised.changes.length > 0 && <ul>{revised.changes.map((c) => <li key={c}>{c}</li>)}</ul>}
+              <p className="small">From {revised.feedback.length} reported problem{revised.feedback.length === 1 ? "" : "s"}.
+                {revised.errors.length ? ` The revision still has ${revised.errors.length} build problem(s); they are marked in the editor.` : " The revision builds."}</p>
+              {revised.changes.length > 0 && (
+                <div className="field-row">
+                  <button className="compact" onClick={() => onRevised(revised.yaml)}>Open in editor</button>
+                  <span className="muted small">Replaces the editor text. Build and run the tests before you save it.</span>
+                </div>
+              )}
+            </div>
+          )}
           <div className="field-row">
             <button className="ghost compact" onClick={() => download("labels")}>Download labels.yaml</button>
             <button className="ghost compact" onClick={() => download("replay")}>Download failed conversations as replay cases</button>

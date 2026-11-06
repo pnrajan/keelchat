@@ -32,6 +32,7 @@ from yachat.channels import CHANNELS
 from yachat.channels.whatsapp_cloud import WhatsAppSender
 from yachat.datasets.models import NAME_PATTERN, Dataset, DatasetIn
 from yachat.datasets.sources import SourceRejected, check_sources
+from yachat.evals.case import ReplayCase
 from yachat.logging import configure, get_logger
 from yachat.policy.compiler import CompiledPolicy, build
 from yachat.policy.drafter import draft_policy
@@ -50,6 +51,7 @@ from yachat.runtime.readiness import readiness
 from yachat.runtime.runtime import NotFound, PolicyRetired, Runtime, RuntimeFailure
 from yachat.state.artifacts import ArtifactStore, artifact_store_from_env
 from yachat.state.models import (
+    AgentTest,
     AuditEvent,
     AuditKind,
     Embed,
@@ -148,6 +150,45 @@ class ReviewIn(Body):
     score: int | None = None
     note: str = ""
     rater: str = ""
+
+
+#: most tests one run takes
+TEST_RUN_LIMIT = 50
+
+
+class AgentTestIn(Body):
+    """A test conversation to keep with the agent; send `id` again to change a saved one."""
+
+    id: str | None = Field(default=None, pattern=r"^tst_[a-f0-9]{12}$")
+    source: Literal["chat", "simulate", "review", "draft", "manual"] = "manual"
+    case: ReplayCase
+
+    @model_validator(mode="after")
+    def _fits(self) -> AgentTestIn:
+        c = self.case
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", c.name):
+            raise ValueError("case.name: letters, digits, _ and - only, up to 80")
+        if len(c.messages) > 30 or any(len(m) > 8_000 for m in c.messages) or len(c.persona) > 1_000:
+            raise ValueError("case: up to 30 messages of 8000 characters, or a persona of 1000")
+        if c.channel not in CHANNELS:
+            raise ValueError(f"case.channel: unknown channel {c.channel!r}")
+        return self
+
+
+class TestRunIn(Body):
+    #: the tests to run; all of the agent's when omitted
+    ids: list[str] | None = Field(default=None, max_length=TEST_RUN_LIMIT)
+
+
+class TestDraftIn(Body):
+    #: draft again targets that already have a drafted test
+    redo: bool = False
+
+
+class SuggestIn(Body):
+    """The policy to revise (the editor's text); the agent's current policy when omitted."""
+
+    yaml: str | None = Field(default=None, max_length=100_000)
 
 
 class HandoffUpdate(Body):
@@ -265,6 +306,7 @@ def stores_from_env() -> dict[str, Any]:
         out["sessions"] = RedisSessionStore.from_url(url)
     if url := os.getenv("DATABASE_URL"):
         from yachat.state.postgres_store import (
+            PostgresAgentTestStore,
             PostgresAgentVersionStore,
             PostgresAuditStore,
             PostgresBudgetStore,
@@ -286,6 +328,7 @@ def stores_from_env() -> dict[str, Any]:
         out["audit"] = PostgresAuditStore(url=url)
         out["handoffs"] = PostgresHandoffStore(url=url)
         out["reviews"] = PostgresReviewStore(url=url)
+        out["tests"] = PostgresAgentTestStore(url=url)
         out["responses"] = PostgresResponseStore(url=url)
         out["datasets"] = PostgresDatasetStore(url=url)
         out["versions"] = PostgresAgentVersionStore(url=url)
@@ -667,7 +710,7 @@ def create_app(
         a saved version, tests and a channel. Computed in code; nothing is registered."""
         await sync_tenant_tools(tool_store, tenant)
         catalog = {d.name: d.kind for d in await rt.datasets.list(tenant)}
-        report = await readiness(body.yaml, tenant, catalog, set(rt.tool_impls), rt.versions)
+        report = await readiness(body.yaml, tenant, catalog, set(rt.tool_impls), rt.versions, rt.tests)
         return report.model_dump(mode="json")
 
     @app.post("/v1/agents/draft")
@@ -1220,6 +1263,132 @@ def create_app(
         reviews = list(reversed(await rt.reviews.list(tenant, agent, limit=EXPORT_LIMIT)))  # oldest first: a stable file to diff
         text = labels_yaml(reviews) if kind == "labels" else cases_yaml(reviews)
         return Response(text, media_type="application/yaml", headers={"Content-Disposition": f'attachment; filename="{kind}.yaml"'})
+
+    @app.post("/v1/tenants/{tenant}/agents/{agent}/reviews/suggest")
+    async def suggest_from_reviews(tenant: TenantId, agent: str, body: SuggestIn) -> dict[str, Any]:
+        """The policy revised by the model to answer what people reported in their ratings (failed replies, low scores
+        with a note), checked by the build. Returns the YAML, its change lines and any build errors; nothing is saved."""
+        from yachat.evals.review import feedback
+        from yachat.policy.drafter import revise_policy
+
+        await reviewed_agent(tenant, agent)
+        problems = feedback(await rt.reviews.list(tenant, agent))
+        if not problems:
+            raise HTTPException(422, "No failed replies or low scores with a note yet: rate some conversations first.")
+        yaml_text = body.yaml
+        if yaml_text is None:
+            active = await rt.versions.active(tenant, agent)
+            if active is None or not active.yaml:
+                raise HTTPException(422, "Send the policy to revise: this agent has no saved version.")
+            yaml_text = active.yaml
+        catalog = {d.name: d.kind for d in await rt.datasets.list(tenant)}
+        async with spending(tenant) as models:
+            draft, changes = await revise_policy(rt.llm, models, yaml_text, problems, tenant, catalog)
+        errors = [{"path": e.path, "message": e.message} for e in draft.errors]
+        return {"yaml": draft.yaml, "changes": changes, "feedback": problems, "errors": errors, "attempts": draft.attempts}
+
+    async def saved_test(tenant: str, agent: str, test_id: str) -> AgentTest:
+        t = await rt.tests.get(tenant, test_id)
+        if t is None or t.agent != agent:
+            raise NotFound(f"test {test_id!r}")
+        return t
+
+    @app.post("/v1/tenants/{tenant}/agents/{agent}/tests", status_code=201)
+    async def save_test(tenant: TenantId, agent: str, body: AgentTestIn) -> dict[str, Any]:
+        """Keep a test conversation with the agent (the console's Test tab). Names are unique per agent, so the tests
+        export as one replay set."""
+        await reviewed_agent(tenant, agent)
+        fields: dict[str, Any] = {"tenant": tenant, "agent": agent, "source": body.source, "case": body.case}
+        if body.id is not None:
+            saved = await saved_test(tenant, agent, body.id)
+            fields |= {"id": saved.id, "created_at": saved.created_at}  # a changed test keeps its place
+        if any(t.case.name == body.case.name and t.id != body.id for t in await rt.tests.list(tenant, agent)):
+            raise HTTPException(409, f"a test named {body.case.name!r} exists; pick another name")
+        return (await rt.tests.save(AgentTest(**fields))).model_dump(mode="json")
+
+    @app.get("/v1/tenants/{tenant}/agents/{agent}/tests")
+    async def list_tests(tenant: TenantId, agent: str) -> list[dict[str, Any]]:
+        """The agent's tests, oldest first."""
+        await reviewed_agent(tenant, agent)
+        return [t.model_dump(mode="json") for t in await rt.tests.list(tenant, agent)]
+
+    @app.delete("/v1/tenants/{tenant}/agents/{agent}/tests/{test_id}", status_code=204)
+    async def delete_test(tenant: TenantId, agent: str, test_id: str) -> Response:
+        await saved_test(tenant, agent, test_id)
+        await rt.tests.delete(tenant, test_id)
+        return Response(status_code=204)
+
+    @app.get("/v1/tenants/{tenant}/agents/{agent}/tests.yaml")
+    async def export_tests(tenant: TenantId, agent: str) -> Response:
+        """The tests as a replay set, for `evals/<agent>/replay.yaml` and CI."""
+        await reviewed_agent(tenant, agent)
+        cases = [t.case.model_dump(mode="json", exclude_defaults=True) for t in await rt.tests.list(tenant, agent)]
+        text = f"# yachat tests for {agent}: {len(cases)}\n" + yaml.safe_dump({"cases": cases}, sort_keys=False, allow_unicode=True, width=120)
+        return Response(text, media_type="application/yaml", headers={"Content-Disposition": 'attachment; filename="replay.yaml"'})
+
+    @app.post("/v1/tenants/{tenant}/agents/{agent}/tests/run")
+    async def run_tests(tenant: TenantId, agent: str, body: TestRunIn) -> dict[str, Any]:
+        """Run the agent's tests (or `ids`) on its current policy, on fake tools and stores of their own like a
+        simulation. Each passes when its expectations and the checks every conversation must pass hold (the judged
+        checks too when EVALS_JUDGE_MODEL is set)."""
+        from yachat.evals.checks import check
+        from yachat.evals.judge import judge_model_from_env
+        from yachat.evals.replay import PARALLEL, run_case
+
+        policy = await rt.policies.latest(agent, tenant)
+        if policy is None:
+            raise NotFound(f"no policy for agent {agent!r}; build or save one first")
+        tests = await rt.tests.list(tenant, agent)
+        if body.ids is not None:
+            unknown = set(body.ids) - {t.id for t in tests}
+            if unknown:
+                raise NotFound(f"tests {sorted(unknown)}")
+            tests = [t for t in tests if t.id in body.ids]
+        if len(tests) > TEST_RUN_LIMIT:
+            raise HTTPException(422, f"{len(tests)} tests; run up to {TEST_RUN_LIMIT} at a time with `ids`")
+        judge = judge_model_from_env()
+        gate = asyncio.Semaphore(PARALLEL)
+
+        async def one(t: AgentTest, models: ModelConfig) -> dict[str, Any]:
+            async with gate:
+                try:
+                    r = await run_case(policy, t.case, rt.llm, models=models)
+                    found = [str(v) for v in await check(policy, r, judge)]
+                except Exception as e:  # a provider error fails this test, never the run
+                    log.warning("test run failed", tenant=tenant, agent=agent, test=t.id, error=e.__class__.__name__)
+                    return {"id": t.id, "name": t.case.name, "passed": False, "problems": [f"the run failed: {e.__class__.__name__}"], "turns": []}
+            turns = [{"user": x.user, "agent": x.agent, "rules": x.rules} for x in r.turns]
+            outcome = {"exit_reason": r.state.exit_reason, "completed": r.state.completed, "fields": r.state.fields}
+            return {"id": t.id, "name": t.case.name, "passed": not found, "problems": found, "turns": turns, "outcome": outcome}
+
+        async with spending(tenant) as models:
+            results = list(await asyncio.gather(*(one(t, models) for t in tests)))
+        log.info("tests run", tenant=tenant, agent=agent, tests=len(results), failed=sum(not x["passed"] for x in results))
+        return {"policy_hash": policy.hash, "judge": judge, "results": results}
+
+    @app.post("/v1/tenants/{tenant}/agents/{agent}/tests/draft")
+    async def draft_tests(tenant: TenantId, agent: str, body: TestDraftIn) -> dict[str, Any]:
+        """Tests drafted from the current policy (`yachat evals generate`): what to cover comes from the policy, the
+        model only plays the user. Skips targets that already have a drafted test unless `redo`. Nothing is saved: keep
+        the ones you approve with POST .../tests."""
+        from yachat.evals.generate import case_name, generate, targets
+        from yachat.evals.judge import judge_model_from_env
+
+        policy = await rt.policies.latest(agent, tenant)
+        if policy is None:
+            raise NotFound(f"no policy for agent {agent!r}; build or save one first")
+        have = {t.case.name for t in await rt.tests.list(tenant, agent)}
+        todo = [t.id for t in targets(policy) if body.redo or case_name(t.id) not in have]
+        if not todo:
+            return {"cases": [], "failures": {}, "not_reached": {}, "targets": []}
+        async with spending(tenant):
+            report = await generate(policy, judge=judge_model_from_env(), only=todo, rounds=1)
+        return {
+            "cases": [c.model_dump(mode="json") for c in report.cases],
+            "failures": report.failures,
+            "not_reached": report.not_reached,
+            "targets": report.targets,
+        }
 
     @app.get("/v1/tenants/{tenant}/handoffs")
     async def list_handoffs(

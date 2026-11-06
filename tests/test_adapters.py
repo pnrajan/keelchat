@@ -302,3 +302,28 @@ async def test_postgres_review_store() -> None:
     await store.save(r.model_copy(update={"agent": "pg-b", "score": 1}))  # an id of another agent's rating changes nothing
     assert (await store.get("pg-t", r.id)).agent == "pg-a" and await store.list("pg-t", "pg-b") == []
     await pool.close()
+
+
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
+async def test_postgres_agent_test_store() -> None:
+    import asyncpg
+
+    from yachat.evals.case import Expect, ReplayCase
+    from yachat.state.models import AgentTest
+    from yachat.state.postgres_store import PostgresAgentTestStore, ensure_schema
+
+    try:
+        pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
+    except Exception as e:  # database down or missing: environment, not code
+        pytest.skip(f"postgres unreachable: {e.__class__.__name__}")
+    await ensure_schema(pool)
+    store = PostgresAgentTestStore(pool)
+    t = AgentTest(tenant="pg-t", agent="pg-a", case=ReplayCase(name="done", messages=["hi", "yes"], expect=Expect(completed=True)))
+    await store.save(t)
+    await store.save(t.model_copy(update={"source": "chat"}))
+    (got,) = await store.list("pg-t", "pg-a")
+    assert got == t.model_copy(update={"source": "chat"}) and got.case.expect.completed is True
+    await store.save(t.model_copy(update={"agent": "pg-b"}))  # an id of another agent's test changes nothing
+    assert (await store.get("pg-t", t.id)).agent == "pg-a" and await store.list("pg-t", "pg-b") == []
+    assert await store.delete("pg-t", t.id) and not await store.delete("pg-t", t.id) and await store.list("pg-t", "pg-a") == []
+    await pool.close()

@@ -171,6 +171,19 @@ export type Review = {
   turns: ReviewTurn[]; replies: ReplyRating[]; score: number | null; note: string; rater: string; created_at: string;
 };
 export type ReviewIn = Omit<Review, "id" | "agent" | "created_at"> & { id?: string };
+/** the policy revised from people's ratings: change lines first, checked by the build */
+export type Suggestion = { yaml: string; changes: string[]; feedback: string[]; errors: ValidationError[]; attempts: number };
+
+/** a replay case: scripted `messages`, or a `persona` the model plays; `expect` is checked in code when it ends */
+export type TestCase = { name: string; messages?: string[]; persona?: string; max_turns?: number; expect?: Record<string, unknown>; note?: string };
+export type TestSource = "chat" | "simulate" | "review" | "draft" | "manual";
+export type AgentTest = { id: string; agent: string; source: TestSource; case: TestCase; created_at: string };
+export type TestResult = {
+  id: string; name: string; passed: boolean; problems: string[]; turns: ReviewTurn[];
+  outcome?: { exit_reason: string | null; completed: boolean; fields: Record<string, string> };
+};
+export type TestRun = { policy_hash: string; judge: string | null; results: TestResult[] };
+export type TestDraft = { cases: TestCase[]; failures: Record<string, string[]>; not_reached: Record<string, string>; targets: string[] };
 
 const query = (q: Record<string, string | undefined>) => {
   const p = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]));
@@ -218,6 +231,19 @@ export const api = {
   /** the rated replies as labels.yaml, or the failed conversations as replay cases */
   reviewFile: async (agent: string, kind: "labels" | "replay") => {
     const r = await send("GET", `${agentPath(agent)}/reviews/${kind}.yaml`);
+    if (!r.ok) throw new Error(`export failed (${r.status})`);
+    return r.text();
+  },
+  suggest: (agent: string, yaml: string) => req<Suggestion>("POST", `${agentPath(agent)}/reviews/suggest`, { yaml }),
+  tests: (agent: string) => req<AgentTest[]>("GET", `${agentPath(agent)}/tests`),
+  saveTest: (agent: string, source: TestSource, c: TestCase, id?: string) =>
+    req<AgentTest>("POST", `${agentPath(agent)}/tests`, { source, case: c, ...(id ? { id } : {}) }),
+  deleteTest: (agent: string, id: string) => req<unknown>("DELETE", `${agentPath(agent)}/tests/${encodeURIComponent(id)}`),
+  runTests: (agent: string, ids?: string[]) => req<TestRun>("POST", `${agentPath(agent)}/tests/run`, ids ? { ids } : {}),
+  draftTests: (agent: string, redo = false) => req<TestDraft>("POST", `${agentPath(agent)}/tests/draft`, { redo }),
+  /** the tests as a replay set for evals/<agent>/replay.yaml */
+  testsFile: async (agent: string) => {
+    const r = await send("GET", `${agentPath(agent)}/tests.yaml`);
     if (!r.ok) throw new Error(`export failed (${r.status})`);
     return r.text();
   },
