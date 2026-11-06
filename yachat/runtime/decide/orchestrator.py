@@ -132,14 +132,14 @@ class Orchestrator:
 
     async def run(self, ctx: TurnContext) -> TurnContext:
         resumed = ctx.state.data.pop("resumed", False)  # the first turn back from a person
-        ctx = await self._route(ctx)
+        ctx = await self._route(ctx, resumed)
         r = ctx.node_result
         if resumed and r is not None and not ctx.handoff_reason:
             r.text = f"{BACK.get(ctx.language, BACK['en'])}\n{r.text}"
             r.goal = "Say they are back with the assistant. Then " + (r.goal or "say the plain version.")
         return ctx
 
-    async def _route(self, ctx: TurnContext) -> TurnContext:
+    async def _route(self, ctx: TurnContext, resumed: bool = False) -> TurnContext:
         ctx.system_prompt = system_prompt(ctx)
         st, graph, q = ctx.state, StepGraph(ctx.policy), ctx.state.open_question
 
@@ -176,6 +176,14 @@ class Orchestrator:
             log.info("routing", decision="planner", reason="open-dialog agent")
             ctx.node_result = await run_planner(ctx)
             return ctx
+
+        if resumed and q is None and ctx.verdict is not None and not st.completed:
+            # back from a person, with no question open: the message ("ok thanks") answers nothing and was meant for the
+            # person, so it is neither an answer nor a side question. The flow asks its current question.
+            ctx.verdict = replace(
+                ctx.verdict, verdict="answered", intent="new_answer", fields={}, edited_field=None, conflict=None, clear_outputs=[], enquiry_text=""
+            )
+            ctx.route = None
 
         if ctx.route == ROUTE_PLANNER:
             r = await run_planner(ctx)
