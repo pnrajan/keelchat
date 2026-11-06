@@ -3,7 +3,8 @@
 A metric in `thresholds.yaml` is one of:
 - a DeepEval metric from `CATALOGUE` (`role_adherence`, `faithfulness`, ...);
 - a rubric the eval set defines under `rubrics:` (scored with DeepEval's ConversationalGEval);
-- `rule_followed`: on each turn where a policy rule matched, does the reply do what the rule says;
+- `rule_followed`: on each turn where a policy rule matched, does the reply do every part of what the rule says
+  (yachat.evals.checks: the judge splits the rule, code decides);
 - `ragas.<Metric>`: any Ragas collections metric whose inputs a turn has (user_input, response, retrieved_contexts),
   scored on the turns where a `context_tools` tool returned something, e.g. `ragas.Faithfulness`, `ragas.ContextPrecisionWithoutReference`.
 """
@@ -104,26 +105,6 @@ def build_metric(name: str, threshold: float, model: Any, rubrics: dict[str, str
         return getattr(dm, CATALOGUE[name][1])(threshold=threshold, model=model, **(options or {}))
     except TypeError as e:
         raise ValueError(f"{name}: needs options in thresholds.yaml ({e})") from e
-
-
-def rule_metric(then: str, threshold: float, model: Any) -> Any:
-    """Single-turn GEval: does the reply do what the matched rule says."""
-    from deepeval.metrics import GEval
-    from deepeval.test_case import SingleTurnParams
-
-    return GEval(
-        name=RULE_FOLLOWED,
-        evaluation_steps=[  # fixed steps: left to itself the judge grades things the rule does not ask for
-            f"The rule says the reply should: {then}",
-            "Check each thing the rule asks for. A part that depends on a condition (for example 'if it is not known "
-            "yet') passes when the condition does not hold; the context (the conversation so far) decides that.",
-            "Ignore everything the rule does not ask for: other questions, repeated questions, extra information, tone, length.",
-            "Give the highest score when the reply does everything the rule asks, the lowest when it does none of it.",
-        ],
-        evaluation_params=[SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.CONTEXT],
-        threshold=threshold,
-        model=model,
-    )
 
 
 def earlier(turns: list[Any], i: int) -> list[str]:

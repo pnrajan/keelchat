@@ -55,7 +55,7 @@ conversation needs no expected answers to be a test:
 | `within_limits` | re-asks, digressions or nudges went past the policy's limits | code |
 | `language_allowed` | the conversation ended in a language the policy does not list | code |
 | `in_scope` | a reply does work the charter puts out of scope; the judge must quote the sentence, and a quote not in the reply does not count | judge |
-| `rule_followed:<rule>` | on a turn where the rule matched, the reply does not do its `then` (earlier turns count as known) | judge |
+| `rule_followed:<rule>` | on a turn where the rule matched, the reply leaves out a part of its `then` that applies; each part done needs a quote from the reply (earlier turns count as known) | judge |
 
 `yachat evals run` applies the code checks. `yachat evals check` applies the judged ones too (when
 `EVALS_JUDGE_MODEL` is set) instead of scoring the thresholds' metrics:
@@ -99,7 +99,7 @@ rubrics:
 options:                           # extra arguments a DeepEval metric needs
   non_advice: {advice_types: [medical]}
 trials: 3                          # runs per case (default 1); a case passes only when every run does
-calibration: {in_scope: 1.0, rule_followed: 0.9}    # from `yachat evals calibrate`
+calibration: {in_scope: 0.95, rule_followed: 0.95}  # from `yachat evals calibrate`
 ```
 
 Metric names:
@@ -109,7 +109,7 @@ Metric names:
 | `conversation_completeness`, `knowledge_retention`, `role_adherence`, `conversation_relevancy` | each conversation | DeepEval |
 | `faithfulness`, `task_completion`, `pii_leakage`, `non_advice`, `role_violation`, `tool_correctness`, `argument_correctness` | each agent turn, with that turn's tool output as context | DeepEval |
 | a name under `rubrics:` | each conversation (ConversationalGEval with your criteria) | DeepEval |
-| `rule_followed` | each turn where a policy rule matched: does the reply do the rule's `then` | DeepEval GEval |
+| `rule_followed` | each turn where a policy rule matched: the judge splits the rule's `then` into parts and quotes where the reply does each; code passes it only when every part that applies is done | judge (yachat) |
 | `ragas.<Metric>` | each turn with output from a `context_tools` tool: `user_input`, `response`, `retrieved_contexts`. Reference-free ones work: `Faithfulness`, `ResponseGroundedness`, `ContextPrecisionWithoutReference`, `AnswerRelevancy` needs embeddings and is not supported | Ragas |
 
 - **Gate**: each metric's average must reach its minimum; an unknown name fails the build (typo guard). A metric with
@@ -156,8 +156,8 @@ judge improves. Metrics with no `calibration` entry are listed under `uncalibrat
 
 | Agent | Check | Labels | Agreement | Judge | Date |
 |---|---|---|---|---|---|
-| support-assistant | `in_scope` | 20 | 100% | Qwen3.5-27B | 2026-11-05 |
-| support-assistant | `rule_followed` | 20 | 90–95% over two runs; misses were all too lenient, passing replies that do only part of the rule | Qwen3.5-27B | 2026-11-05 |
+| support-assistant | `in_scope` | 20 | 95–100% over two runs | Qwen3.5-27B | 2026-11-05 |
+| support-assistant | `rule_followed` | 20 | 95–100% over two runs (90–95% before the rule was judged part by part) | Qwen3.5-27B | 2026-11-05 |
 
 ## Online (production)
 
