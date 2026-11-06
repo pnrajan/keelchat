@@ -52,7 +52,7 @@ uv sync --all-extras
 ```
 
 Open http://127.0.0.1:5173, pick **Support assistant**, press **Build & try**, then **New session**, and chat. The
-**Inspector** shows why each reply was chosen.
+**Inspector** shows why each reply was chosen, and the **Review** tab lets you rate the conversation.
 
 Prefer the terminal? `uv run yachat build examples/support_assistant.yaml` validates a policy and
 `uv run yachat serve` starts the API, with interactive docs at `/docs`. The
