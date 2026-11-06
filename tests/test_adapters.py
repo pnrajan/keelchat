@@ -298,4 +298,7 @@ async def test_postgres_review_store() -> None:
     await store.save(r.model_copy(update={"score": 4}))
     (got,) = await store.list("pg-t", "pg-a")
     assert got.id == r.id and got.score == 4 and await store.list("pg-t", "other") == []
+    assert (await store.get("pg-t", r.id)) == got and await store.get("pg-t", "rev_missing") is None
+    await store.save(r.model_copy(update={"agent": "pg-b", "score": 1}))  # an id of another agent's rating changes nothing
+    assert (await store.get("pg-t", r.id)).agent == "pg-a" and await store.list("pg-t", "pg-b") == []
     await pool.close()

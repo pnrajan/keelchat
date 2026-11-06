@@ -57,7 +57,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     if (Array.isArray(detail)) {
       const issues = detail.map((d: ValidationError & { loc?: unknown[]; msg?: string }) =>
         d.path !== undefined ? { path: d.path, message: d.message } : { path: (d.loc ?? []).join("."), message: d.msg ?? "" });
-      throw new ApiError(issues.map((i) => `${i.path}: ${i.message}`).join("\n"), issues, r.status);
+      throw new ApiError(issues.map((i) => (i.path ? `${i.path}: ${i.message}` : i.message)).join("\n"), issues, r.status);
     }
     throw new ApiError(String(detail ?? r.statusText), [], r.status);
   }

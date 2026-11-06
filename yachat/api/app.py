@@ -1183,30 +1183,43 @@ def create_app(
             rt.metrics.incr("audit_write_failed")
             log.error("audit write failed", tenant=tenant, error=f"{e.__class__.__name__}: {e}")
 
+    async def reviewed_agent(tenant: str, agent: str) -> str:
+        if await rt.policies.latest(agent, tenant) is None:
+            raise NotFound(f"agent {agent!r}")
+        return agent
+
     @app.post("/v1/tenants/{tenant}/agents/{agent}/reviews", status_code=201)
     async def save_review(tenant: TenantId, agent: str, body: ReviewIn) -> dict[str, Any]:
-        """A person's rating of a conversation from the test chat or a simulation (the console's Review tab)."""
+        """A person's rating of a conversation from the test chat or a simulation (the console's Review tab). Send the
+        `id` of a saved rating of this agent to change it."""
+        await reviewed_agent(tenant, agent)
+        fields = body.model_dump(exclude_none=True) | {"tenant": tenant, "agent": agent}
+        if body.id is not None:
+            saved = await rt.reviews.get(tenant, body.id)
+            if saved is None or saved.agent != agent:
+                raise NotFound(f"review {body.id!r}")
+            fields["created_at"] = saved.created_at  # a changed rating keeps its place in the list
         try:
-            review = Review.model_validate(body.model_dump(exclude_none=True) | {"tenant": tenant, "agent": agent})
+            review = Review.model_validate(fields)
         except ValidationError as e:  # the limits and turn numbers live on the stored model
             raise HTTPException(422, detail=e.errors(include_url=False, include_context=False)) from e
-        review = await rt.reviews.save(review)
-        return review.model_dump(mode="json")
+        return (await rt.reviews.save(review)).model_dump(mode="json")
 
     @app.get("/v1/tenants/{tenant}/agents/{agent}/reviews")
     async def list_reviews(tenant: TenantId, agent: str) -> list[dict[str, Any]]:
-        """Rated conversations, newest first."""
+        """Rated conversations, newest first (the latest 500)."""
+        await reviewed_agent(tenant, agent)
         return [r.model_dump(mode="json") for r in await rt.reviews.list(tenant, agent)]
 
     @app.get("/v1/tenants/{tenant}/agents/{agent}/reviews/{kind}.yaml")
     async def export_reviews(tenant: TenantId, agent: str, kind: Literal["labels", "replay"]) -> Response:
         """Rated replies as `labels.yaml` (judge calibration), or failed conversations as replay cases."""
-        from yachat.evals.review import cases_yaml, labels_yaml
+        from yachat.evals.review import EXPORT_LIMIT, cases_yaml, labels_yaml
 
-        reviews = list(reversed(await rt.reviews.list(tenant, agent)))  # oldest first: a stable file to diff
+        await reviewed_agent(tenant, agent)
+        reviews = list(reversed(await rt.reviews.list(tenant, agent, limit=EXPORT_LIMIT)))  # oldest first: a stable file to diff
         text = labels_yaml(reviews) if kind == "labels" else cases_yaml(reviews)
-        name = f"{agent}-{kind}.yaml"
-        return Response(text, media_type="application/yaml", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+        return Response(text, media_type="application/yaml", headers={"Content-Disposition": f'attachment; filename="{kind}.yaml"'})
 
     @app.get("/v1/tenants/{tenant}/handoffs")
     async def list_handoffs(

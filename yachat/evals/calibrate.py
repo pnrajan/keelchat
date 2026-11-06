@@ -106,12 +106,19 @@ class CalibrationReport:
         return "\n".join(lines)
 
 
-def _validate(policy: CompiledPolicy, labels: LabelSet) -> None:
+def _problem(policy: CompiledPolicy, lb: Label) -> str | None:
+    """Why the policy cannot judge this label (a rule renamed or removed since it was labeled), or None."""
     rules = rules_by_name(policy)
+    kind, _, rule = lb.check.partition(":")
+    if lb.check != "in_scope" and not (kind == "rule_followed" and rule in rules):
+        return f"{lb.check!r} is not in_scope or rule_followed:<one of {sorted(rules)}>"
+    return None
+
+
+def _validate(policy: CompiledPolicy, labels: LabelSet) -> None:
     for i, lb in enumerate(labels.labels):
-        kind, _, rule = lb.check.partition(":")
-        if lb.check != "in_scope" and not (kind == "rule_followed" and rule in rules):
-            raise ValueError(f"labels[{i}].check: {lb.check!r} is not in_scope or rule_followed:<one of {sorted(rules)}>")
+        if why := _problem(policy, lb):
+            raise ValueError(f"labels[{i}].check: {why}")
 
 
 def _result(lb: Label) -> ReplayResult:
@@ -125,18 +132,19 @@ def _result(lb: Label) -> ReplayResult:
 
 async def calibrate(policy: CompiledPolicy, labels: LabelSet, judge: str, parallel: int = PARALLEL) -> CalibrationReport:
     """Run the judged check of every label on its last turn and count where the judge agrees with the person."""
-    _validate(policy, labels)
     report = CalibrationReport(policy.agent, judge)
     gate = asyncio.Semaphore(parallel)
 
     async def one(lb: Label) -> list[str]:
+        if why := _problem(policy, lb):
+            return [f"label failed: {why}"]
         async with gate:
             return [v.detail for v in await judged_checks(policy, _result(lb), judge, only={lb.check}, turn=len(lb.turns))]
 
     found = await asyncio.gather(*(one(lb) for lb in labels.labels))
     for i, (lb, details) in enumerate(zip(labels.labels, found, strict=True)):
         where = f"labels[{i}] {lb.check}{f' ({lb.note})' if lb.note else ''}"
-        if any(d.startswith("judge failed") for d in details):
+        if any(d.startswith(("judge failed", "label failed")) for d in details):
             report.errors.append(f"{where}: {'; '.join(details)}")
             continue
         a = report.checks.setdefault(group(lb.check), Agreement())

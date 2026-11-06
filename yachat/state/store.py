@@ -726,6 +726,9 @@ class ReviewStore(ABC):
         """Insert, or replace the review with the same id."""
 
     @abstractmethod
+    async def get(self, tenant: str, review_id: str) -> Review | None: ...
+
+    @abstractmethod
     async def list(self, tenant: str, agent: str, limit: int = 500) -> builtins.list[Review]:
         """Newest first."""
 
@@ -737,6 +740,10 @@ class InMemoryReviewStore(ReviewStore):
     async def save(self, review: Review) -> Review:
         self._r[(review.tenant, review.id)] = review.model_copy(deep=True)
         return review
+
+    async def get(self, tenant: str, review_id: str) -> Review | None:
+        r = self._r.get((tenant, review_id))
+        return r.model_copy(deep=True) if r else None
 
     async def list(self, tenant: str, agent: str, limit: int = 500) -> builtins.list[Review]:
         rows = [r.model_copy(deep=True) for (t, _), r in self._r.items() if t == tenant and r.agent == agent]

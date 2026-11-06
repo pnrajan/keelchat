@@ -297,9 +297,9 @@ class ReviewTurn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    user: str
-    agent: str
-    rules: list[str] = Field(default_factory=list)
+    user: str = Field(max_length=8_000)
+    agent: str = Field(max_length=8_000)
+    rules: list[str] = Field(default_factory=list, max_length=20)
 
 
 class ReplyRating(BaseModel):
@@ -337,7 +337,14 @@ class Review(BaseModel):
 
     @model_validator(mode="after")
     def _replies_name_turns(self) -> Review:
+        seen: set[tuple[int, str]] = set()
         for i, x in enumerate(self.replies):
             if x.turn > len(self.turns):
                 raise ValueError(f"replies[{i}].turn: {x.turn}, but the conversation has {len(self.turns)} turns")
+            if (x.turn, x.check) in seen:
+                raise ValueError(f"replies[{i}]: turn {x.turn} {x.check} is rated twice")
+            seen.add((x.turn, x.check))
+            rule = x.check.partition(":")[2]
+            if rule and rule not in self.turns[x.turn - 1].rules:
+                raise ValueError(f"replies[{i}].check: rule {rule!r} did not match on turn {x.turn}")
         return self
