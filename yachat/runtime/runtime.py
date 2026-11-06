@@ -468,6 +468,7 @@ class Runtime:
                 ctx.short_circuit_with(LIMIT_REACHED, note="usage limit reached")
                 log.info("usage limit reached", tenant=policy.tenant, turns=plan.turns, limit_turns=plan.limit_turns, spent_usd=round(plan.spent_usd, 6))
             ctx = await self.pipeline.run(ctx)
+            ctx.state.data.pop("resumed", None)  # the first turn back from a person is over, however it ended
             try:
                 ctx.state = await self.sessions.save(ctx.state)
             except VersionConflict as e:
