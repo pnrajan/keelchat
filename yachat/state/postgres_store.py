@@ -949,7 +949,7 @@ class PostgresReviewStore(_Pooled, ReviewStore):
         async with (await self.pool).acquire() as con:
             await con.execute(
                 "INSERT INTO reviews (tenant, id, agent, created_at, review) VALUES ($1,$2,$3,$4,$5::jsonb) "
-                "ON CONFLICT (tenant, id) DO UPDATE SET review=EXCLUDED.review",
+                "ON CONFLICT (tenant, id) DO UPDATE SET review=EXCLUDED.review WHERE reviews.agent = EXCLUDED.agent",
                 review.tenant,
                 review.id,
                 review.agent,
@@ -957,6 +957,11 @@ class PostgresReviewStore(_Pooled, ReviewStore):
                 review.model_dump_json(),
             )
         return review
+
+    async def get(self, tenant: str, review_id: str) -> Review | None:
+        async with (await self.pool).acquire() as con:
+            row = await con.fetchrow("SELECT review FROM reviews WHERE tenant=$1 AND id=$2", tenant, review_id)
+        return Review.model_validate_json(row["review"]) if row else None
 
     async def list(self, tenant: str, agent: str, limit: int = 500) -> list[Review]:
         async with (await self.pool).acquire() as con:

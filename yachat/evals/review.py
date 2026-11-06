@@ -12,26 +12,41 @@ from yachat.state.models import Review
 
 #: an overall score at or below this makes the conversation a replay case even with no failed reply
 LOW_SCORE = 2
+#: most ratings an export reads
+EXPORT_LIMIT = 10_000
+
+
+def _latest(reviews: list[Review]) -> list[Review]:
+    """The newest rating of each conversation (rating a test chat again after it grew saves a new one). `reviews` is
+    oldest first."""
+    by: dict[tuple[str, str], Review] = {}
+    for r in reviews:
+        by[(r.source, r.conversation)] = r
+    return sorted(by.values(), key=lambda r: r.created_at)
 
 
 def labels_yaml(reviews: list[Review]) -> str:
-    """One label per rated reply: the conversation up to that reply, the check, the person's verdict."""
+    """One label per rated reply: the conversation up to that reply, the check, the person's verdict. `reviews` is
+    oldest first."""
     labels: list[dict[str, object]] = []
-    for r in reviews:
+    skipped = 0
+    for r in _latest(reviews):
         for x in sorted(r.replies, key=lambda x: (x.turn, x.check)):
             turns = [{"user": t.user, "agent": t.agent} for t in r.turns[: x.turn]]
             if not all(t["user"] and t["agent"] for t in turns):
-                continue  # a label needs every message of its context
+                skipped += 1  # a label needs every message of its context
+                continue
             note = "; ".join(n for n in (x.note, f"{r.source} {r.conversation}") if n)
             labels.append({"check": x.check, "turns": turns, "pass": x.ok, "note": note})
-    return _dump("labels", "yachat review: replies a person rated (yachat evals calibrate)", labels)
+    left_out = f" ({skipped} left out: an empty message in the conversation)" if skipped else ""
+    return _dump("labels", f"yachat review: replies a person rated (yachat evals calibrate){left_out}", labels)
 
 
 def cases_yaml(reviews: list[Review]) -> str:
     """One replay case per conversation a person failed: its messages up to the last failed reply (all of them when only
     the overall score is low). The checks it failed are in `note`; `yachat evals check` judges them again."""
     cases: list[dict[str, object]] = []
-    for r in reviews:
+    for r in _latest(reviews):
         failed = [x for x in r.replies if not x.ok]
         if not failed and (r.score is None or r.score > LOW_SCORE):
             continue
@@ -44,7 +59,7 @@ def cases_yaml(reviews: list[Review]) -> str:
 
 
 def _name(r: Review) -> str:
-    return "review_" + re.sub(r"[^a-z0-9]+", "_", f"{r.conversation}_{r.id[-6:]}".lower()).strip("_")
+    return "review_" + re.sub(r"[^a-z0-9]+", "_", f"{r.conversation}_{r.id.removeprefix('rev_')}".lower()).strip("_")
 
 
 def _dump(key: str, header: str, rows: list[dict[str, object]]) -> str:

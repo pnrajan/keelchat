@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ReplyRating, Review as Saved, ReviewTurn } from "./api";
 
 export type Conversation = { source: "chat" | "simulate"; id: string; label: string; policy_hash: string; turns: ReviewTurn[] };
@@ -19,39 +19,55 @@ export default function Review({ agent, conversations }: { agent: string | null;
   const [note, setNote] = useState("");
   const [rater, setRater] = useState(() => remember("yachat.rater"));
   const [id, setId] = useState<string | undefined>();
-  const [saved, setSaved] = useState<Saved[]>([]);
+  // the agent whose ratings `saved` holds: a slow answer for an agent no longer shown is dropped
+  const [saved, setSaved] = useState<{ agent: string; reviews: Saved[] } | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const current = useRef(agent);
+  current.current = agent;
 
   const conv = conversations.find((c) => `${c.source}:${c.id}` === pick) ?? conversations[0];
-  const load = useCallback(() => { if (agent) api.reviews(agent).then(setSaved, (e: Error) => setMsg({ kind: "err", text: e.message })); }, [agent]);
+  const convKey = conv ? `${conv.source}:${conv.id}:${conv.turns.length}` : "";
+  const reviews = useMemo(() => (saved && saved.agent === agent ? saved.reviews : []), [saved, agent]);
+  const loaded = !!saved && saved.agent === agent;
+  const load = useCallback(() => {
+    if (!agent) return;
+    api.reviews(agent).then(
+      (r) => { if (current.current === agent) setSaved({ agent, reviews: r }); },
+      (e: Error) => setMsg({ kind: "err", text: e.message }),
+    );
+  }, [agent]);
   useEffect(load, [load]);
 
-  // switching conversation: start fresh, or reopen this conversation's saved rating to change it
+  // a conversation shown (or the ratings arriving): start fresh, or reopen its saved rating to change it. Reloading
+  // after a save does not run this again, so clicks made meanwhile are kept.
   useEffect(() => {
-    const prev = conv && saved.find((r) => r.source === conv.source && r.conversation === conv.id && r.turns.length === conv.turns.length);
+    if (!loaded || !conv) return;
+    const prev = reviews.find((r) => r.source === conv.source && r.conversation === conv.id && r.turns.length === conv.turns.length);
     setVerdicts(Object.fromEntries((prev?.replies ?? []).map((x) => [key(x.turn, x.check), x.ok])));
     setNotes(Object.fromEntries((prev?.replies ?? []).filter((x) => x.note).map((x) => [x.turn, x.note ?? ""])));
     setScore(prev?.score ?? null); setNote(prev?.note ?? ""); setId(prev?.id);
-  }, [conv?.source, conv?.id, conv?.turns.length, saved]);
+  }, [convKey, loaded]);
 
   const failures = useMemo(() => {
     const by: Record<string, { failed: number; rated: number }> = {};
-    for (const r of saved) for (const x of r.replies) {
+    for (const r of reviews) for (const x of r.replies) {
       const b = (by[x.check] ??= { failed: 0, rated: 0 });
       b.rated += 1; if (!x.ok) b.failed += 1;
     }
     return Object.entries(by).sort((a, b) => b[1].failed - a[1].failed);
-  }, [saved]);
-  const scored = saved.filter((r) => r.score !== null);
+  }, [reviews]);
+  const scored = reviews.filter((r) => r.score !== null);
 
   if (!agent) return <div className="empty">Build a policy first: reviews belong to the agent you built.</div>;
   if (!conv) return <div className="empty">Chat with the agent or run a simulation, then rate the conversation here.</div>;
 
   const set = (turn: number, check: string, ok: boolean) =>
     setVerdicts((v) => { const k = key(turn, check); const n = { ...v }; if (n[k] === ok) delete n[k]; else n[k] = ok; return n; });
+  // a turn's note explains its failed checks (or every check, when none failed)
   const replies: ReplyRating[] = Object.entries(verdicts).map(([k, ok]) => {
     const [turn, check] = [Number(k.split("|")[0]), k.slice(k.indexOf("|") + 1)];
-    return { turn, check, ok, ...(notes[turn] ? { note: notes[turn] } : {}) };
+    const failedHere = Object.entries(verdicts).some(([k2, ok2]) => !ok2 && Number(k2.split("|")[0]) === turn);
+    return { turn, check, ok, ...(notes[turn] && (!ok || !failedHere) ? { note: notes[turn] } : {}) };
   });
 
   async function save() {
@@ -67,8 +83,9 @@ export default function Review({ agent, conversations }: { agent: string | null;
     if (!agent) return;
     try {
       const text = await api.reviewFile(agent, kind);
-      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([text], { type: "application/yaml" })), download: `${agent}-${kind}.yaml` });
-      a.click(); URL.revokeObjectURL(a.href);
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([text], { type: "application/yaml" })), download: `${kind}.yaml` });
+      document.body.appendChild(a); a.click(); a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 0);
     } catch (e) { setMsg({ kind: "err", text: (e as Error).message }); }
   }
 
@@ -100,7 +117,7 @@ export default function Review({ agent, conversations }: { agent: string | null;
                     </span>
                   );
                 })}
-                <input id={`review-note-${turn}`} className="compact" placeholder="Why (optional)" maxLength={500} value={notes[turn] ?? ""}
+                <input id={`review-note-${turn}`} className="compact" aria-label={`Why, for turn ${turn}`} placeholder="Why (optional)" maxLength={500} value={notes[turn] ?? ""}
                   onChange={(e) => setNotes((n) => ({ ...n, [turn]: e.target.value }))} />
               </div>
             </div>
@@ -108,25 +125,25 @@ export default function Review({ agent, conversations }: { agent: string | null;
         })}
       </div>
 
-      <div className="rate-row">
+      <div className="rate-row" role="group" aria-label="Overall score, 1 bad to 5 great">
         <span className="small">Overall</span>
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} className={`chip${score === n ? (n <= 2 ? " on-bad" : " on-ok") : ""}`} aria-pressed={score === n} onClick={() => setScore(score === n ? null : n)}>{n}</button>
         ))}
         <span className="muted small">1 bad · 5 great</span>
       </div>
-      <textarea id="review-note" rows={2} maxLength={2000} placeholder="What was good or bad about this conversation (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+      <textarea id="review-note" aria-label="Note on the conversation" rows={2} maxLength={2000} placeholder="What was good or bad about this conversation (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
       <div className="field-row">
-        <input id="review-rater" className="compact" placeholder="Your name" maxLength={80} value={rater} onChange={(e) => setRater(e.target.value)} />
+        <input id="review-rater" className="compact" aria-label="Your name" placeholder="Your name" maxLength={80} value={rater} onChange={(e) => setRater(e.target.value)} />
         <button className="primary" onClick={save} disabled={!replies.length && score === null}>{id ? "Update rating" : "Save rating"}</button>
       </div>
-      {msg && <div className={`callout ${msg.kind}`}>{msg.text}</div>}
+      {msg && <div className={`callout ${msg.kind}`} role="status">{msg.text}</div>}
 
       <h3 className="review-h">Ratings for {agent}</h3>
-      {saved.length === 0 ? <p className="muted small">None saved yet.</p> : (
+      {reviews.length === 0 ? <p className="muted small">None saved yet.</p> : (
         <>
           <p className="muted small">
-            {saved.length} conversation{saved.length === 1 ? "" : "s"} rated
+            {reviews.length} conversation{reviews.length === 1 ? "" : "s"} rated
             {scored.length > 0 && ` · average ${(scored.reduce((a, r) => a + (r.score ?? 0), 0) / scored.length).toFixed(1)}/5`}
           </p>
           {failures.length > 0 && (
@@ -142,7 +159,7 @@ export default function Review({ agent, conversations }: { agent: string | null;
             <button className="ghost compact" onClick={() => download("replay")}>Download failed conversations as replay cases</button>
           </div>
           <p className="muted small">
-            Save labels as <code>evals/{agent.replace(/-/g, "_")}/labels.yaml</code> and run <code>yachat evals calibrate</code> to see how often the judge agrees
+            Save labels as <code>labels.yaml</code> in the agent's eval folder (<code>evals/{agent.replace(/-/g, "_")}/</code>) and run <code>yachat evals calibrate</code> to see how often the judge agrees
             with you. Add the replay cases to <code>replay.yaml</code> so <code>yachat evals check</code> catches each failure again.
           </p>
         </>

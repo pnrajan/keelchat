@@ -250,7 +250,7 @@ export default function App() {
     ...(session && chatTurns.length ? [{ source: "chat" as const, id: session.id, label: "Test chat", policy_hash: session.policy_hash, turns: chatTurns }] : []),
     ...(simRun && simRun.agent === built?.agent
       ? simRun.result.conversations.filter((c) => c.turn_log.length).map((c) => ({
-        source: "simulate" as const, id: `${c.name}-${c.session_id.slice(-6)}`, label: `Simulated: ${c.name}`, policy_hash: simRun.result.policy_hash,
+        source: "simulate" as const, id: `${c.name.slice(0, 100)}-${c.session_id.slice(-6)}`, label: `Simulated: ${c.name}`, policy_hash: simRun.result.policy_hash,
         turns: c.turn_log.map((t) => ({ user: t.user, agent: t.agent, rules: t.rules })),
       }))
       : []),

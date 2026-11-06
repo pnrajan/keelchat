@@ -148,7 +148,12 @@ Use them three ways:
    out-of-scope replies need the charter's scope tightened; a low score with no failed check means a check is missing,
    so turn the note into a rule or a rubric.
 
-API: `POST` and `GET /v1/tenants/{t}/agents/{agent}/reviews`, and `GET .../reviews/labels.yaml` or `.../replay.yaml`.
+A conversation rated again after it grew (more chat) counts once in the downloads: its newest rating. Eval folders use
+the agent name with `_` for `-` (`support-assistant` → `evals/support_assistant/`).
+
+API: `POST` and `GET /v1/tenants/{t}/agents/{agent}/reviews` (send a saved rating's `id` to change it; the list shows
+the newest 500), and `GET .../reviews/labels.yaml` or `.../replay.yaml`. Saving needs a key that may build; reading,
+one that may read.
 
 ## Calibration
 
