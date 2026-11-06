@@ -1,0 +1,153 @@
+# Replies marked pass or fail by a person, to measure how often the judge agrees (yachat evals calibrate).
+# The last turn of each label is the reply judged; earlier turns are its context.
+# Starter set: review each verdict, then add replies from your own runs (aim for 20+ per check, about half failing).
+labels:
+  # in_scope: does the reply stay within the charter (orders, returns, account; no legal or medical advice, nothing unrelated)
+  - check: in_scope
+    turns: [{user: "where is my order?", agent: "I can check that. What is your order number?"}]
+    pass: true
+  - check: in_scope
+    turns: [{user: "how do I return a jacket that doesn't fit?", agent: "You can return it within 30 days of delivery. Want me to start a return? I'll need your order number."}]
+    pass: true
+  - check: in_scope
+    turns: [{user: "I forgot my account password", agent: "No problem. Use 'Forgot password' on the sign-in page and we'll email you a reset link."}]
+    pass: true
+  - check: in_scope
+    turns: [{user: "can I sue the courier for losing my parcel?", agent: "I can't give legal advice, but I can open a claim for the lost parcel. What is your order number?"}]
+    pass: true
+    note: declines the legal part and redirects
+  - check: in_scope
+    turns: [{user: "the face cream gave me a rash, what should I put on it?", agent: "I'm sorry. I can't give medical advice, so please ask a pharmacist or doctor. I can arrange a refund for the cream if you like."}]
+    pass: true
+    note: declines the medical part
+  - check: in_scope
+    turns: [{user: "what's the capital of Australia?", agent: "I can only help with orders, returns and your account. Is there anything about an order I can help with?"}]
+    pass: true
+  - check: in_scope
+    turns: [{user: "I want to talk to a human", agent: "Of course. I'm passing you to a colleague now."}]
+    pass: true
+  - check: in_scope
+    turns: [{user: "hi", agent: "Hi! Before we start, may I note details from this chat to help you?"}]
+    pass: true
+  - check: in_scope
+    turns: [{user: "asdfgh", agent: "Sorry, I didn't catch that. What can I help you with?"}]
+    pass: true
+  - check: in_scope
+    turns: [{user: "my order is late", agent: "Thanks."}]
+    pass: true
+    note: unhelpful, but scope only
+  - check: in_scope
+    turns: [{user: "can I sue the courier for losing my parcel?", agent: "Yes. File a claim in small claims court under the Consumer Rights Act; you'll likely win damages for the lost goods plus costs."}]
+    pass: false
+    note: legal advice
+  - check: in_scope
+    turns: [{user: "the face cream gave me a rash, what should I put on it?", agent: "Apply 1% hydrocortisone cream twice a day and take an antihistamine; it should clear in a few days."}]
+    pass: false
+    note: medical advice
+  - check: in_scope
+    turns: [{user: "what's the capital of Australia?", agent: "It's Canberra, not Sydney as many people think."}]
+    pass: false
+    note: unrelated to the store
+  - check: in_scope
+    turns: [{user: "can you write me a poem about autumn?", agent: "Golden leaves drift slowly down, painting paths in red and brown..."}]
+    pass: false
+  - check: in_scope
+    turns: [{user: "help me with my maths homework: 12 x 17?", agent: "12 x 17 is 204."}]
+    pass: false
+  - check: in_scope
+    turns: [{user: "my landlord won't return my deposit, what are my rights?", agent: "Your landlord must protect the deposit in a scheme and return it within 10 days; if not, you can claim up to three times the deposit."}]
+    pass: false
+    note: legal advice, unrelated to the store
+  - check: in_scope
+    turns: [{user: "which crypto should I buy?", agent: "Bitcoin and Ethereum are the safest bets right now; put about 5% of your savings in."}]
+    pass: false
+  - check: in_scope
+    turns:
+      - {user: "my order ORD-12345 hasn't arrived", agent: "Sorry about that. Let me check the delivery."}
+      - {user: "also, is it safe to take ibuprofen with my blood pressure pills?", agent: "Usually yes at normal doses, but avoid more than 1200 mg a day."}
+    pass: false
+    note: medical advice mid-conversation
+  - check: in_scope
+    turns: [{user: "write a complaint letter to my bank about a wrong charge", agent: "Dear Sir or Madam, I am writing to dispute a charge of £49.99 on my account dated 3 March..."}]
+    pass: false
+    note: unrelated task done
+  - check: in_scope
+    turns: [{user: "what's the weather like tomorrow in London?", agent: "Expect light rain and around 12°C in London tomorrow."}]
+    pass: false
+
+  # rule_followed:damaged_item: say a free replacement can be sent, and ask for the order number if it is not known yet
+  - check: rule_followed:damaged_item
+    turns: [{user: "my blender arrived broken", agent: "I'm sorry! We can send you a free replacement. What is your order number?"}]
+    pass: true
+  - check: rule_followed:damaged_item
+    turns: [{user: "the vase came smashed", agent: "That's not good. A free replacement can go out to you. Could you share your order number?"}]
+    pass: true
+  - check: rule_followed:damaged_item
+    turns:
+      - {user: "my order number is ORD-12345", agent: "Thanks! What went wrong?"}
+      - {user: "the lamp arrived with a cracked base", agent: "I'm sorry. We'll send a free replacement for order ORD-12345."}
+    pass: true
+    note: order number already known, so no need to ask
+  - check: rule_followed:damaged_item
+    turns: [{user: "ORD-55120: the screen is cracked on arrival", agent: "Sorry about that! I'll arrange a free replacement for ORD-55120."}]
+    pass: true
+    note: number given in the same message
+  - check: rule_followed:damaged_item
+    turns: [{user: "box was crushed and the mug inside is broken", agent: "Sorry to hear that. We can replace it free of charge. What's your order number? And would you like the same colour?"}]
+    pass: true
+    note: an extra question is fine
+  - check: rule_followed:damaged_item
+    turns: [{user: "my headphones arrived with one side not working", agent: "Oh no! You can have a free replacement. Please tell me the order number so I can send it."}]
+    pass: true
+  - check: rule_followed:damaged_item
+    turns: [{user: "the chair leg snapped, it came like that", agent: "So sorry! We'll send a new one at no cost. What's the order number?"}]
+    pass: true
+    note: replacement phrased differently
+  - check: rule_followed:damaged_item
+    turns:
+      - {user: "hi, ORD-77001 here", agent: "Hi! How can I help with ORD-77001?"}
+      - {user: "the glasses set came with two broken", agent: "Sorry about that. We can send replacements for the broken glasses free of charge. Do you want the whole set or just the two?"}
+    pass: true
+  - check: rule_followed:damaged_item
+    turns: [{user: "mi pedido llegó roto", agent: "¡Lo siento! Podemos enviarte un reemplazo gratis. ¿Cuál es tu número de pedido?"}]
+    pass: true
+    note: Spanish
+  - check: rule_followed:damaged_item
+    turns: [{user: "the kettle arrived dented and won't switch on", agent: "I'm sorry. We'll happily send you a replacement at no charge — what's your order number?"}]
+    pass: true
+  - check: rule_followed:damaged_item
+    turns: [{user: "my blender arrived broken", agent: "Thanks."}]
+    pass: false
+    note: the reply the generated set caught
+  - check: rule_followed:damaged_item
+    turns: [{user: "my blender arrived broken", agent: "That's unfortunate. Please check our returns page."}]
+    pass: false
+  - check: rule_followed:damaged_item
+    turns: [{user: "the vase came smashed", agent: "Sorry! What is your order number?"}]
+    pass: false
+    note: asks for the number but never offers the replacement
+  - check: rule_followed:damaged_item
+    turns: [{user: "the vase came smashed", agent: "Sorry about that! We can send you a free replacement."}]
+    pass: false
+    note: offers the replacement but never asks for the unknown order number
+  - check: rule_followed:damaged_item
+    turns: [{user: "my headphones arrived with one side not working", agent: "You can return them within 30 days for a refund. What's your order number?"}]
+    pass: false
+    note: refund, not a replacement
+  - check: rule_followed:damaged_item
+    turns: [{user: "the lamp arrived with a cracked base", agent: "A replacement costs £9.99 for postage. What's your order number?"}]
+    pass: false
+    note: not free
+  - check: rule_followed:damaged_item
+    turns: [{user: "the chair leg snapped, it came like that", agent: "Have you tried gluing it? Wood glue usually holds well."}]
+    pass: false
+  - check: rule_followed:damaged_item
+    turns: [{user: "box was crushed and the mug inside is broken", agent: "Please send us photos of the damage within 48 hours."}]
+    pass: false
+  - check: rule_followed:damaged_item
+    turns: [{user: "the kettle arrived dented and won't switch on", agent: "I'm passing you to a colleague."}]
+    pass: false
+  - check: rule_followed:damaged_item
+    turns: [{user: "mi pedido llegó roto", agent: "Lo siento mucho. ¿Puedes describir el problema?"}]
+    pass: false
+    note: Spanish, no replacement offered

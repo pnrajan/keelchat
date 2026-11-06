@@ -98,7 +98,8 @@ rubrics:
   natural_tone: The assistant sounds like a helpful person, not a form, and asks one clear question at a time.
 options:                           # extra arguments a DeepEval metric needs
   non_advice: {advice_types: [medical]}
-calibration: {}
+trials: 3                          # runs per case (default 1); a case passes only when every run does
+calibration: {in_scope: 1.0, rule_followed: 0.9}    # from `yachat evals calibrate`
 ```
 
 Metric names:
@@ -116,6 +117,10 @@ Metric names:
   `rule_followed` must include a case where a rule fires.
 - **Calibration**: the report lists gated metrics with no `calibration` entry under `uncalibrated`; their scores
   still gate, but treat a failure as a prompt to look, not proof (see below).
+- **Trials**: the model answers differently each run, so one pass proves little. With `trials: k` (or `--trials k`
+  on `evals run` and `evals check`) each case runs k times and passes only when every run does (pass^k). The report
+  gives `passed_every_trial`, and `flaky` lists cases that passed some runs but not all; each failure says which
+  trial it came from. Metrics average over every run. Cost and time grow k times.
 - **Speed**: up to three cases run at once, each on a runtime of its own; judged scores run one at a time to stay
   inside provider rate limits.
 - **Judge**: `EVALS_JUDGE_MODEL`, any litellm model id, so evals need no Anthropic credit. Without it only the
@@ -123,16 +128,36 @@ Metric names:
 - **Simulate first**: the console's **Simulate** tab and `yachat simulate` run the same kinds of conversations
   without expectations or scores, to explore an agent before you write its set.
 
-## Calibration (required before a metric gates)
+## Calibration (required before a judged check gates)
 
-Label ~30 conversations per agent by hand (pass/fail per metric), run the judge, record agreement in
-`thresholds.yaml: calibration` and here:
+A judge can be wrong. Before trusting `in_scope` or `rule_followed`, measure how often it agrees with a person:
 
-| Agent | Metric | Human-labeled set | Agreement | Date |
-|---|---|---|---|---|
-| hiring-agent | (none yet) | | | |
+1. In `evals/<agent>/labels.yaml`, write replies and mark each one pass or fail by hand. Aim for 20+ per check,
+   about half of them failing, close calls included. The last turn is the reply judged; earlier turns are context.
 
-Until a row exists for a metric, treat its score as advisory, not a gate.
+   ```yaml
+   labels:
+     - check: rule_followed:damaged_item       # or in_scope
+       turns:
+         - {user: "my order number is ORD-12345", agent: "Thanks! What went wrong?"}
+         - {user: "the lamp arrived cracked", agent: "Sorry! We'll send a free replacement for ORD-12345."}
+       pass: true
+       note: order number already known       # optional: why
+   ```
+
+2. Run `EVALS_JUDGE_MODEL=... uv run yachat evals calibrate evals/<agent>`. It runs the same judged checks on every
+   label and prints the agreement per check, how often the judge was too lenient or too strict, and each
+   disagreement with the judge's reason. It exits 1 when a check agrees less than 80%.
+3. Copy the printed `calibration:` block into `thresholds.yaml`. The judge varies too: run it twice and record the lower figure. Rerun it when you change the judge model or the
+   prompts in `yachat/evals/checks.py` and `metrics.py`.
+
+A disagreement means either the judge or the label is wrong: fix the label, or treat that check as advice until the
+judge improves. Metrics with no `calibration` entry are listed under `uncalibrated` in the report.
+
+| Agent | Check | Labels | Agreement | Judge | Date |
+|---|---|---|---|---|---|
+| support-assistant | `in_scope` | 20 | 100% | Qwen3.5-27B | 2026-11-05 |
+| support-assistant | `rule_followed` | 20 | 90–95% over two runs; misses were all too lenient, passing replies that do only part of the rule | Qwen3.5-27B | 2026-11-05 |
 
 ## Online (production)
 

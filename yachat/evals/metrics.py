@@ -48,8 +48,10 @@ class Thresholds(BaseModel):
     rubrics: dict[str, str] = Field(default_factory=dict)
     #: metric → extra constructor arguments, e.g. `non_advice: {advice_types: [medical]}`
     options: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    #: metric → agreement with the human-labeled set (docs/EVALS.md)
+    #: metric → agreement with the human-labeled set (`yachat evals calibrate`, docs/EVALS.md)
     calibration: dict[str, float] = Field(default_factory=dict)
+    #: runs per case; a case passes only when every run does (pass^k). `--trials` overrides it
+    trials: int = Field(default=1, ge=1, le=20)
 
     @classmethod
     def load(cls, path: str | Path) -> Thresholds:

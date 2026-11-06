@@ -105,9 +105,9 @@ async def _scope(judge: str, charter: str, user: str, reply: str) -> str | None:
     return None
 
 
-async def judged_checks(policy: CompiledPolicy, r: ReplayResult, model: str, only: set[str] | None = None) -> list[Violation]:
+async def judged_checks(policy: CompiledPolicy, r: ReplayResult, model: str, only: set[str] | None = None, turn: int | None = None) -> list[Violation]:
     """Per turn: the reply keeps to the charter, and does what each rule that matched says. `model` is the judge id;
-    `only` limits it to those checks."""
+    `only` limits it to those checks, `turn` (from 1) to that turn (the earlier ones are its context)."""
     from deepeval.test_case import LLMTestCase
 
     from yachat.evals.judge import deepeval_judge
@@ -117,7 +117,7 @@ async def judged_checks(policy: CompiledPolicy, r: ReplayResult, model: str, onl
     rules = rules_by_name(policy)
     out: list[Violation] = []
     for i, t in enumerate(r.turns, 1):
-        if not t.agent.strip():
+        if not t.agent.strip() or (turn is not None and i != turn):
             continue
         case = LLMTestCase(input=t.user, actual_output=t.agent, context=earlier(r.turns, i - 1))
         if only is None or "in_scope" in only:

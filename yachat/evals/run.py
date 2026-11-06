@@ -29,6 +29,8 @@ REASON_CHARS = 120
 class EvalReport:
     agent: str
     cases: int
+    #: runs per case: the model answers differently each run, so a case passes only when every run passes (pass^k)
+    trials: int = 1
     expectation_failures: dict[str, list[str]] = dc_field(default_factory=dict)
     #: case → checks every conversation must pass (yachat.evals.checks)
     check_failures: dict[str, list[str]] = dc_field(default_factory=dict)
@@ -37,6 +39,23 @@ class EvalReport:
     judged: bool = False
     #: gated metrics with no recorded agreement with human labels: treat their scores as advisory (docs/EVALS.md)
     uncalibrated: list[str] = dc_field(default_factory=list)
+    #: case → runs with no failure
+    passes: dict[str, int] = dc_field(default_factory=dict)
+    _runs: dict[str, int] = dc_field(default_factory=dict, repr=False)
+
+    def add(self, case: str, expectation_failures: list[str], check_failures: list[str]) -> None:
+        """One run of a case. With several trials each failure says which run it came from."""
+        n = self._runs[case] = self._runs.get(case, 0) + 1
+        self.passes[case] = self.passes.get(case, 0) + (not expectation_failures and not check_failures)
+        tag = f"trial {n}: " if self.trials > 1 else ""
+        for failures, into in ((expectation_failures, self.expectation_failures), (check_failures, self.check_failures)):
+            if failures:
+                into.setdefault(case, []).extend(tag + f for f in failures)
+
+    @property
+    def flaky(self) -> dict[str, str]:
+        """Cases that passed some runs but not all: passes / trials."""
+        return {c: f"{p}/{self.trials}" for c, p in self.passes.items() if 0 < p < self.trials}
 
     @property
     def ok(self) -> bool:
@@ -48,6 +67,9 @@ class EvalReport:
             "cases": self.cases,
             "ok": self.ok,
             "judged": self.judged,
+            "trials": self.trials,
+            "passed_every_trial": f"{sum(p == self.trials for p in self.passes.values())}/{self.cases}",
+            "flaky": self.flaky,
             "expectation_failures": self.expectation_failures,
             "check_failures": self.check_failures,
             "metric_scores": [asdict(s) for s in self.metric_scores],
@@ -148,21 +170,21 @@ async def score(results: list[ReplayResult], thresholds: Thresholds, policy: Com
 FROM_ENV = "env"
 
 
-async def evaluate(agent_dir: str | Path, judge: str | None = FROM_ENV, scores: bool = True) -> EvalReport:
+async def evaluate(agent_dir: str | Path, judge: str | None = FROM_ENV, scores: bool = True, trials: int | None = None) -> EvalReport:
     """`judge` is the judge model id; None checks in code only; the default reads EVALS_JUDGE_MODEL. With `scores`, the
-    judge scores the thresholds' metrics; without, it runs the judged checks on every turn instead (`yachat evals check`)."""
+    judge scores the thresholds' metrics; without, it runs the judged checks on every turn instead (`yachat evals check`).
+    `trials` runs each case that many times (default: the thresholds' `trials`); metrics average over every run."""
     agent_dir = Path(agent_dir)
     thresholds = Thresholds.load(agent_dir / "thresholds.yaml")
     policy = build((agent_dir / thresholds.policy).read_text())
-    results = await run_set(policy, load_agent_set(agent_dir))
-    report = EvalReport(agent=policy.agent, cases=len(results))
+    replay = load_agent_set(agent_dir)
+    k = trials or thresholds.trials
+    results = await run_set(policy, replay.model_copy(update={"cases": [c for c in replay.cases for _ in range(k)]}))
+    report = EvalReport(agent=policy.agent, cases=len(replay.cases), trials=k)
     model = judge_model_from_env() if judge == FROM_ENV else judge
     for r in results:
-        if r.expectation_failures:
-            report.expectation_failures[r.case.name] = r.expectation_failures
         found = code_checks(policy, r) if scores or not model else [v for v in await check(policy, r, model) if v.check != "expect"]
-        if found:
-            report.check_failures[r.case.name] = [str(v) for v in found]
+        report.add(r.case.name, r.expectation_failures, [str(v) for v in found])
     report.judged = bool(model)
     if model and scores:
         report.metric_scores = await score(results, thresholds, policy, model)
@@ -171,7 +193,7 @@ async def evaluate(agent_dir: str | Path, judge: str | None = FROM_ENV, scores: 
     return report
 
 
-def main(argv: list[str], scores: bool = True) -> int:
+def main(argv: list[str], scores: bool = True, trials: int | None = None) -> int:
     """Each argument is an eval set folder; none: every folder under ./evals with a thresholds.yaml."""
     agent_dirs = [Path(a) for a in argv] or sorted(p.parent for p in Path("evals").glob("*/thresholds.yaml"))
     if not agent_dirs:
@@ -179,7 +201,7 @@ def main(argv: list[str], scores: bool = True) -> int:
         return 2
     ok = True
     for d in agent_dirs:
-        report = asyncio.run(evaluate(d, scores=scores))
+        report = asyncio.run(evaluate(d, scores=scores, trials=trials))
         print(json.dumps(report.to_dict(), indent=2))
         ok = ok and report.ok
     return 0 if ok else 1

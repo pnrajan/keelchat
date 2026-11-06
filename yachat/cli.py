@@ -31,9 +31,12 @@ def main(argv: list[str] | None = None) -> int:
     ev = sub.add_parser("evals", help="evaluation harness (DeepEval, Ragas); install yachat[evals]")
     evs = ev.add_subparsers(dest="evals_cmd", required=True)
     evr = evs.add_parser("run", help="run eval sets (default: every evals/<agent>/ here); CI gate")
-    evr.add_argument("agent_dirs", nargs="*")
     evc = evs.add_parser("check", help="run eval sets against the checks every conversation must pass (judged ones with EVALS_JUDGE_MODEL)")
-    evc.add_argument("agent_dirs", nargs="*")
+    for e in (evr, evc):
+        e.add_argument("agent_dirs", nargs="*")
+        e.add_argument("--trials", type=int, default=None, help="runs per case; a case passes only when every run does (default: thresholds.yaml trials)")
+    evk = evs.add_parser("calibrate", help="how often the judge agrees with replies a person labeled (evals/<agent>/labels.yaml)")
+    evk.add_argument("agent_dirs", nargs="*")
     evg = evs.add_parser("generate", help="generate an eval set from a policy: one case per target reached, failures shortened")
     evg.add_argument("policy", help="policy YAML")
     evg.add_argument("--dir", default=None, help="eval set folder (default: evals/<agent>/)")
@@ -96,10 +99,18 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(REGISTRY.manifest().model_dump(mode="json"), indent=2))
         return 0
     if args.cmd == "evals":
+        import litellm
+
         from yachat.evals.run import main as evals_main
 
+        litellm.suppress_debug_info = True  # its "Provider List" banner goes to stdout and breaks the JSON report
+
         if args.evals_cmd in ("run", "check"):
-            return evals_main(list(args.agent_dirs), scores=args.evals_cmd == "run")
+            return evals_main(list(args.agent_dirs), scores=args.evals_cmd == "run", trials=args.trials)
+        if args.evals_cmd == "calibrate":
+            from yachat.evals.calibrate import main as calibrate_main
+
+            return calibrate_main(list(args.agent_dirs))
         if args.evals_cmd == "generate":
             from yachat.evals.generate import main as generate_main
 
