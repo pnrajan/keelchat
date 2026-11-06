@@ -32,8 +32,13 @@ runs every bot, and keeps the counting, safety checks and channel rules in code 
   input and output guardrails; memory only for listed items, with consent for sensitive ones.
 - **Any model, any channel.** Anthropic or anything litellm reaches (OpenAI, Gemini, Bedrock, Ollama…), directly or
   through a LiteLLM gateway. Web widget, WhatsApp, SMS, Slack and phone.
+- **Tested without writing answers.** Every conversation is checked against the policy: no errors, loops or broken
+  limits, replies in scope, rules followed. `yachat evals generate` plays users against each part of the policy and
+  turns failures into short replay scripts.
+- **Handoff that comes back.** A person takes over through the inbox or your helpdesk; when they resolve the ticket,
+  the bot tells the user and resumes the conversation.
 - **Laptop to production.** Runs with only a model key, every store in memory; add Redis, Postgres and S3 for
-  production. Tenant keys, versions with rollback, a handoff inbox, and cost and outcome dashboards.
+  production. Tenant keys, versions with rollback, and cost and outcome dashboards.
 
 ## Quickstart
 
@@ -115,6 +120,17 @@ Allow it in a policy with `tools: [slot_search]`. To start a package of your own
 `uv run yachat new package acme_caps`: it writes a tool, a flow step, a guardrail, an agent that uses them and a
 passing contract test. [Your first step in ten minutes](docs/ADDING_A_CAPABILITY.md#start-here-your-first-step-in-ten-minutes)
 walks through it.
+
+## Test it
+
+```bash
+uv run yachat evals generate examples/support_assistant.yaml   # a test set from the policy: evals/support_assistant/generated.yaml
+uv run yachat evals check evals/support_assistant              # every case through the checks, judged ones with EVALS_JUDGE_MODEL
+uv run yachat evals run                                        # the CI gate: expectations, checks and metric thresholds
+```
+
+Targets come from the policy (finish the flow, give up, a bad answer per field, each rule and a near miss, out of
+scope, asking for a person, each language); the model only plays the user. [Evals](docs/EVALS.md) has the details.
 
 ## Examples
 
