@@ -1,7 +1,7 @@
 """How often the judge agrees with a person: replies a person marked pass or fail (`evals/<agent>/labels.yaml`) go
 through the same judged checks, and the agreement per check is what `thresholds.yaml: calibration` records.
 
-A judged check whose agreement is unknown or low is advice, not a gate.
+Judged checks fail `yachat evals check` either way; the agreement says how far to trust those failures.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from dataclasses import field as dc_field
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from yachat.evals.checks import judged_checks, rules_by_name
 from yachat.evals.metrics import Thresholds
@@ -31,8 +31,8 @@ MIN_LABELS = 20
 class Turn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    user: str
-    agent: str
+    user: str = Field(min_length=1)
+    agent: str = Field(min_length=1)
 
 
 class Label(BaseModel):
@@ -44,7 +44,7 @@ class Label(BaseModel):
     check: str
     turns: list[Turn] = Field(min_length=1)
     #: the person's verdict: does the reply pass this check
-    passes: bool = Field(alias="pass")
+    passes: StrictBool = Field(alias="pass")
     note: str = ""
 
 
@@ -89,12 +89,13 @@ class CalibrationReport:
 
     @property
     def ok(self) -> bool:
-        return bool(self.checks) and all(a.rate >= CALIBRATED for a in self.checks.values())
+        """Every label graded, and every check agrees at least CALIBRATED."""
+        return bool(self.checks) and not self.errors and all(a.rate >= CALIBRATED for a in self.checks.values())
 
     def summary(self) -> str:
         lines = [f"{self.agent}: judge {self.judge}"]
         for name, a in self.checks.items():
-            flag = "" if a.rate >= CALIBRATED else f"  below {CALIBRATED:.0%}: advice only, not a gate"
+            flag = "" if a.rate >= CALIBRATED else f"  below {CALIBRATED:.0%}: check its failures by hand"
             few = f"  (only {a.labels} labels; aim for {MIN_LABELS}+)" if a.labels < MIN_LABELS else ""
             lines.append(f"  {name}: {a.agree}/{a.labels} agree ({a.rate:.0%}) · too lenient {a.too_lenient} · too strict {a.too_strict}{flag}{few}")
         lines += [f"  differs {d}" for d in self.disagreements]

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from tests.conftest import ROOT
 from yachat.evals.calibrate import LABELS, Label, LabelSet, Turn, calibrate, group
@@ -47,6 +48,9 @@ def test_labels_load_and_name_a_check_the_policy_has() -> None:
     bad = LabelSet(labels=[Label.model_validate({"check": "rule_followed:nope", "turns": [Turn(user="a", agent="b")], "pass": True})])
     with pytest.raises(ValueError, match=r"labels\[0\]\.check"):
         validate_labels(policy, bad)
+    for wrong in ({"pass": "no"}, {"pass": False, "turns": [{"user": "a", "agent": ""}]}):  # never coerced, never empty
+        with pytest.raises(ValidationError):
+            Label.model_validate({"check": "in_scope", "turns": [{"user": "a", "agent": "b"}], "pass": True} | wrong)
 
 
 async def test_trials_run_each_case_that_many_times(tmp_path: Path) -> None:
@@ -55,7 +59,7 @@ async def test_trials_run_each_case_that_many_times(tmp_path: Path) -> None:
     (tmp_path / "replay.yaml").write_text(yaml.safe_dump({"cases": [{"name": "hello", "messages": ["hi"]}]}))
     report = await evaluate(tmp_path, judge=None)
     assert report.trials == 2 and report.cases == 1 and report._runs == {"hello": 2}
-    assert report.to_dict()["passed_every_trial"] in ("0/1", "1/1")
+    assert report.passes == {"hello": 2} and report.to_dict()["passed_every_trial"] == "1/1", report.to_dict()
 
 
 @pytest.mark.skipif(not JUDGE, reason="EVALS_JUDGE_MODEL not set")

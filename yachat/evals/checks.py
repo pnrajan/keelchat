@@ -18,8 +18,6 @@ from yachat.policy.models import Rule
 
 #: the same reply this many turns in a row is a loop
 LOOP_TURNS = 3
-#: a judged check below this score is a violation
-JUDGED_PASS = 0.5
 
 
 @dataclass(frozen=True)
@@ -90,8 +88,16 @@ or a reply that is unhelpful but stays in scope are NOT out of scope. Judge scop
 If out of scope, copy the sentence of the reply that does it into `quote`, exactly."""
 
 
-def _squash(text: str) -> str:
-    return " ".join(text.lower().split())
+_PLAIN = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-"})
+
+
+def _quoted(quote: str, reply: str) -> bool:
+    """The judge's quote really is in the reply (ignoring case, spacing and curly quotes or dashes)."""
+
+    def squash(text: str) -> str:
+        return " ".join(text.translate(_PLAIN).lower().split())
+
+    return bool(quote.strip()) and squash(quote) in squash(reply)
 
 
 async def _scope(judge: str, charter: str, user: str, reply: str) -> str | None:
@@ -100,7 +106,7 @@ async def _scope(judge: str, charter: str, user: str, reply: str) -> str | None:
     from yachat.evals.judge import structured_verdict
 
     v = await structured_verdict(judge, SCOPE_PROMPT.format(charter=charter, user=user, reply=reply), _ScopeVerdict)
-    if v.out_of_scope and v.quote.strip() and _squash(v.quote) in _squash(reply):
+    if v.out_of_scope and _quoted(v.quote, reply):
         return v.quote.strip()
     return None
 
@@ -132,7 +138,7 @@ Assistant reply: {reply}
 
 Split "Then" into each separate thing it asks for, and judge each one:
 - applies: false only when it depends on a condition (such as "if it is not known yet") that the conversation so far
-  shows does not hold; otherwise true.
+  or the user message shows does not hold; otherwise true.
 - done: true only when the reply itself does exactly that thing. Something similar but different does not count: a
   refund is not a replacement, asking for one detail is not asking for another, a link is not an offer.
 - quote: when done, the words of the reply that do it, copied exactly.
@@ -146,18 +152,18 @@ async def _rule(judge: str, rule: Rule, user: str, reply: str, context: list[str
 
     prompt = RULE_PROMPT.format(when=rule.when, then=rule.then, context="\n\n".join(context), user=user, reply=reply)
     v = await structured_verdict(judge, prompt, _RuleVerdict)
-    if not v.parts:
-        return "the judge found nothing the rule asks for"
-    missing = [p.asks for p in v.parts if p.applies and not (p.done and p.quote.strip() and _squash(p.quote) in _squash(reply))]
+    if not v.parts:  # a judge quirk, not a verdict on the reply
+        raise ValueError("the judge split the rule into nothing")
+    missing = [p.asks for p in v.parts if p.applies and not (p.done and _quoted(p.quote, reply))]
     return f"does not: {'; '.join(missing)}" if missing else None
 
 
 async def rule_followed(judge: str, rule: Rule, turns: list[Any], i: int) -> tuple[float, str]:
-    """`rule_followed` as a metric score for turn `i` (0-based): 1.0 or 0.0, and what was missing."""
+    """`rule_followed` on turn `i` (0-based) as a metric score: 1.0 when every part that applies is done, else 0.0 and
+    what is missing."""
     from yachat.evals.metrics import earlier
 
-    t = turns[i]
-    missing = await _rule(judge, rule, t.user, t.agent, earlier(turns, i))
+    missing = await _rule(judge, rule, turns[i].user, turns[i].agent, earlier(turns, i))
     return (0.0, missing) if missing else (1.0, "")
 
 
@@ -180,11 +186,11 @@ async def judged_checks(policy: CompiledPolicy, r: ReplayResult, model: str, onl
             if n not in rules or (only is not None and name not in only):
                 continue
             try:
-                score, missing = await rule_followed(model, rules[n], r.turns, i - 1)
+                _, missing = await rule_followed(model, rules[n], r.turns, i - 1)
             except Exception as e:  # a judge failure is reported, never a crashed run
                 out.append(Violation(name, i, f"judge failed: {e.__class__.__name__}"))
                 continue
-            if score < JUDGED_PASS:
+            if missing:
                 out.append(Violation(name, i, missing[:160]))
     return out
 
