@@ -27,6 +27,7 @@ from yachat.state.models import (
     MemoryRecord,
     PolicyTemplate,
     PolicyVersion,
+    Review,
     SessionState,
     SurveyResponse,
     new_id,
@@ -715,6 +716,31 @@ class HandoffStore(ABC):
         external_id: str | None = None,
     ) -> Handoff | None:
         """Change the given properties only; None when there is no such handoff."""
+
+
+class ReviewStore(ABC):
+    """Conversations a person rated (the console's Review tab)."""
+
+    @abstractmethod
+    async def save(self, review: Review) -> Review:
+        """Insert, or replace the review with the same id."""
+
+    @abstractmethod
+    async def list(self, tenant: str, agent: str, limit: int = 500) -> builtins.list[Review]:
+        """Newest first."""
+
+
+class InMemoryReviewStore(ReviewStore):
+    def __init__(self) -> None:
+        self._r: dict[tuple[str, str], Review] = {}
+
+    async def save(self, review: Review) -> Review:
+        self._r[(review.tenant, review.id)] = review.model_copy(deep=True)
+        return review
+
+    async def list(self, tenant: str, agent: str, limit: int = 500) -> builtins.list[Review]:
+        rows = [r.model_copy(deep=True) for (t, _), r in self._r.items() if t == tenant and r.agent == agent]
+        return sorted(rows, key=lambda r: r.created_at, reverse=True)[:limit]
 
 
 class InMemoryHandoffStore(HandoffStore):

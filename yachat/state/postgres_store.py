@@ -26,6 +26,7 @@ from yachat.state.models import (
     MemoryRecord,
     PolicyTemplate,
     PolicyVersion,
+    Review,
     SessionState,
     SurveyResponse,
     now,
@@ -43,6 +44,7 @@ from yachat.state.store import (
     Plan,
     RateLimiter,
     ResponseStore,
+    ReviewStore,
     SessionStore,
     TemplateStore,
     TenantToolStore,
@@ -215,6 +217,15 @@ CREATE TABLE IF NOT EXISTS handoffs (
     PRIMARY KEY (tenant, id)
 );
 CREATE INDEX IF NOT EXISTS handoffs_tenant_status ON handoffs (tenant, status, created_at DESC);
+CREATE TABLE IF NOT EXISTS reviews (
+    tenant TEXT NOT NULL,
+    id TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    review JSONB NOT NULL,
+    PRIMARY KEY (tenant, id)
+);
+CREATE INDEX IF NOT EXISTS reviews_tenant_agent ON reviews (tenant, agent, created_at DESC);
 -- tables created before tenancy keyed rows without the tenant, so two tenants overwrote each other: re-key them.
 -- The old key was unique on (user_id, agent, item), so the wider key cannot conflict.
 DO $$
@@ -929,3 +940,25 @@ class PostgresHandoffStore(_Pooled, HandoffStore):
                     setattr(h, k, v)
 
         return await self._change(tenant, handoff_id, apply)
+
+
+class PostgresReviewStore(_Pooled, ReviewStore):
+    """Rated conversations in Postgres, one JSON row each."""
+
+    async def save(self, review: Review) -> Review:
+        async with (await self.pool).acquire() as con:
+            await con.execute(
+                "INSERT INTO reviews (tenant, id, agent, created_at, review) VALUES ($1,$2,$3,$4,$5::jsonb) "
+                "ON CONFLICT (tenant, id) DO UPDATE SET review=EXCLUDED.review",
+                review.tenant,
+                review.id,
+                review.agent,
+                review.created_at,
+                review.model_dump_json(),
+            )
+        return review
+
+    async def list(self, tenant: str, agent: str, limit: int = 500) -> list[Review]:
+        async with (await self.pool).acquire() as con:
+            rows = await con.fetch("SELECT review FROM reviews WHERE tenant=$1 AND agent=$2 ORDER BY created_at DESC LIMIT $3", tenant, agent, limit)
+        return [Review.model_validate_json(r["review"]) for r in rows]

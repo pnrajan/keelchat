@@ -49,7 +49,20 @@ from yachat.runtime.llm_factory import fake_tools_from_env, llm_from_env
 from yachat.runtime.readiness import readiness
 from yachat.runtime.runtime import NotFound, PolicyRetired, Runtime, RuntimeFailure
 from yachat.state.artifacts import ArtifactStore, artifact_store_from_env
-from yachat.state.models import AuditEvent, AuditKind, Embed, Handoff, HandoffStatus, PolicyTemplate, PolicyVersion, SessionState, subject_of
+from yachat.state.models import (
+    AuditEvent,
+    AuditKind,
+    Embed,
+    Handoff,
+    HandoffStatus,
+    PolicyTemplate,
+    PolicyVersion,
+    ReplyRating,
+    Review,
+    ReviewTurn,
+    SessionState,
+    subject_of,
+)
 from yachat.state.store import (
     EmbedStore,
     InMemoryEmbedStore,
@@ -121,6 +134,20 @@ class SessionCreate(Body):
     tenant: TenantId = "default"
     channel: str = "web"
     policy_hash: str | None = None
+
+
+class ReviewIn(Body):
+    """A person's rating of one conversation; send `id` again to change a saved one."""
+
+    id: str | None = Field(default=None, pattern=r"^rev_[a-f0-9]{12}$")
+    policy_hash: str = ""
+    source: Literal["chat", "simulate"]
+    conversation: str
+    turns: list[ReviewTurn]
+    replies: list[ReplyRating] = Field(default_factory=list)
+    score: int | None = None
+    note: str = ""
+    rater: str = ""
 
 
 class HandoffUpdate(Body):
@@ -246,6 +273,7 @@ def stores_from_env() -> dict[str, Any]:
             PostgresMemoryStore,
             PostgresRateLimiter,
             PostgresResponseStore,
+            PostgresReviewStore,
             PostgresSessionStore,
             PostgresTemplateStore,
             PostgresTurnLocks,
@@ -257,6 +285,7 @@ def stores_from_env() -> dict[str, Any]:
         out["memory"] = PostgresMemoryStore(url=url)
         out["audit"] = PostgresAuditStore(url=url)
         out["handoffs"] = PostgresHandoffStore(url=url)
+        out["reviews"] = PostgresReviewStore(url=url)
         out["responses"] = PostgresResponseStore(url=url)
         out["datasets"] = PostgresDatasetStore(url=url)
         out["versions"] = PostgresAgentVersionStore(url=url)
@@ -1153,6 +1182,31 @@ def create_app(
         except Exception as e:  # the answer is already computed
             rt.metrics.incr("audit_write_failed")
             log.error("audit write failed", tenant=tenant, error=f"{e.__class__.__name__}: {e}")
+
+    @app.post("/v1/tenants/{tenant}/agents/{agent}/reviews", status_code=201)
+    async def save_review(tenant: TenantId, agent: str, body: ReviewIn) -> dict[str, Any]:
+        """A person's rating of a conversation from the test chat or a simulation (the console's Review tab)."""
+        try:
+            review = Review.model_validate(body.model_dump(exclude_none=True) | {"tenant": tenant, "agent": agent})
+        except ValidationError as e:  # the limits and turn numbers live on the stored model
+            raise HTTPException(422, detail=e.errors(include_url=False, include_context=False)) from e
+        review = await rt.reviews.save(review)
+        return review.model_dump(mode="json")
+
+    @app.get("/v1/tenants/{tenant}/agents/{agent}/reviews")
+    async def list_reviews(tenant: TenantId, agent: str) -> list[dict[str, Any]]:
+        """Rated conversations, newest first."""
+        return [r.model_dump(mode="json") for r in await rt.reviews.list(tenant, agent)]
+
+    @app.get("/v1/tenants/{tenant}/agents/{agent}/reviews/{kind}.yaml")
+    async def export_reviews(tenant: TenantId, agent: str, kind: Literal["labels", "replay"]) -> Response:
+        """Rated replies as `labels.yaml` (judge calibration), or failed conversations as replay cases."""
+        from yachat.evals.review import cases_yaml, labels_yaml
+
+        reviews = list(reversed(await rt.reviews.list(tenant, agent)))  # oldest first: a stable file to diff
+        text = labels_yaml(reviews) if kind == "labels" else cases_yaml(reviews)
+        name = f"{agent}-{kind}.yaml"
+        return Response(text, media_type="application/yaml", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
     @app.get("/v1/tenants/{tenant}/handoffs")
     async def list_handoffs(

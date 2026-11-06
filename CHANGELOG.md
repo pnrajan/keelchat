@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
+- Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
 - `--trials k` / `trials:` on evals: each case runs k times and passes only when every run does; flaky cases listed.
 - `rule_followed` judged part by part: each part of the rule that applies needs a quote from the reply; code decides.
 - `yachat evals calibrate`: the judge's agreement with replies a person labeled (`labels.yaml`).
