@@ -10,6 +10,7 @@ import Handoffs from "./Handoffs";
 import Setup from "./Setup";
 import Simulate from "./Simulate";
 import Review, { Conversation } from "./Review";
+import Compose from "./Compose";
 import Tests from "./Tests";
 import Rain from "./Rain";
 import Reach from "./Reach";
@@ -85,10 +86,11 @@ export default function App() {
   const [online, setOnline] = useState<boolean | null>(null);
   const [openHandoffs, setOpenHandoffs] = useState(0);
   const [focusHandoff, setFocusHandoff] = useState<string | null>(null);
-  const [view, setView] = useState<"console" | "dashboard" | "settings" | "reach" | "install">(() =>
-    location.hash === "#dashboard" ? "dashboard" : location.hash === "#usage" ? "settings" : location.hash === "#reach" ? "reach" : location.hash.startsWith("#install") ? "install" : "console");
+  const [view, setView] = useState<"console" | "compose" | "dashboard" | "settings" | "reach" | "install">(() =>
+    location.hash === "#dashboard" ? "dashboard" : location.hash === "#usage" ? "settings" : location.hash === "#reach" ? "reach" : location.hash.startsWith("#install") ? "install"
+      : location.hash === "#compose" ? "compose" : "console");
   useEffect(() => {
-    const hash = { dashboard: "#dashboard", settings: "#usage", reach: "#reach", install: "#install", console: "" }[view];
+    const hash = { dashboard: "#dashboard", settings: "#usage", reach: "#reach", install: "#install", compose: "#compose", console: "" }[view];
     try { history.replaceState(null, "", hash || location.pathname); } catch { /* hash is a convenience */ }
   }, [view]);
   const countHandoffs = useCallback(() => { api.handoffs("open").then((h) => setOpenHandoffs(h.length), () => undefined); }, []);
@@ -273,6 +275,7 @@ export default function App() {
         <div className="brand"><span className="mark" aria-hidden>y</span><span>yachat<span className="caret" aria-hidden /></span> <span className="muted">/ test console</span></div>
         <div className="topbar-right">
           {workspace && <span className="pill" title="The tenant your key belongs to">workspace <code>{workspace}</code></span>}
+          <button className={`pill link${view === "compose" ? " on" : ""}`} onClick={() => setView("compose")} title="Build a policy without writing YAML">Compose</button>
           <button className={`pill link${view === "console" ? " on" : ""}`} onClick={() => setView("console")} title="Write a policy and talk to it">Editor · test chat</button>
           <button className={`pill link${view === "install" ? " on" : ""}`} onClick={() => setView("install")} title="Web, SMS, Slack, WhatsApp, voice">Channels</button>
           <button className={`pill link${view === "reach" ? " on" : ""}`} onClick={() => setView("reach")} title="Publish agents and see survey results">Publish · results</button>
@@ -288,6 +291,11 @@ export default function App() {
         </div>
       </header>
 
+      {view === "compose" && (
+        <Compose policy={policy} onChange={setPolicy} schema={schema} datasets={datasets} botTypes={botTypes} issues={live.issues} onIssues={onIssues}
+          onSave={() => void saveVersion()} onAddStep={addStep} savedTick={savedTick}
+          onTry={() => { setView("console"); void build(); }} onTests={() => { setView("console"); setTab("test"); }} />
+      )}
       {view === "dashboard" && <Dashboard workspace={workspace} onOpenHandoffs={() => { setFocusHandoff(null); setTab("handoffs"); setView("console"); }} />}
       {view === "settings" && <Usage workspace={workspace} />}
       {view === "reach" && <Reach workspace={workspace} />}

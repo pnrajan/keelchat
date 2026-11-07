@@ -544,3 +544,30 @@ button { white-space: nowrap; }
 .thought { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--border); border-left: 3px solid var(--phosphor, var(--accent)); border-radius: var(--radius-sm); background: var(--surface-2); }
 .thought h3 { margin: 0; font-size: 13px; }
 .thought ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+
+/* Compose: cards on the left, the YAML they write on the right */
+.compose { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; padding: 16px; align-items: start; }
+@media (max-width: 1000px) { .compose { grid-template-columns: minmax(0, 1fr); } }
+.compose-left { display: flex; flex-direction: column; gap: 14px; }
+.compose-right { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 12px; max-height: calc(100vh - 110px); overflow: auto; }
+.compose-right .editor { min-height: 420px; }
+.compose h3 { margin: 4px 0 0; font-size: 13px; }
+.compose-start, .compose-ask { display: flex; flex-direction: column; gap: 8px; }
+.compose-start textarea { flex: 1; min-width: 0; }
+.chips-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.compose-card { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: 0 12px; }
+.compose-card[open] { padding-bottom: 12px; }
+.compose-card > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 10px 0; cursor: pointer; list-style: none; }
+.compose-card > summary::-webkit-details-marker { display: none; }
+.compose-card > summary::before { content: "▸"; color: var(--faint); width: 10px; }
+.compose-card[open] > summary::before { content: "▾"; }
+.compose-card > * + * { margin-top: 8px; }
+label.inline-field { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; flex: none; font-size: 12.5px; color: var(--text); }
+.inline-field select, .inline-field input { width: auto; }
+.compose-steps th, .compose-steps td { text-align: left; font-size: 12.5px; }
+.compose-steps td:nth-child(n+2), .compose-steps th:nth-child(n+2) { text-align: center; }
+.rule-edit { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.rule-edit label { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.rule-edit .field-row input.compact { flex: 1; }
+input.narrow { width: 64px; }
+.compose { position: relative; z-index: 1; overflow: auto; flex: 1; min-height: 0; }

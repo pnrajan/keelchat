@@ -19,6 +19,7 @@ The features behind a policy, with the YAML that turns each one on. Start with t
 
 | Tab | What you do there |
 |---|---|
+| **Compose** | Build a policy without writing YAML: draft it from a sentence or start from a bot type, ask for changes in plain words ("also ask for their email") and see exactly what changed before applying them, and set every part on cards (purpose, steps and questions, safety, rules, handoff, memory, small talk, and how carefully each step replies). The YAML and its build check sit beside the cards. |
 | **Editor · test chat** | Edit the YAML with completion for keys, step names, tools and guardrails, docs on hover, and build errors marked on their lines as you type. **Build & try** compiles it and the chat pane talks to it. |
 | **Inspector** | For each turn: every stage with its timing, the intent verdict, the route, tool calls, the session state and what was remembered. |
 | **Simulate** | Model-played personas and scripted replays against the policy, on fake tools. |

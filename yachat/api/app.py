@@ -130,6 +130,14 @@ class DraftIn(Body):
     tenant: TenantId = "default"
 
 
+class EditIn(Body):
+    """A policy and a change to it, in plain words."""
+
+    yaml: str = Field(min_length=1, max_length=100_000)
+    instruction: str = Field(min_length=3, max_length=2_000)
+    tenant: TenantId = "default"
+
+
 class SessionCreate(Body):
     agent: str
     user_id: str
@@ -723,6 +731,20 @@ def create_app(
         async with spending(tenant) as models:
             draft = await draft_policy(rt.llm, models, body.description, tenant, catalog)
         return {"yaml": draft.yaml, "errors": [{"path": e.path, "message": e.message} for e in draft.errors], "attempts": draft.attempts}
+
+    @app.post("/v1/agents/edit")
+    async def edit_agent(body: EditIn, request: Request) -> dict[str, Any]:
+        """The policy changed as asked in plain words ("also ask for their email"), checked by the build and repaired
+        from its errors. Returns the YAML, a line per change and any errors left; never registered or saved."""
+        from yachat.policy.drafter import edit_policy
+
+        tenant = own(request, body.tenant)
+        await sync_tenant_tools(tool_store, tenant)
+        catalog = {d.name: d.kind for d in await rt.datasets.list(tenant)}
+        async with spending(tenant) as models:
+            draft, changes = await edit_policy(rt.llm, models, body.yaml, body.instruction, tenant, catalog)
+        errors = [{"path": e.path, "message": e.message} for e in draft.errors]
+        return {"yaml": draft.yaml, "changes": changes, "errors": errors, "attempts": draft.attempts}
 
     @app.post("/v1/tenants/{tenant}/agents", status_code=201)
     async def save_version(tenant: TenantId, body: VersionIn) -> dict[str, Any]:

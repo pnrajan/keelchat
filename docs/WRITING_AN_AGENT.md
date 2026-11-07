@@ -3,7 +3,12 @@
 A policy describes one job the agent must finish with the user: apply for a role, book an appointment, qualify a
 lead. Everything in the YAML serves that goal. This guide is the checklist we use before an agent ships.
 
-Start from a bot type with **New agent…** (Blank, Support, Hiring, Analyst, Coach, or one your team saved), or
+The quickest way in is the console's **Compose** view: describe the bot in a sentence or pick a bot type, then ask for
+changes in plain words ("hand off refunds over $100", "be warmer"). Each change is checked by the build and shown as a
+diff before you apply it, and cards set every part (steps and questions, rules, handoff, memory, small talk, how
+carefully each step replies) while the YAML updates beside them.
+
+Or start from a bot type with **New agent…** (Blank, Support, Hiring, Analyst, Coach, or one your team saved), or
 **Duplicate** an existing agent from its Versions tab. Write it in the console's policy editor: it completes keys and names from the registry, shows docs on hover and
 marks build errors on their lines as you type. **+ Add step** inserts a step with its settings; **Describe a bot…**
 drafts a first version from a plain description. **Save version** keeps each valid build as a numbered version; the

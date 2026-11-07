@@ -82,7 +82,7 @@ A change is verified when `uv run pytest`, `uv run ruff check .` and `uv run myp
 ```
 yachat/
   policy/        models, loader, validator (YAML paths), compiler (CompiledPolicy), defaults, memory_types, durations, errors,
-                 schema (editor JSON Schema), drafter (policy from a description; revised from ratings)
+                 schema (editor JSON Schema), drafter (policy from a description; changed as asked; revised from ratings)
   registry/      core (@tool/@action/@node/@guardrail/@preprocessor, REGISTRY, manifest), discovery, contract,
                  mcp (MCP servers → `<alias>.<tool>`), tenant_tools (Tool Registry API HTTP tools)
   runtime/       context (TurnContext), pipeline (stages, timing, short-circuit), llm (Anthropic), litellm_client,
@@ -113,7 +113,7 @@ yachat/
 evals/           <agent>/ sets: replay.yaml (fixtures, cases, expect), generated.yaml, labels.yaml, thresholds.yaml (policy, minimums, rubrics, trials)
 examples/        policies (support, booking, concierge, hiring, surveys, analyst, coach), data/, sim_script.yaml, contrib_tool/,
                  extensions/booking_caps (example tool, guardrail and channel package)
-frontend/        React test console (policy editor, chat, trace/state inspector, simulate, tests, review, versions, channels, results, handoff inbox)
+frontend/        React test console (compose, policy editor, chat, trace/state inspector, simulate, tests, review, versions, channels, results, handoff inbox)
 plugins/yachat/  Claude Code plugin (.mcp.json → /mcp, build-agent skill); .claude-plugin/marketplace.json lists it
 docs/            DEVELOPER_GUIDE.md, ARCHITECTURE.md, WRITING_AN_AGENT.md, ADDING_A_CAPABILITY.md, EVALS.md
 scripts/        dev.sh, knowledge.sh, analytics.sh, db.sh (docker compose Redis+Postgres); run.sh at the root;
