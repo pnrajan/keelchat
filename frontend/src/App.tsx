@@ -18,6 +18,8 @@ import Versions from "./Versions";
 
 const PolicyEditor = lazy(() => import("./PolicyEditor"));  // CodeMirror is most of the bundle: load it on its own
 
+/** a reply's plan (`think: true` steps and high-stakes turns) */
+type Thought = { need: string; unknown: string; plan: string[]; rules: string[]; added_rules: string[] };
 type Msg = { role: "user" | "agent"; text: string; meta?: string[]; analysis?: AnalysisResult | null; error?: boolean; handoff?: string; rules?: string[] };
 type Tab = "setup" | "analysis" | "trace" | "state" | "rendered" | "metrics" | "versions" | "simulate" | "test" | "review" | "handoffs" | "audit";
 const TABS: Tab[] = ["setup", "analysis", "trace", "state", "rendered", "metrics", "versions", "simulate", "test", "review", "handoffs", "audit"];
@@ -214,7 +216,8 @@ export default function App() {
     setInput("");
     try {
       const r = await api.turn(session.id, text, crypto.randomUUID(), action);
-      const meta = [r.route ?? "-", `${r.llm_calls} model`, `${r.tool_calls} tool`, r.outbound.exit_reason ? `exit: ${r.outbound.exit_reason}` : "", r.rules?.length ? `rules: ${r.rules.join(", ")}` : "", r.errors.length ? `${r.errors.length} errors` : ""].filter(Boolean);
+      const planned = r.outbound.items.some((x) => x.type === "reasoning");
+      const meta = [r.route ?? "-", ...(planned ? ["planned"] : []), `${r.llm_calls} model`, `${r.tool_calls} tool`, r.outbound.exit_reason ? `exit: ${r.outbound.exit_reason}` : "", r.rules?.length ? `rules: ${r.rules.join(", ")}` : "", r.errors.length ? `${r.errors.length} errors` : ""].filter(Boolean);
       const analysis = latestAnalysis(r.outbound.items);
       const handoff = r.outbound.items.find((x) => x.type === "handoff")?.ticket_id as string | undefined;
       setMsgs((m) => [...m, { role: "agent", text: r.outbound.text, meta, analysis, handoff, rules: r.rules ?? [] }]);
@@ -242,6 +245,7 @@ export default function App() {
   const analysis = latestAnalysis(last?.outbound.items);
   const verification = latestVerification(last?.outbound.items);
   const totalMs = last ? Math.max(1, ...last.trace.filter((t) => !t.skipped).map((t) => t.ms)) : 1;
+  const thought = last?.outbound.items.find((x) => x.type === "reasoning") as Thought | undefined;
   // conversations the Review and Test tabs work on: this test chat (each user message with the reply to it) and the last simulation
   const chatTurns = msgs.flatMap((m, i) => {
     const r = msgs[i + 1];
@@ -456,6 +460,18 @@ export default function App() {
             {tab === "analysis" && <Panel key={last?.turn_id}><Analysis result={analysis} verification={verification} /></Panel>}
             {tab === "trace" && (last ? (
               <div className="trace">
+                {thought && (
+                  <section className="thought" aria-label="How the reply was planned">
+                    <h3>How the reply was planned</h3>
+                    <dl className="facts">
+                      <dt>Need</dt><dd>{thought.need || "-"}</dd>
+                      {thought.unknown && <><dt>Not known</dt><dd>{thought.unknown} <span className="muted small">(not assumed)</span></dd></>}
+                      {thought.rules.length > 0 && <><dt>Rules</dt><dd>{thought.rules.join(", ")}{thought.added_rules.length > 0 &&
+                        <span className="muted small"> · {thought.added_rules.join(", ")} added by code (the plan left it out)</span>}</dd></>}
+                    </dl>
+                    <ol>{thought.plan.map((x) => <li key={x}>{x}</li>)}</ol>
+                  </section>
+                )}
                 {last.trace.map((t, i) => (
                   <div key={i} className={`trace-row${t.skipped ? " skipped" : ""}`}>
                     <div className="row-between"><span>{t.stage}{t.note ? <em> · {t.note}</em> : null}</span><span>{t.skipped ? "skipped" : `${t.ms.toFixed(0)} ms`}</span></div>

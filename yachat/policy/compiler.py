@@ -38,6 +38,7 @@ class CompiledStep(BaseModel):
     #: the model tier this step's work runs on; None: each job keeps its usual tier
     model: Tier | None = None
     high_stakes: bool = False
+    think: bool = False
 
 
 class CompiledMemoryItem(BaseModel):
@@ -168,6 +169,7 @@ def compile_policy(
                 rules=s.rules,
                 model=s.model,
                 high_stakes=s.high_stakes,
+                think=s.think,
             )
         )
         for t in spec.tools:
@@ -249,7 +251,7 @@ def compile_policy(
 
 
 #: step fields added after policies were first pinned: in the hash only when set, so existing hashes stay stable
-_LATER_STEP_FIELDS: dict[str, Any] = {"rules": [], "model": None, "high_stakes": False}
+_LATER_STEP_FIELDS: dict[str, Any] = {"rules": [], "model": None, "high_stakes": False, "think": False}
 
 
 def _handoff_payload(h: HandoffSpec) -> dict[str, Any]:

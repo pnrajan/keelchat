@@ -25,7 +25,8 @@ runs every bot, and keeps the counting, safety checks and channel rules in code 
 - **Code decides, the model phrases.** Steps validate answers and pick what happens next; re-asks, digressions and
   exits are counted by the runtime, never by the model.
 - **Rules where you need them.** Plain-language `when` / `then` rules on the agent or on one step, and a model tier
-  per step: small for simple steps, large or `high_stakes` for the hard ones.
+  per step: small for simple steps, large or `high_stakes` for the hard ones. `think: true` plans a reply before it
+  is written; `curious: true` asks one follow-up when an answer is too thin.
 - **Extend without forking.** A tool, flow step, guardrail or channel is one decorated Python function or class, or
   an MCP server. One contract suite checks them all.
 - **Safe by default.** Every tool call goes through one gateway (allow list, timeouts, circuit breaker, scrubbing);

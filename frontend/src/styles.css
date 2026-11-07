@@ -539,3 +539,8 @@ button { white-space: nowrap; }
 .sim-row label.inline { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .sim-row label.inline input { width: 56px; }
 .sim-row .field-row input.compact:first-child { min-width: 120px; }
+
+/* Trace tab: how a reply was planned */
+.thought { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--border); border-left: 3px solid var(--phosphor, var(--accent)); border-radius: var(--radius-sm); background: var(--surface-2); }
+.thought h3 { margin: 0; font-size: 13px; }
+.thought ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }

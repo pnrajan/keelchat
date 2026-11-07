@@ -49,6 +49,7 @@ def _step_schema(name: str, defs: dict[str, Any]) -> dict[str, Any]:
         "rules": {**_rules(defs), "description": "rules that apply only while this step is asking"},
         "model": {"enum": ["small", "large"], "description": "run this step on the small (cheaper) or large (stronger) model"},
         "high_stakes": {"type": "boolean", "description": "write this step's replies with the large model and always check them"},
+        "think": {"type": "boolean", "description": "plan each reply before it is written: what the user needs, what is unknown, the rules it must follow"},
     }
     return {
         "type": "object",

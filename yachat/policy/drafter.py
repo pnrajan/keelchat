@@ -108,6 +108,7 @@ async def draft_policy(llm: LLMClient, models: ModelConfig, description: str, te
 
 REVISE = """You revise an agent policy (YAML) so the agent stops making the mistakes people reported when they rated its
 conversations. Reply with the whole revised YAML only.
+- The reply is the policy file itself: top-level keys (`agent:`, `charter:`, `flow:`...), never nested under another key.
 - Change as little as possible: keep every key, step and comment the feedback does not touch, and the same `agent`.
 - Fix the cause, not the one conversation. Prefer, in this order: reword the `then` of a rule that did not do its job;
   add a rule (`rules:` items with `name` in snake_case, `when` the situation in the user's words, `then` what the reply

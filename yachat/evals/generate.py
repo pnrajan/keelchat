@@ -61,6 +61,14 @@ def targets(policy: CompiledPolicy) -> list[Target]:
                             "then a valid one when asked again.",
                         )
                     )
+                    if st.settings.get("curious"):
+                        out.append(
+                            Target(
+                                f"probe:{f['name']}",
+                                f"Cooperates, but answers {f['name'].replace('_', ' ')} in three or four words with no details, "
+                                "then gives the details when asked.",
+                            )
+                        )
     for name, rule in rules_by_name(policy).items():
         out.append(Target(f"rule:{name}", f"Cooperates, and early on brings up this situation in their own words: {rule.when}", Expect(rules_fired=[name])))
         out.append(
@@ -87,6 +95,7 @@ def covered(policy: CompiledPolicy, r: ReplayResult) -> set[str]:
     s = r.state
     keys = {f"step:{n}" for n, status in s.steps.items() if status == "complete"}
     keys |= {f"reask:{n}" for t in r.turns for n in t.reasked}  # the session clears a count once the field is answered
+    keys |= {f"probe:{n}" for t in r.turns for n in t.probed}
     keys |= {f"rule:{n}" for t in r.turns for n in t.rules}
     if s.completed:
         keys.add("completed")

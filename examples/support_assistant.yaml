@@ -8,6 +8,8 @@ tools: [knowledge_search]          # extras; flow steps bring their own tools
 flow:
   - greet_consent
   - form_fill:
+      think: true                  # plan each reply first: what they need, what is unknown, which rules apply
+      curious: true                # one follow-up when an answer is too thin to act on (e.g. "it's broken")
       fields:
         - name: order_number
           ask: What is your order number?

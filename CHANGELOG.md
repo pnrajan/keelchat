@@ -9,6 +9,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
 - Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
 - Console **Test** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
+- `think: true` on a step: the reply is planned first (need, what is unknown, the rules it must follow); code adds any matched rule the plan missed; the plan shows in the Trace tab.
+- `curious: true` on form steps: one follow-up when a valid answer is too thin to act on, counted in code (one per field); drafted tests cover it.
 - **Suggest policy changes** from ratings: the model revises the policy to answer failed replies and low scores, each change named; checked by the build, never saved.
 - `--trials k` / `trials:` on evals: each case runs k times and passes only when every run does; flaky cases listed.
 - `rule_followed` judged part by part: each part of the rule that applies needs a quote from the reply; code decides.
@@ -30,6 +32,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `yachat.evals`.
 
 ### Fixed
+- Answers from documents that do not answer the question say so, instead of describing the documents.
 - After a person resolves a handoff, the user's next message continues the flow instead of counting as a digression.
 - `./run.sh` keeps extras from `uv sync --all-extras`.
 - Booking example guardrail typed with `GuardContext`.

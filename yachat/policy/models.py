@@ -47,6 +47,8 @@ class FlowStep(PolicyModel):
     model: Tier | None = None
     #: every reply of this step is written with the large model and checked before it is sent
     high_stakes: bool = False
+    #: the reply is planned before it is written (what the user needs, what is unknown, the rules it must follow)
+    think: bool = False
     settings: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
@@ -67,6 +69,7 @@ class FlowStep(PolicyModel):
                 rules=body.pop("rules", None) or [],
                 model=body.pop("model", None),
                 high_stakes=body.pop("high_stakes", False),
+                think=body.pop("think", False),
                 settings=body,
             )
         raise ValueError("a flow step is a name or a single-key mapping {name: settings}")
