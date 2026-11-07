@@ -265,3 +265,28 @@ def test_a_handoff_trigger_listed_twice_is_rejected_with_its_path() -> None:
     with pytest.raises(PolicyValidationError) as e:
         build(support.replace("when: [user_request, max_reasks]", "when: [user_request, user_request]"))
     assert [(x.path, x.message) for x in e.value.errors] == [("handoff.when", "listed twice: user_request")]
+
+
+def test_the_language_reference_names_every_key_the_build_accepts() -> None:
+    """docs/POLICY_LANGUAGE.md is the definition of the policy language: a key the build accepts but the page does not
+    name is a gap in it."""
+    from tests.conftest import ROOT
+    from yachat.policy.schema import policy_json_schema
+
+    doc = (ROOT / "docs" / "POLICY_LANGUAGE.md").read_text()
+    s = policy_json_schema()
+    keys = set(s["properties"])
+    for k in ("guardrails", "limits", "handoff"):
+        keys |= set(s["properties"][k]["properties"])
+    for alt in s["properties"]["flow"]["items"]["oneOf"][1:]:
+        ((name, body),) = alt["properties"].items()
+        keys.add(name)
+        for part in [body, *body.get("anyOf", [])]:
+            keys |= set(part.get("properties") or {})
+    keys |= set(s["properties"]["memory"]["items"]["oneOf"][1]["properties"])
+    keys |= set(s["properties"]["rules"]["items"]["properties"])
+    for d in ("FieldSpec", "SurveyQuestion", "Objective", "AskIf", "ChoiceOption"):
+        keys |= set(s["$defs"][d]["properties"])
+    keys |= set(s["$defs"]["QuestionKind"]["enum"]) | set(s["$defs"]["ConditionOp"]["enum"])
+    missing = sorted(k for k in keys if f"`{k}`" not in doc)
+    assert not missing, f"not defined in docs/POLICY_LANGUAGE.md: {missing}"

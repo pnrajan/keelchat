@@ -102,3 +102,37 @@ async def test_without_small_talk_a_chat_counts_as_wandering_off() -> None:
     await say(rt, s.id, "yes")
     r = await say(rt, s.id, "haha sorry, how's your day going?")
     assert r.state.digressions == 1 and "small_talk" not in r.state.data
+
+
+def test_only_the_change_lines_an_edit_adds_are_its_changes() -> None:
+    from yachat.policy.drafter import new_changes
+
+    before = "# change: reworded the refund rule (for: 2 failed replies)\nagent: a\n"
+    after = "# change: reworded the refund rule (for: 2 failed replies)\n# change: added Spanish\nagent: a\nlanguages: [en, es]\n"
+    yaml, changes = new_changes(before, after)
+    assert changes == ["added Spanish"]
+    assert yaml == "# change: reworded the refund rule (for: 2 failed replies)\nagent: a\nlanguages: [en, es]\n"
+
+
+async def test_small_talk_leaves_the_off_topic_count_as_it_was() -> None:
+    rt, _ = await make_runtime(SUPPORT)
+    s = await rt.start_session("support-assistant", "u1")
+    await say(rt, s.id, "hi")
+    await say(rt, s.id, "yes")
+    r = await say(rt, s.id, "what's the capital of France?")
+    assert r.state.digressions == 1, r.outbound.text
+    r = await say(rt, s.id, "haha sorry, how's your day going?")
+    assert r.state.data.get("small_talk") == 1 and r.state.digressions == 1  # not reset by chit-chat
+    r = await say(rt, s.id, "ORD-12345")
+    assert "small_talk" not in r.state.data  # any other turn ends the run
+
+
+async def test_a_follow_up_that_starts_with_no_is_still_kept() -> None:
+    rt, _ = await make_runtime(SUPPORT)
+    s = await rt.start_session("support-assistant", "u1")
+    for m in ("hi", "yes", "ORD-12345"):
+        await say(rt, s.id, m)
+    r = await say(rt, s.id, "it's broken")
+    assert r.state.open_question and r.state.open_question.field == "issue__more", r.outbound.text
+    r = await say(rt, s.id, "No power at all, the screen stays black")
+    assert "No power at all" in r.state.fields["issue"], r.state.fields

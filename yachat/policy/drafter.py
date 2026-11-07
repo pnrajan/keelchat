@@ -138,12 +138,25 @@ async def edit_policy(
     the draft (its change lines removed) and the change lines. Never registered or saved."""
     content = f"Catalog:\n{catalog(tenant, datasets)}\n\n" + untrusted("policy", yaml) + "\n\n" + untrusted("request", instruction[:EDIT_LIMIT])
     d = await _until_it_builds(llm, models, "policy_edit", EDIT, [{"role": "user", "content": content}], tenant, datasets)
-    changes = [m.strip() for m in CHANGE.findall(d.yaml)]
-    d.yaml = CHANGE.sub("", d.yaml).lstrip("\n")  # the change lines are shown beside the diff, not kept in the file
+    d.yaml, changes = new_changes(yaml, d.yaml)
     header = _header(yaml)
     if header and not d.yaml.startswith("#"):  # the file's opening comments are the owner's: kept as written
         d.yaml = header + d.yaml
     return d, changes
+
+
+def new_changes(before: str, after: str) -> tuple[str, list[str]]:
+    """The change lines `after` adds, taken out of it (they are shown, not kept). Lines already in `before` (e.g. from a
+    revision suggested by ratings) are not this edit's: they stay where they are."""
+    earlier = {m.strip() for m in CHANGE.findall(before)}
+    changes, kept = [], []
+    for line in after.splitlines(keepends=True):
+        m = CHANGE.match(line)
+        if m and m.group(1).strip() not in earlier:
+            changes.append(m.group(1).strip())
+        else:
+            kept.append(line)
+    return "".join(kept).lstrip("\n"), changes
 
 
 def _header(yaml: str) -> str:

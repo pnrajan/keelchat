@@ -139,6 +139,7 @@ See `docs/ADDING_A_CAPABILITY.md`.
 | `docs/COMPARISON.md` | yachat against Rasa Pro, Parlant, LangGraph and Botpress |
 | `docs/ARCHITECTURE.md` | components, life of a message, deployment topology |
 | `docs/WRITING_AN_AGENT.md` | how a team writes a goal-oriented policy; pre-launch checklist |
+| `docs/POLICY_LANGUAGE.md` | every policy key, its values and defaults (a test fails when the build accepts a key it does not name) |
 | `CONTRIBUTING.md`, `SECURITY.md` | PR checks and review rules; vulnerability reporting and runtime protections |
 
 ---

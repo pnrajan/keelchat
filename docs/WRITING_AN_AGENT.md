@@ -8,6 +8,8 @@ will do in plain words, and ask for changes the same way ("hand off refunds over
 checked by the build and listed before you apply it. **Fine-tune** has cards for every part (steps and questions,
 rules, handoff, memory, small talk, how carefully each step replies) and **Show YAML** has the file itself.
 
+Every key, its values and defaults are defined in [The policy language](POLICY_LANGUAGE.md).
+
 Or start from a bot type with **New agent…** (Blank, Support, Hiring, Analyst, Coach, or one your team saved), or
 **Duplicate** an existing agent from its Versions tab. Write it in the console's policy editor: it completes keys and names from the registry, shows docs on hover and
 marks build errors on their lines as you type. **+ Add step** inserts a step with its settings; **Describe a bot…**

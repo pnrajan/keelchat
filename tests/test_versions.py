@@ -107,7 +107,8 @@ async def test_only_valid_builds_are_saved():
         assert r.status_code == 200 and [e["path"] for e in r.json()["errors"]] == ["limits.reasks"]
         r = await c.post("/v1/agents/validate", json={"yaml": "agent: [unclosed"})
         assert r.json()["errors"][0]["path"].startswith("line 1")
-        assert (await c.post("/v1/agents/validate", json={"yaml": SUPPORT})).json() == {"errors": [], "agent": "support-assistant"}
+        r = (await c.post("/v1/agents/validate", json={"yaml": SUPPORT})).json()
+        assert r["errors"] == [] and r["agent"] == "support-assistant" and r["summary"]
         assert (await c.post("/v1/sessions", json={"agent": "support-assistant", "user_id": "u"})).status_code == 404  # validate registers nothing
 
 

@@ -3,8 +3,9 @@ import { isMap, isScalar, isSeq, parseDocument, YAMLMap, type Node } from "yaml"
 
 export type Field = { name: string; ask: string; expect: string; optional: boolean };
 export type Step = { name: string; verify: boolean; fields: Field[] | null; think: boolean; curious: boolean; model: string; high_stakes: boolean };
-export type Rule = { name: string; when: string; then: string; high_stakes: boolean };
-export type Memory = { field: string; extract: string; half_life: string };
+/** `rest`: the item's other keys (`overrides`; `from`, `type`, `sensitive`...), written back as they were */
+export type Rule = { name: string; when: string; then: string; high_stakes: boolean; rest: Record<string, unknown> };
+export type Memory = { field: string; extract: string; half_life: string; rest: Record<string, unknown> };
 export type Handoff = { when: string[]; timeout: string } | null;
 export type Config = {
   agent: string; charter: string; languages: string[]; tools: string[];
@@ -39,15 +40,18 @@ export function readConfig(text: string): Config | null {
     languages: list(js.languages ?? ["en"]), tools: list(js.tools),
     input: "input" in g ? list(g.input) : null, output: "output" in g ? list(g.output) : null, reasks: num(l.reasks), digressions: num(l.digressions), steps,
     memory: Array.isArray(js.memory) ? js.memory.length : 0,
-    rules: (Array.isArray(js.rules) ? js.rules : []).map((r: Record<string, unknown>) => ({
-      name: String(r?.name ?? ""), when: String(r?.when ?? ""), then: String(r?.then ?? ""), high_stakes: r?.high_stakes === true,
-    })),
+    rules: (Array.isArray(js.rules) ? js.rules : []).map((r: Record<string, unknown>) => {
+      const { name, when, then, high_stakes, ...rest } = r ?? {};
+      return { name: String(name ?? ""), when: String(when ?? ""), then: String(then ?? ""), high_stakes: high_stakes === true, rest };
+    }),
     handoff: js.handoff && typeof js.handoff === "object"
       ? { when: list((js.handoff as Record<string, unknown>).when ?? ["user_request"]), timeout: String((js.handoff as Record<string, unknown>).timeout ?? "") }
       : null,
-    memoryItems: (Array.isArray(js.memory) ? js.memory : []).map((m: unknown) => typeof m === "string"
-      ? { field: m, extract: "", half_life: "" }
-      : { field: String((m as Record<string, unknown>)?.field ?? ""), extract: String((m as Record<string, unknown>)?.extract ?? ""), half_life: String((m as Record<string, unknown>)?.half_life ?? "") }),
+    memoryItems: (Array.isArray(js.memory) ? js.memory : []).map((m: unknown) => {
+      if (typeof m === "string") return { field: m, extract: "", half_life: "", rest: {} };
+      const { field, extract, half_life, ...rest } = (m ?? {}) as Record<string, unknown>;
+      return { field: String(field ?? ""), extract: String(extract ?? ""), half_life: String(half_life ?? ""), rest };
+    }),
     small_talk: typeof js.small_talk === "string" ? js.small_talk : "off",
   };
 }
@@ -110,8 +114,10 @@ export function moveStep(text: string, index: number, by: -1 | 1): string {
 
 /** Rules as the policy writes them: `high_stakes` only when on. */
 export const rulesValue = (rules: Rule[]) =>
-  rules.map((r) => ({ name: r.name, when: r.when, then: r.then, ...(r.high_stakes ? { high_stakes: true } : {}) }));
+  rules.map((r) => ({ name: r.name, when: r.when, then: r.then, ...r.rest, ...(r.high_stakes ? { high_stakes: true } : {}) }));
 
 /** Memory items as the policy writes them: a bare name when nothing else is set (the platform extracts it). */
 export const memoryValue = (items: Memory[]) =>
-  items.map((m) => (!m.extract && !m.half_life ? m.field : { field: m.field, ...(m.extract ? { extract: m.extract } : {}), ...(m.half_life ? { half_life: m.half_life } : {}) }));
+  items.map((m) => (!m.extract && !m.half_life && Object.keys(m.rest).length === 0
+    ? m.field
+    : { field: m.field, ...(m.extract ? { extract: m.extract } : {}), ...m.rest, ...(m.half_life ? { half_life: m.half_life } : {}) }));

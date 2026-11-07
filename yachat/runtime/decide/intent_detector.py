@@ -110,7 +110,8 @@ def schema_for(ctx: TurnContext) -> dict[str, Any]:
                 "additionalProperties": False,
             },
         }
-    return {**SCHEMA, "properties": {**SCHEMA["properties"], **extra}, "required": [*SCHEMA["required"], *extra]}
+    first = {"small_talk": extra.pop("small_talk")} if "small_talk" in extra else {}  # judged before the intents, not after
+    return {**SCHEMA, "properties": {**first, **SCHEMA["properties"], **extra}, "required": [*first, *SCHEMA["required"], *extra]}
 
 
 @lru_cache(maxsize=1)
@@ -293,6 +294,12 @@ class IntentDetector:
         return v
 
     async def run(self, ctx: TurnContext) -> TurnContext:
+        # small talk in a row: cleared here, so any turn that is not small talk (whichever way it returns) ends the run;
+        # _small_talk sets it again
+        talk = int(ctx.state.data.pop(SMALL_TALK_KEY, 0))
+        return await self._run(ctx, talk)
+
+    async def _run(self, ctx: TurnContext, talk: int) -> TurnContext:
         st, d = ctx.state, ctx.policy.defaults
         if ctx.handoff_reason and (ctx.handoff_reason == "follow_up" or may_hand_off(ctx)):  # passed to a person: nothing to classify
             ctx.trace.append(StageTrace("decide.intent_detector.llm", 0.0, skipped=True, note="handoff"))
@@ -306,7 +313,7 @@ class IntentDetector:
                 ctx.verdict = AnswerVerdict("digressed", intent="enquiry", reason="detector error", items=[IntentItem("enquiry", text=ctx.text)], in_scope=True)
             if self._wants_human(ctx) or self._wants_to_stop(ctx):  # a quiet "please stop" is confirmed for every agent
                 return ctx
-            if self._small_talk(ctx):
+            if self._small_talk(ctx, talk):
                 return ctx
             if not ctx.verdict.in_scope or ctx.verdict.intent == "off_topic":
                 ctx.verdict.in_scope = False
@@ -373,7 +380,7 @@ class IntentDetector:
         for f, val in v.fields.items():  # answers given before they were asked are kept for the step that will ask them
             if f in known_fields(ctx) and f not in st.fields and f != (q.field if q else None) and f not in open_fields(ctx) and str(val or "").strip():
                 st.prefilled[f] = val
-        if self._small_talk(ctx):  # before answers: chit-chat read as a guess at the open field is not an answer
+        if self._small_talk(ctx, talk):  # before answers: chit-chat read as a guess at the open field is not an answer
             ctx.reask = True
             ctx.route = ROUTE_REASK
             return ctx
@@ -424,20 +431,18 @@ class IntentDetector:
         return ctx
 
     @staticmethod
-    def _small_talk(ctx: TurnContext) -> bool:
+    def _small_talk(ctx: TurnContext, talk: int) -> bool:
         """Small talk the policy answers in kind: not counted as wandering off, up to SMALL_TALK_TURNS in a row."""
         v, st = ctx.verdict, ctx.state
         if v is None or not v.small_talk or v.edited_field:  # the flag decides ("how are you?" may read as a question or an answer)
-            st.data.pop(SMALL_TALK_KEY, None)  # in a row only
             return False
-        n = int(st.data.get(SMALL_TALK_KEY, 0)) + 1
+        n = talk + 1
         st.data[SMALL_TALK_KEY] = n
         if n > SMALL_TALK_TURNS:  # enough chat: from here on it counts like any other detour (never as an answer)
             ctx.verdict = replace(v, verdict="digressed", intent="off_topic", fields={})
             log.info("small talk", turns=n, decision="counted", reason=f"more than {SMALL_TALK_TURNS} in a row")
             return False
-        ctx.verdict = replace(v, verdict="digressed", fields={}, reason=SMALL_TALK, in_scope=True)
-        st.digressions = 0
+        ctx.verdict = replace(v, verdict="digressed", fields={}, reason=SMALL_TALK, in_scope=True)  # digressions left as they are
         ctx.decide("count", "small_talk", reason=f"{n} in a row; not counted as wandering off")
         log.info("small talk", turns=n, decision="answered in kind")
         return True

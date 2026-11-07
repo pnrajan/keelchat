@@ -176,6 +176,7 @@ contextual rules, Parlant; for programmatic multi-agent graphs, LangGraph; for a
 | I want to… | Read |
 |---|---|
 | write or tune a bot, and check it before launch | [Writing an agent](docs/WRITING_AN_AGENT.md) |
+| look up any key of the policy YAML | [The policy language](docs/POLICY_LANGUAGE.md) |
 | build one complex bot from plan to launch | [Building an agent end to end](docs/BUILDING_AN_AGENT_END_TO_END.md) |
 | use the console, channels, memory, handoff, documents, data or Claude | [What a bot can do](docs/FEATURES.md) |
 | add a tool, step, guardrail, channel or MCP server | [Adding a capability](docs/ADDING_A_CAPABILITY.md) |

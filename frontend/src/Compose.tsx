@@ -1,6 +1,6 @@
 // Compose: make a bot in two steps. Say what it should do; read what it will do, in plain words; ask for any change in
 // plain words. Detailed settings and the YAML are one click away, folded, for people who want them.
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { diffLines } from "diff";
 import { api, BotType, Dataset, ValidationError } from "./api";
 import { Config, Memory, memoryValue, readConfig, Rule, rulesValue, setKey, setStep } from "./policyDoc";
@@ -29,7 +29,8 @@ const TRIGGERS: { id: string; label: string }[] = [
   { id: "disengaged", label: "they keep wandering off" },
   { id: "tool_unavailable", label: "a tool is down" },
 ];
-const snake = (s: string) => s.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+// as typed: a space becomes `_` and stays, so "refund over" can be typed; only leading `_` is dropped
+const snake = (s: string) => s.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+/, "");
 const plainChange = (c: string) => c.replace(/`/g, "").replace(/^./, (x) => x.toUpperCase());
 
 export default function Compose(p: Props) {
@@ -41,11 +42,18 @@ export default function Compose(p: Props) {
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [change, setChange] = useState<Change | null>(null);
   const [check, setCheck] = useState<Check | null>(null);
+  const [showYaml, setShowYaml] = useState(false);
+  const latest = useRef(p.policy);
+  latest.current = p.policy;
   const { onIssues } = p;
 
   useEffect(() => {  // what the bot does in plain words, and whether it builds: half a second after the last change
+    const sent = p.policy;
     const t = window.setTimeout(() => {
-      api.validate(p.policy).then((r) => { setCheck(r); onIssues(r.errors, r.agent); }, () => setCheck(null));
+      api.validate(sent).then(
+        (r) => { if (latest.current === sent) { setCheck(r); onIssues(r.errors, r.agent); } },  // an older answer is dropped
+        () => { if (latest.current === sent) setCheck(null); },
+      );
     }, 500);
     return () => window.clearTimeout(t);
   }, [p.policy, onIssues]);
@@ -68,8 +76,10 @@ export default function Compose(p: Props) {
     try { setChange({ before: p.policy, ...(await api.editPolicy(p.policy, instruction.trim())) }); } catch (e) { fail(e); } finally { setBusy(null); }
   }
 
+  const stale = change !== null && change.before !== p.policy;  // edited since asking: applying would lose those edits
+
   function apply() {
-    if (!change) return;
+    if (!change || stale) return;
     p.onChange(change.yaml); setChange(null); setAsk("");
     setMsg({ kind: "ok", text: "Done. Try it to see the difference." });
   }
@@ -153,8 +163,10 @@ export default function Compose(p: Props) {
               <strong>{change.changes.length ? "Here's what will change" : "Suggested change"}</strong>
               {change.changes.length > 0 && <ul>{change.changes.map((c) => <li key={c}>{plainChange(c)}</li>)}</ul>}
               {change.errors.length > 0 && <p className="small">It still needs a fix after this; you can apply it and press Fix it for me.</p>}
+              {stale && <p className="small"><b>You changed the bot after asking.</b> Ask again so this change includes your edits.</p>}
               <div className="field-row">
-                <button className="primary compact" onClick={apply}>Apply</button>
+                <button className="primary compact" onClick={apply} disabled={stale}>Apply</button>
+                {stale && <button className="compact" onClick={() => edit(ask)} disabled={!!busy || ask.trim().length < 3}>Ask again</button>}
                 <button className="ghost compact" onClick={() => setChange(null)}>Discard</button>
               </div>
               <details><summary className="muted small">Show the exact changes</summary><Diff from={change.before} to={change.yaml} /></details>
@@ -169,11 +181,13 @@ export default function Compose(p: Props) {
             : <FineTune {...p} cfg={cfg} />}
         </details>
 
-        <details className="compose-more">
-          <summary><b>Show YAML</b><span className="muted small">the file behind your bot, for developers</span></summary>
-          <Suspense fallback={<pre className="code">{p.policy}</pre>}>
-            <PolicyEditor value={p.policy} onChange={p.onChange} schema={p.schema} datasets={p.datasets} onIssues={p.onIssues} />
-          </Suspense>
+        <details className="compose-more" onToggle={(e) => setShowYaml((e.target as HTMLDetailsElement).open)}>
+          <summary><b>Show YAML</b><span className="muted small">the file behind your bot, for developers · <a href="https://github.com/pnrajan/yachat/blob/main/docs/POLICY_LANGUAGE.md" target="_blank" rel="noreferrer">what each key means</a></span></summary>
+          {showYaml && (  // loaded and checked only when open; the summary above does the checking otherwise
+            <Suspense fallback={<pre className="code">{p.policy}</pre>}>
+              <PolicyEditor value={p.policy} onChange={p.onChange} schema={p.schema} datasets={p.datasets} onIssues={p.onIssues} />
+            </Suspense>
+          )}
         </details>
       </div>
     </main>
@@ -228,7 +242,7 @@ function FineTune(p: Props & { cfg: Config }) {
             <label>Then<input aria-label="Then" value={r.then} placeholder="say a free replacement can be sent" onChange={(e) => setRules(cfg.rules.map((x, k) => (k === i ? { ...x, then: e.target.value } : x)))} /></label>
           </div>
         ))}
-        <button className="compact" onClick={() => setRules([...cfg.rules, { name: `rule_${cfg.rules.length + 1}`, when: "", then: "", high_stakes: false }])}>+ Add rule</button>
+        <button className="compact" onClick={() => setRules([...cfg.rules, { name: `rule_${cfg.rules.length + 1}`, when: "", then: "", high_stakes: false, rest: {} }])}>+ Add rule</button>
       </details>
 
       <details className="compose-card">
@@ -256,7 +270,7 @@ function FineTune(p: Props & { cfg: Config }) {
             <button className="ghost compact" aria-label={`Forget ${m.field}`} onClick={() => setMemory(cfg.memoryItems.filter((_, k) => k !== i))}>✕</button>
           </div>
         ))}
-        <button className="compact" onClick={() => setMemory([...cfg.memoryItems, { field: `item_${cfg.memoryItems.length + 1}`, extract: "", half_life: "" }])}>+ Remember something</button>
+        <button className="compact" onClick={() => setMemory([...cfg.memoryItems, { field: `item_${cfg.memoryItems.length + 1}`, extract: "", half_life: "", rest: {} }])}>+ Remember something</button>
         {cfg.memoryItems.length > 0 && <p className="muted small">Memory needs the consent step first; the launch checklist says so if it is missing.</p>}
       </details>
     </div>

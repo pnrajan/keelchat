@@ -9,6 +9,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
 - Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
 - Console **Test** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
+- [The policy language](docs/POLICY_LANGUAGE.md): every key, value and default in one page; a test keeps it in step with the build. Linked from Compose's Show YAML.
+- Console Inspector in four groups (Setup, This reply, Test, More); stage timings folded.
 - Console **Compose** view: say what the bot should do, read what it will do in plain words (`/v1/agents/validate` now returns this summary), change it in plain words (`POST /v1/agents/edit`, checked by the build, listed before applying), then **Try it**. Fine-tune cards and the YAML are folded below.
 - The drafter writes `rules`, `handoff`, `small_talk`, `think` and `curious` when a description asks for them.
 - `think: true` on a step: the reply is planned first (need, what is unknown, the rules it must follow); code adds any matched rule the plan missed; the plan shows in the Trace tab.
