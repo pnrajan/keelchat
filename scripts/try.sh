@@ -4,18 +4,20 @@
 #   scripts/try.sh                # http://127.0.0.1:8000/console/ (the next free port if 8000 is taken)
 #   scripts/try.sh --port 8010
 #   scripts/try.sh --judge        # also run the judged checks (EVALS_JUDGE_MODEL from .env); each test takes minutes
+#   scripts/try.sh --no-open      # do not open the browser
 #
-# Saves examples/support_assistant.yaml as the agent `support-assistant` with three tests. In the console pick it under
-# Saved agents, press Build & try, then open the Test tab and press Run.
+# Saves examples/support_assistant.yaml as the agent `support-assistant` with three tests and opens the console. Pick it
+# under Saved agents, press Build & try, then open the Test tab and press Run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PORT=8000 JUDGE='' JUDGED=off
+PORT=8000 JUDGE='' JUDGED=off OPEN=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) [ $# -ge 2 ] || { echo "--port needs a number" >&2; exit 2; }; PORT=$2; shift 2 ;;
     --judge) JUDGE=1 JUDGED=on; shift ;;
-    -h|--help) sed -n 2,9p "$0"; exit 0 ;;
+    --no-open) OPEN=''; shift ;;
+    -h|--help) sed -n 2,10p "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -49,6 +51,29 @@ saved() {
 }
 saved || { echo "could not save the sample agent and tests" >&2; exit 1; }
 
-echo "console: $BASE/console/  (Saved agents → support-assistant → Build & try → Test → Run)"
-echo "api docs: $BASE/docs   judge: $JUDGED   Ctrl-C stops it"
+cat <<EOF
+
+  yachat is running: $BASE/console/   (API docs: $BASE/docs, judge $JUDGED)
+
+  Try the Test tab
+    1. In the Policy dropdown (top left), pick  support-assistant  under "Saved agents".
+    2. Press  Build & try.
+    3. In the Inspector (right), open the  Test  tab and press  Run 3 tests  (about a minute).
+       Each test shows pass or fail; click one to see the conversation.
+    4. Press  Draft tests from the policy  for more, and Keep the ones you want.
+
+  Save your own chat as a test
+    5. Press  New session  and chat in the middle pane (try order number #98765).
+    6. In the Test tab, under "Save a conversation as a test", press  Save as test.
+
+  Rate replies and get policy suggestions
+    7. Open the  Review  tab, mark replies Pass or Fail, add a reason, press  Save rating.
+    8. Press  Suggest policy changes, then  Open in editor  to see the revised policy.
+
+  Everything is in memory: it is gone when you stop. Ctrl-C stops it.
+
+EOF
+if [ -n "$OPEN" ]; then  # the default browser, where there is one
+  if command -v open >/dev/null; then open "$BASE/console/"; elif command -v xdg-open >/dev/null; then xdg-open "$BASE/console/" >/dev/null 2>&1 || true; fi
+fi
 wait $API_PID
