@@ -53,6 +53,7 @@ uv sync --all-extras
 
 Open http://127.0.0.1:5173, pick **Support assistant**, press **Build & try**, then **New session**, and chat. The
 **Inspector** shows why each reply was chosen; the **Test** tab saves the chat as a test, and **Review** rates it.
+`scripts/try.sh` starts the console with a sample agent and tests ready to run, no database needed.
 
 Prefer the terminal? `uv run yachat build examples/support_assistant.yaml` validates a policy and
 `uv run yachat serve` starts the API, with interactive docs at `/docs`. The
