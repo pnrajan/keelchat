@@ -217,6 +217,18 @@ flow:
   appended. Code allows one follow-up per field and never asks about ids, numbers, names, dates or yes/no answers.
   Drafted tests (`yachat evals generate`, the console's Test tab) cover each such field.
 
+### Small talk
+
+```yaml
+small_talk: brief    # off (default) | brief | warm
+```
+
+A message that is only friendly chit-chat ("how's your day going?", "lovely weather!") is answered in kind and the
+conversation goes back to the open question. `brief` replies in one short sentence; `warm` in one or two, picking up
+what they mentioned. It is not counted as wandering off, and is never taken as an answer to the open question. Code
+allows two such turns in a row; the third counts like any other detour (`limits.digressions`). With `off`, small talk
+counts as wandering off, as before. Tone still comes from the charter. Drafted tests cover it when it is on.
+
 Answers from documents are also held to the question: when the documents found do not answer it, the agent says it
 does not know, instead of describing what they contain.
 

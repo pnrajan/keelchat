@@ -74,6 +74,8 @@ class AnswerVerdict:
     wants_human: bool = False
     #: the user wants the conversation to stop (confirmed with them before it ends)
     wants_to_stop: bool = False
+    #: the message is only friendly small talk (asked only when the policy's `small_talk` is on)
+    small_talk: bool = False
 
 
 @dataclass

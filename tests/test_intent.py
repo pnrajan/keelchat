@@ -159,7 +159,9 @@ async def test_out_of_scope_mid_form_says_so_then_reasks():
     await say(rt, s.id, "hi")
     await say(rt, s.id, "yes")
     r = await say(rt, s.id, "can you give me legal advice about suing my landlord?")
-    assert "outside what I can help with" in r.outbound.text and "order number" in r.outbound.text.lower() and r.state.digressions == 1
+    # declined and counted, then the question again (the wording is the model's: the support example plans its replies)
+    assert r.route == ROUTE_REASK and r.state.digressions == 1 and "order number" in r.outbound.text.lower(), r.outbound.text
+    assert not r.state.fields
 
 
 class DetectorDown(RecordingLLM):

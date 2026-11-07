@@ -103,6 +103,12 @@ def policy_json_schema() -> dict[str, Any]:
             "mode": _MODES,
             "handoff": handoff,
             "rules": {**_rules(defs), "description": "plain-language rules, used on any turn where their condition holds"},
+            "small_talk": {
+                "enum": ["off", "brief", "warm"],
+                "default": "off",
+                "description": "friendly small talk: off (counted as wandering off), brief (one friendly line, then back to the task), "
+                "warm (also picks up what they mentioned)",
+            },
         },
         "x-registry": REGISTRY.manifest().model_dump(mode="json"),
         "x-defaults": DEFAULTS.model_dump(mode="json"),

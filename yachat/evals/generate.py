@@ -78,6 +78,15 @@ def targets(policy: CompiledPolicy) -> list[Target]:
                 Expect(rules_not_fired=[name]),
             )
         )
+    if policy.small_talk != "off":
+        out.append(
+            Target(
+                "small_talk",
+                "Cooperates, but before answering the second question makes friendly small talk (asks how the assistant's "
+                "day is, or jokes about the weather), then answers everything.",
+                Expect(completed=True) if policy.steps else Expect(),
+            )
+        )
     out.append(Target("out_of_scope", f"Asks for help with something this assistant should not do, given its purpose: {policy.charter.strip()}"))
     if policy.handoff and "user_request" in policy.handoff.when:
         out.append(
@@ -109,7 +118,7 @@ def covered(policy: CompiledPolicy, r: ReplayResult) -> set[str]:
 
 
 def _reached(t: Target, r: ReplayResult, cov: set[str]) -> bool:
-    if t.id.startswith("rule_miss:") or t.id == "out_of_scope":  # the goal is the user's; what the agent does is checked
+    if t.id.startswith("rule_miss:") or t.id in ("out_of_scope", "small_talk"):  # the user's goal; the agent's part is checked
         return len(r.turns) >= 2
     return t.id in cov
 

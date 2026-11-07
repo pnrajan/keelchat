@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
 - Console **Test** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
 - `think: true` on a step: the reply is planned first (need, what is unknown, the rules it must follow); code adds any matched rule the plan missed; the plan shows in the Trace tab.
+- `small_talk: off | brief | warm` on a policy: chit-chat answered in kind, then back to the question; not counted and never read as an answer, up to two turns in a row (counted in code).
 - `curious: true` on form steps: one follow-up when a valid answer is too thin to act on, counted in code (one per field); drafted tests cover it.
 - **Suggest policy changes** from ratings: the model revises the policy to answer failed replies and low scores, each change named; checked by the build, never saved.
 - `--trials k` / `trials:` on evals: each case runs k times and passes only when every run does; flaky cases listed.

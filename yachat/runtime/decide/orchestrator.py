@@ -10,7 +10,7 @@ from yachat.logging import get_logger
 from yachat.registry.core import REGISTRY, NodeResult
 from yachat.runtime.context import TurnContext
 from yachat.runtime.decide import rules
-from yachat.runtime.decide.intent_detector import DETECTOR_ERROR, GREETING_ONLY, ROUTE_NUDGE, ROUTE_PLANNER, ROUTE_REASK, step_fields
+from yachat.runtime.decide.intent_detector import DETECTOR_ERROR, GREETING_ONLY, ROUTE_NUDGE, ROUTE_PLANNER, ROUTE_REASK, SMALL_TALK, step_fields
 from yachat.runtime.decide.planner import run_planner
 from yachat.runtime.understand.language_rules import NAMES
 from yachat.state.flow import StepGraph
@@ -31,6 +31,13 @@ OUT_OF_SCOPE = {
 }
 #: the first reply after a person hands the conversation back
 BACK = {"en": "Thanks for waiting. You're back with the assistant.", "es": "Gracias por esperar. Vuelves a hablar con el asistente."}
+#: small talk answered in kind: the reply's goal, by the policy's `small_talk`
+SMALL_TALK_GOAL = {
+    "brief": "Answer their small talk in kind, in one short friendly sentence, as the assistant (asked how you are: say you're "
+    "doing well and thank them; a remark: agree or react to it)",
+    "warm": "Answer their small talk warmly, in one or two short sentences, as the assistant (asked how you are: say you're "
+    "doing well, thank them and ask after them; a remark: react to it and pick up what they mentioned)",
+}
 #: what a reply does when it answers a side question in the middle of a step
 RETURN_GOAL = "Then return to the open question and ask it."
 
@@ -166,6 +173,9 @@ class Orchestrator:
             return ctx
 
         if not ctx.policy.has_flow:  # planner mode, no flow
+            if ctx.verdict and ctx.verdict.reason == SMALL_TALK:
+                ctx.reply("Happy to chat! What can I help you with?", goal=SMALL_TALK_GOAL[ctx.policy.small_talk] + ", then ask what you can help with.")
+                return ctx
             if ctx.verdict and not ctx.verdict.in_scope:
                 log.info("routing", decision="decline", reason="out of scope per charter")
                 ctx.reply(
@@ -197,6 +207,8 @@ class Orchestrator:
                 lead, goal = "Sorry, I didn't catch that.", "Say you didn't catch that, and ask the question again."
             elif v is not None and v.reason == GREETING_ONLY:
                 lead, goal = "Hi again!", "Greet them back warmly in a few words, then ask the question again."
+            elif v is not None and v.reason == SMALL_TALK:
+                lead, goal = "Happy to chat!", SMALL_TALK_GOAL[ctx.policy.small_talk] + ", then ask the question again."
             elif v is not None and (not v.in_scope or v.intent == "off_topic"):
                 lead = OUT_OF_SCOPE_IN_FLOW.get(ctx.language, OUT_OF_SCOPE_IN_FLOW["en"])
                 goal = "Say briefly that this is outside what you help with here, then ask the question."
