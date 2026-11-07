@@ -704,13 +704,14 @@ def create_app(
 
     @app.post("/v1/agents/validate")
     async def validate_agent(body: AgentUpload, request: Request) -> dict[str, Any]:
-        """Every error the build would report, as YAML paths, without registering anything (the editor's live check)."""
+        """Every error the build would report, as YAML paths, without registering anything (the editor's live check), and
+        what the policy does in plain words (computed in code) when it builds."""
         scoped = body.model_copy(update={"tenant": own(request, body.tenant)})  # a 403 is not a validation error
         try:
             compiled = await compile_upload(scoped)
         except HTTPException as e:
-            return {"errors": e.detail, "agent": None}
-        return {"errors": [], "agent": compiled.agent}
+            return {"errors": e.detail, "agent": None, "summary": []}
+        return {"errors": [], "agent": compiled.agent, "summary": plain_summary(compiled)}
 
     @app.post("/v1/tenants/{tenant}/agents/readiness")
     async def agent_readiness(tenant: TenantId, body: AgentUpload) -> dict[str, Any]:

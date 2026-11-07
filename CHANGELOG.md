@@ -9,7 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
 - Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
 - Console **Test** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
-- Console **Compose** view: draft from a sentence or a bot type, change the policy in plain words (`POST /v1/agents/edit`, checked by the build, shown as a diff before applying), and cards for every part: steps and questions, safety, rules, handoff, memory, small talk, and per-step think, curious, high stakes and model.
+- Console **Compose** view: say what the bot should do, read what it will do in plain words (`/v1/agents/validate` now returns this summary), change it in plain words (`POST /v1/agents/edit`, checked by the build, listed before applying), then **Try it**. Fine-tune cards and the YAML are folded below.
 - The drafter writes `rules`, `handoff`, `small_talk`, `think` and `curious` when a description asks for them.
 - `think: true` on a step: the reply is planned first (need, what is unknown, the rules it must follow); code adds any matched rule the plan missed; the plan shows in the Trace tab.
 - `small_talk: off | brief | warm` on a policy: chit-chat answered in kind, then back to the question; not counted and never read as an answer, up to two turns in a row (counted in code).
@@ -35,6 +35,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `yachat.evals`.
 
 ### Fixed
+- A handoff trigger listed twice is rejected with its path (`handoff.when`).
 - Answers from documents that do not answer the question say so, instead of describing the documents.
 - After a person resolves a handoff, the user's next message continues the flow instead of counting as a digression.
 - `./run.sh` keeps extras from `uv sync --all-extras`.

@@ -254,3 +254,14 @@ def test_yes_and_no_are_words_not_booleans():
     survey = build(text).step("survey").settings["questions"]
     channel = next(q for q in survey if q["key"] == "channel")
     assert [o if isinstance(o, str) else o["label"] for o in channel["options"]] == ["Yes", "No", "On", "Off"]
+
+
+def test_a_handoff_trigger_listed_twice_is_rejected_with_its_path() -> None:
+    from tests.conftest import ROOT
+    from yachat.policy.compiler import build
+    from yachat.policy.errors import PolicyValidationError
+
+    support = (ROOT / "examples" / "support_assistant.yaml").read_text()
+    with pytest.raises(PolicyValidationError) as e:
+        build(support.replace("when: [user_request, max_reasks]", "when: [user_request, user_request]"))
+    assert [(x.path, x.message) for x in e.value.errors] == [("handoff.when", "listed twice: user_request")]

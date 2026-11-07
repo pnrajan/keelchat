@@ -187,3 +187,13 @@ async def test_a_policy_is_changed_as_asked_in_plain_words() -> None:
     assert p.agent == "support-assistant" and any("email" in f for f in fields) and "order_number" in fields
     assert [x.name for x in p.rules] == ["damaged_item"]  # nothing else changed
     assert r["yaml"].startswith("# A generic support assistant") and "# change:" not in r["yaml"]
+
+
+def test_the_plain_summary_lists_rules_and_small_talk() -> None:
+    from tests.conftest import ROOT
+    from yachat.policy.compiler import build
+    from yachat.policy.summary import plain_summary
+
+    lines = plain_summary(build((ROOT / "examples" / "support_assistant.yaml").read_text()))
+    assert "When the customer says an item arrived damaged or broken: say a free replacement can be sent" in " ".join(lines)
+    assert any("small talk" in x for x in lines) and any(x.startswith("Passes the chat to you when") for x in lines)

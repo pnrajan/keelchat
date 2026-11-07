@@ -39,6 +39,7 @@ Keys (no others): agent, charter, languages, tools, flow, guardrails, limits, me
 - rules: only for situations the description names: `- {name: snake_case, when: the situation in the user's words,
   then: what the reply must do}`.
 - handoff: when the description wants a person reachable: `handoff: {when: [user_request]}` (also max_reasks).
+  Never list `handoff` or `exit` as flow steps: the runtime runs them.
 - small_talk: brief when the description asks for a friendly or chatty bot; omit otherwise.
 - A step may take `think: true` (plan replies first; for nuanced or sensitive steps) and a form step `curious: true`
   (one follow-up on a vague answer, e.g. a problem description); add them only when the description asks for care.
@@ -120,7 +121,11 @@ EDIT = """You change an agent policy (YAML) as the owner asks. Reply with the wh
 - Keys you may use: agent, charter, languages, tools, flow, guardrails, limits, memory, mode, rules, handoff, small_talk.
   A rule is `{name: snake_case, when: the situation in the user's words, then: what the reply must do}`; a step may
   take `think`, `model` (small|large), `high_stakes` and `rules`; a form step `curious`.
-- Begin the YAML with one comment line per change: `# change: <what changed>`."""
+- To let people reach a person, set the top-level `handoff: {when: [user_request]}` (add max_reasks or disengaged
+  when asked); to hand off in a situation ("refunds over $100"), add a rule whose `then` offers a person and include
+  user_request. Never add `handoff` or `exit` as flow steps: the runtime runs them.
+- Begin the YAML with one comment line per change, in plain words for a non-technical owner (no key names):
+  `# change: <what changed>`."""
 
 #: what the owner asks, at most
 EDIT_LIMIT = 2_000

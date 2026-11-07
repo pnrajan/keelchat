@@ -53,8 +53,8 @@ uv sync --all-extras
 ./run.sh                    # console on :5173, API on :8000
 ```
 
-Open http://127.0.0.1:5173. To make your own bot without writing YAML, open **Compose**: describe it, ask for changes in
-plain words, and set each part on cards. To try the example, pick **Support assistant**, press **Build & try**, then
+Open http://127.0.0.1:5173. To make your own bot without writing YAML, open **Compose**: say what it should do, read
+back what it will do in plain words, and ask for changes the same way. To try the example, pick **Support assistant**, press **Build & try**, then
 **New session**, and chat. The
 **Inspector** shows why each reply was chosen; the **Test** tab saves the chat as a test, and **Review** rates it.
 `scripts/try.sh` starts the console with a sample agent and tests ready to run, no database needed.
