@@ -593,3 +593,8 @@ button.back { align-self: flex-start; }
 .subtabs button:hover:not(:disabled) { background: transparent; color: var(--text); }
 .subtabs button.on { color: var(--text); font-weight: 550; box-shadow: inset 0 -2px 0 var(--phosphor); }
 .timing > summary { cursor: pointer; padding: 4px 0; }
+.setup-more { padding: 0 12px; background: var(--surface-2); }
+.setup-more[open] { padding-bottom: 12px; }
+.setup-more .config { border-top: 0; padding-top: 0; }
+.readiness details ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.readiness details li { display: list-item; }
