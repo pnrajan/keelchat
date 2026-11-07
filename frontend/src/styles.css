@@ -497,3 +497,45 @@ code.snippet { display: block; font-size: 11.5px; padding: 8px 10px; background:
 .chip.on-bad { color: var(--err); background: var(--err-soft); border-color: var(--err); }
 .review-h { margin: 8px 0 0; font-size: 13px; }
 
+
+/* Text boxes without a style of their own read like the inputs around them */
+textarea { font: inherit; font-size: 13px; line-height: 1.45; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--surface); color: var(--text); resize: vertical; }
+button { white-space: nowrap; }
+
+/* Conversations: who spoke on the left, what they said wrapping beside it */
+.transcript { gap: 8px; max-height: 360px; padding: 10px 12px; }
+.transcript .exchange { display: flex; flex-direction: column; gap: 3px; }
+.transcript .exchange + .exchange { padding-top: 8px; border-top: 1px dashed var(--border); }
+.transcript .line { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 8px; font-size: 13px; line-height: 1.45; color: var(--text); }
+.transcript .line.agent { color: var(--muted); }
+.transcript .line .tag { margin-left: 6px; vertical-align: 1px; }
+.transcript .who { font: 500 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); padding-top: 3px; }
+
+/* Test tab */
+.test-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.test-bar .grow { flex: 1; }
+.tiles.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tiles > div.good .num { color: var(--ok); }
+.tiles > div.bad { border-color: color-mix(in srgb, var(--err) 35%, transparent); background: var(--err-soft); }
+.tiles > div.bad .num { color: var(--err); }
+.handoff.test .handoff-head { row-gap: 6px; }
+.handoff.test.fail { border-left: 3px solid var(--err); }
+.handoff.test.pass { border-left: 3px solid var(--ok); }
+.handoff.test.running { border-left: 3px solid var(--accent); }
+.expects { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; flex-basis: 100%; }
+.expects .tag { text-transform: none; letter-spacing: 0; font: 12px var(--sans, inherit); padding: 1px 8px; }
+.problem-line, .problem { flex-basis: 100%; font-size: 12.5px; color: var(--err); line-height: 1.4; }
+.review > p.muted.small { margin: 0; line-height: 1.5; }
+.handoff-head, .analysis-chip, .type, .chip { white-space: normal; }
+.list-head { align-items: center; margin-top: 4px; }
+.list-head .review-h { margin: 0; }
+.list-head .actions { display: inline-flex; gap: 2px; }
+.transcript.bare { background: transparent; padding: 0; max-height: none; }
+.review-turn { gap: 8px; padding: 10px 12px; }
+.rate-row { padding-top: 6px; border-top: 1px solid var(--border); }
+.sim-row .field-row { flex-wrap: nowrap; align-items: center; }
+.sim-row .field-row input.compact:first-child { flex: 1; min-width: 0; }
+.sim-row select.compact { flex: none; width: 92px; }
+.sim-row label.inline { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.sim-row label.inline input { width: 56px; }
+.sim-row .field-row input.compact:first-child { min-width: 120px; }

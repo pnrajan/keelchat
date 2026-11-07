@@ -119,8 +119,10 @@ export default function Review({ agent, conversations, policy, onRevised }: Prop
           const turn = i + 1;
           return (
             <div key={turn} className="review-turn">
-              <div className="line user"><span className="muted small">User</span> {t.user}</div>
-              <div className="line agent"><span className="muted small">Agent</span> {t.agent}</div>
+              <div className="transcript bare">
+                <div className="line user"><span className="who">User</span><span>{t.user}</span></div>
+                <div className="line agent"><span className="who">Agent</span><span>{t.agent}</span></div>
+              </div>
               <div className="rate-row">
                 {checksFor(t).map((c) => {
                   const v = verdicts[key(turn, c)];
