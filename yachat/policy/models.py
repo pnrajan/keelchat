@@ -10,10 +10,25 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from yachat.policy.durations import parse_duration
 
 Mode = Literal["flow", "planner", "adaptive"]
+#: which model tier a step's work runs on: small (the classify model) or large (the generate model)
+Tier = Literal["small", "large"]
 
 
 class PolicyModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class Rule(PolicyModel):
+    """A plain-language rule: when the condition holds for the user's message, the reply follows `then`. Matched each
+    turn by the intent detector (a structured verdict); conflicts are settled in code by `overrides`."""
+
+    name: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    when: str = Field(min_length=1)
+    then: str = Field(min_length=1)
+    #: rules this one wins over when both match
+    overrides: list[str] = Field(default_factory=list)
+    #: a turn this rule matches is written with the large model and always checked before it is sent
+    high_stakes: bool = False
 
 
 class FlowStep(PolicyModel):
@@ -26,6 +41,12 @@ class FlowStep(PolicyModel):
     repairs: int | dict[str, int] | None = None
     #: check this step's phrased replies before they are sent; None: the node's own setting
     verify: bool | None = None
+    #: rules that apply only while this step is asking
+    rules: list[Rule] = Field(default_factory=list)
+    #: the model tier this step's work runs on; None: each job keeps its usual tier
+    model: Tier | None = None
+    #: every reply of this step is written with the large model and checked before it is sent
+    high_stakes: bool = False
     settings: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
@@ -43,6 +64,9 @@ class FlowStep(PolicyModel):
                 mode=body.pop("mode", None),
                 repairs=body.pop("repairs", None),
                 verify=body.pop("verify", None),
+                rules=body.pop("rules", None) or [],
+                model=body.pop("model", None),
+                high_stakes=body.pop("high_stakes", False),
                 settings=body,
             )
         raise ValueError("a flow step is a name or a single-key mapping {name: settings}")
@@ -136,6 +160,8 @@ class AgentPolicy(PolicyModel):
     memory: list[MemoryField] = Field(default_factory=list)
     mode: Mode | None = None
     handoff: HandoffSpec | None = None
+    #: rules that apply on every turn
+    rules: list[Rule] = Field(default_factory=list)
 
     @field_validator("flow", mode="before")
     @classmethod

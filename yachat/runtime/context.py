@@ -7,6 +7,7 @@ from dataclasses import field as dc_field
 from typing import TYPE_CHECKING, Any
 
 from yachat.policy.compiler import CompiledPolicy
+from yachat.policy.models import Rule
 from yachat.registry.core import GuardContext, NodeResult
 from yachat.state.models import AuditEvent, AuditKind, MemoryRecord, SessionState, new_id
 from yachat.state.store import HandoffStore, MemoryStore, ResponseStore
@@ -131,6 +132,8 @@ class TurnContext:
     exit_reason: str | None = None
     #: validated FormFill answers this turn (field → value) for the memory writer
     validated_answers: dict[str, Any] = dc_field(default_factory=dict)
+    #: the policy rules that matched this turn (after `overrides`), in policy order
+    rules: list[Rule] = dc_field(default_factory=list)
     #: entities found by the normalization pre-processor
     entities: dict[str, list[str]] = dc_field(default_factory=dict)
     #: why this turn passes the conversation to a person (a policy `handoff.when` trigger, or follow_up after one)

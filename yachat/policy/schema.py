@@ -11,7 +11,7 @@ from pydantic import BaseModel, TypeAdapter
 from yachat.datasets.models import field_dataset_kind
 from yachat.policy.defaults import DEFAULTS
 from yachat.policy.durations import Duration
-from yachat.policy.models import HandoffSpec, Limits, MemoryField
+from yachat.policy.models import HandoffSpec, Limits, MemoryField, Rule
 from yachat.registry.core import REGISTRY
 
 _MODES = {"enum": ["flow", "planner", "adaptive"]}
@@ -28,6 +28,12 @@ def _model_schema(model: type[BaseModel], defs: dict[str, Any]) -> dict[str, Any
     return schema
 
 
+def _rules(defs: dict[str, Any]) -> dict[str, Any]:
+    rule = _model_schema(Rule, defs)
+    rule["description"] = "when the condition holds for the user's message, the reply follows `then`"
+    return {"type": "array", "items": rule}
+
+
 def _step_schema(name: str, defs: dict[str, Any]) -> dict[str, Any]:
     spec = REGISTRY.node(name)
     cfg = _model_schema(spec.config_model, defs)
@@ -40,6 +46,9 @@ def _step_schema(name: str, defs: dict[str, Any]) -> dict[str, Any]:
         "mode": _MODES,
         "repairs": _REPAIRS,
         "verify": {"type": "boolean", "description": "check this step's replies before they are sent (default true); false passes them through"},
+        "rules": {**_rules(defs), "description": "rules that apply only while this step is asking"},
+        "model": {"enum": ["small", "large"], "description": "run this step on the small (cheaper) or large (stronger) model"},
+        "high_stakes": {"type": "boolean", "description": "write this step's replies with the large model and always check them"},
     }
     return {
         "type": "object",
@@ -92,6 +101,7 @@ def policy_json_schema() -> dict[str, Any]:
             "memory": {"type": "array", "items": {"oneOf": [{"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, memory]}},
             "mode": _MODES,
             "handoff": handoff,
+            "rules": {**_rules(defs), "description": "plain-language rules, used on any turn where their condition holds"},
         },
         "x-registry": REGISTRY.manifest().model_dump(mode="json"),
         "x-defaults": DEFAULTS.model_dump(mode="json"),

@@ -211,7 +211,7 @@ export default function App() {
     setInput("");
     try {
       const r = await api.turn(session.id, text, crypto.randomUUID(), action);
-      const meta = [r.route ?? "-", `${r.llm_calls} model`, `${r.tool_calls} tool`, r.outbound.exit_reason ? `exit: ${r.outbound.exit_reason}` : "", r.errors.length ? `${r.errors.length} errors` : ""].filter(Boolean);
+      const meta = [r.route ?? "-", `${r.llm_calls} model`, `${r.tool_calls} tool`, r.outbound.exit_reason ? `exit: ${r.outbound.exit_reason}` : "", r.rules?.length ? `rules: ${r.rules.join(", ")}` : "", r.errors.length ? `${r.errors.length} errors` : ""].filter(Boolean);
       const analysis = latestAnalysis(r.outbound.items);
       const handoff = r.outbound.items.find((x) => x.type === "handoff")?.ticket_id as string | undefined;
       setMsgs((m) => [...m, { role: "agent", text: r.outbound.text, meta, analysis, handoff }]);

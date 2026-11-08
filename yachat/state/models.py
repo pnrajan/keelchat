@@ -148,7 +148,7 @@ class PolicyTemplate(BaseModel):
 
 
 #: what an audit record is about
-AuditKind = Literal["turn", "answer", "count", "step", "exit", "handoff", "guardrail", "tool", "llm"]
+AuditKind = Literal["turn", "answer", "count", "step", "exit", "handoff", "guardrail", "tool", "llm", "rule"]
 
 
 def subject_of(tenant: str, user_id: str) -> str:
