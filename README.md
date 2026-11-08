@@ -9,7 +9,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange)](CHANGELOG.md)
 
-**[Try the demo](https://yachat-demo.fly.dev)**: chat with the support assistant, no sign-up.
+**[Try the demo](https://yachat-demo.fly.dev)**: describe a bot and get its YAML, or chat with a ready-made one. No sign-up.
 
 <img src="docs/assets/console.jpg" alt="The yachat test console: a policy on the left, a test chat in the middle, and why each reply was chosen on the right" width="900">
 
