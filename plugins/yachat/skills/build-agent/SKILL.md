@@ -62,8 +62,8 @@ flow:
   - greet_consent
   - form_fill:
       fields:
-        - {name: order_number, ask: What is your order number?, expect: An order number such as ORD-12345}
-        - {name: issue, ask: What went wrong with the order?, expect: A short description of the problem}
+        - {name: order_number, ask: "What is your order number?", expect: An order number such as ORD-12345}
+        - {name: issue, ask: "What went wrong with the order?", expect: A short description of the problem}
 guardrails: {input: [prompt_injection, sql_injection], output: [pii, no_legal_advice]}
 limits: {reasks: 3, digressions: 3}
 memory:

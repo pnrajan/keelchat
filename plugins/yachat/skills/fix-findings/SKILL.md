@@ -26,7 +26,7 @@ yachat checkout**, never on the server.
    - Read `CLAUDE.md`, then the files the task names. They are a hint; find the real place first.
    - Write the test the task describes, in the matching `tests/test_*.py`. Run it and see it fail. Tests call the
      real model, so build the conversation with `tests/helpers.py` (`make_runtime`, `say`).
-   - Make the smallest change that passes it. Keep to the laws in `CLAUDE.md` §2: behaviour comes from the policy,
+   - Make the smallest change that passes it. Keep to the laws in `CLAUDE.md`: behaviour comes from the policy,
      counting lives in code, no fake LLM.
    - Run `uv run ruff check .`, `uv run ruff format .`, `uv run mypy` and the touched test files (with `-n0` when
      they call the model). Run `npm run build` in `frontend/` when the console changed.

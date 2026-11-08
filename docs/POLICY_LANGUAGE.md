@@ -31,8 +31,8 @@ flow:
       think: true
       curious: true
       fields:
-        - {name: order_number, ask: What is your order number?, expect: An order number in any format}
-        - {name: issue, ask: What went wrong?, expect: A short description of the problem, optional: true}
+        - {name: order_number, ask: "What is your order number?", expect: An order number in any format}
+        - {name: issue, ask: "What went wrong?", expect: A short description of the problem, optional: true}
 rules:
   - {name: damaged_item, when: the customer says an item arrived damaged, then: say a free replacement can be sent}
 guardrails: {input: [prompt_injection, sql_injection], output: [pii, no_legal_advice]}

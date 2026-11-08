@@ -18,6 +18,7 @@ uv run yachat registry                                # tools, steps, guardrails
 uv run yachat serve --port 8000                       # the runtime API
 uv run yachat simulate <policy.yaml> <script.yaml>    # scripted conversations
 uv run yachat evals run [evals/<agent>]               # evaluation harness
+uv run yachat evals check|generate|calibrate|export   # judged checks, sets from a policy, judge agreement, a session as a case
 uv run yachat knowledge serve|add ...                 # Knowledge Service and indexing
 uv run yachat analytics serve                         # Analytics Service
 ```
@@ -92,14 +93,15 @@ summary and key metrics) add those records up in **DuckDB** over the whole windo
 | Postgres (recent) | `COPY` of one tenant's window into DuckDB | `DATABASE_URL` |
 | S3 archive (older) | DuckDB reads the Iceberg table's Parquet files on S3 directly, only that tenant's days | `AUDIT_ARCHIVE_WAREHOUSE=s3://bucket/prefix` |
 
-With the archive on, records are copied to S3 daily. Postgres keeps the last 7 days, the archive keeps everything
+With the archive on, records are copied to S3 hourly. Postgres keeps the last 7 days (`AUDIT_HOT_DAYS`), the archive keeps everything
 up to `AUDIT_RETENTION_DAYS`, and each dashboard reads older days from S3 and recent ones from Postgres, counting
 each record once. S3 credentials come from the usual AWS variables (`AWS_ENDPOINT_URL_S3` for MinIO). Athena,
 Spark, Trino or your own DuckDB can read the same table. How it works: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Configuration
 
-Everything is an environment variable, loaded from `.env`; [`.env.example`](../.env.example) documents every key. Only
+Everything is an environment variable, loaded from `.env`; [`.env.example`](../.env.example) documents most keys
+(not yet `YACHAT_MODEL_CRITIC`, `YACHAT_DUCKDB_EXTENSIONS` or `YACHAT_ALLOW_PRIVATE_TOOL_URLS`). Only
 the model provider is required; everything else runs in memory when unset.
 
 <details>
@@ -135,7 +137,7 @@ One image serves the API (with the console), the Knowledge Service or the Analyt
 picks which (`deploy/entrypoint.sh`). It runs as a non-root user and exposes `/health`. `docker-compose.yml` runs
 Redis, Postgres and an optional LiteLLM gateway next to it.
 
-Where the code lives: the structure map in [`CLAUDE.md`](../CLAUDE.md#4-structure), or by task in
+Where the code lives: the table in [`CLAUDE.md`](../CLAUDE.md#code-organization), or by task in
 [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md#where-things-live).
 
 ## Troubleshooting

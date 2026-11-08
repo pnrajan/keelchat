@@ -137,8 +137,8 @@ curl -s -X DELETE localhost:8000/v1/users/dev/memory      # forget everything re
 
 ## Debugging
 
-**Start with the console's Inspector.** *Trace* lists every step of the last turn with its time and notes (skipped
-steps, the routing reason). *State* is the session as stored: step progress, collected fields, step outputs, counters. *Rendered*
+**Start with the console's Inspector** (the **This reply** group). *Why* lists every step of the last turn with its time and notes (skipped
+steps, the routing reason). *State* is the session as stored: step progress, collected fields, step outputs, counters. *Raw*
 shows the channel-specific payload. *Analysis* shows the full analysis behind an analytics reply, including the SQL
 and any Python, and the verification of analytics and knowledge answers: the plan, each check with pass or fail, and
 the problems the verifier found.
