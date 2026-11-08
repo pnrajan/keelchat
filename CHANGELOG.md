@@ -27,6 +27,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `yachat.evals`.
 
 ### Fixed
+- After a person resolves a handoff, the user's next message continues the flow instead of counting as a digression.
 - `./run.sh` keeps extras from `uv sync --all-extras`.
 - Booking example guardrail typed with `GuardContext`.
 - Planner no longer offers a `dataset` argument to agents without datasets.

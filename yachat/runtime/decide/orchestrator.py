@@ -131,7 +131,7 @@ class Orchestrator:
         return owner
 
     async def run(self, ctx: TurnContext) -> TurnContext:
-        resumed = ctx.state.data.pop("resumed", False)  # the first turn back from a person
+        resumed = ctx.state.data.get("resumed", False)  # the first turn back from a person (cleared after the turn)
         ctx = await self._route(ctx)
         r = ctx.node_result
         if resumed and r is not None and not ctx.handoff_reason:

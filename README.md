@@ -33,9 +33,8 @@ runs every bot, and keeps the counting, safety checks and channel rules in code 
 - **Any model, any channel.** Anthropic or anything litellm reaches (OpenAI, Gemini, Bedrock, Ollama…), directly or
   through a LiteLLM gateway. Web widget, WhatsApp, SMS, Slack and phone.
 - **Tested without writing answers.** Every conversation is checked against the policy: no errors, loops or broken
-  limits, replies in scope, rules followed. `yachat evals generate` plays users against each part of the policy and
-  turns failures into short replay scripts. Cases can run several times to catch flaky ones, and the judge is
-  measured against replies a person labeled.
+  limits, replies in scope, rules followed. Test sets are generated from the policy, and people rate conversations in
+  the console to keep the judge honest.
 - **Handoff that comes back.** A person takes over through the inbox or your helpdesk; when they resolve the ticket,
   the bot tells the user and resumes the conversation.
 - **Laptop to production.** Runs with only a model key, every store in memory; add Redis, Postgres and S3 for
@@ -53,7 +52,7 @@ uv sync --all-extras
 ```
 
 Open http://127.0.0.1:5173, pick **Support assistant**, press **Build & try**, then **New session**, and chat. The
-**Inspector** shows why each reply was chosen.
+**Inspector** shows why each reply was chosen, and the **Review** tab lets you rate the conversation.
 
 Prefer the terminal? `uv run yachat build examples/support_assistant.yaml` validates a policy and
 `uv run yachat serve` starts the API, with interactive docs at `/docs`. The
@@ -126,16 +125,19 @@ walks through it.
 
 ```bash
 uv run yachat evals generate examples/support_assistant.yaml   # a test set from the policy: evals/support_assistant/generated.yaml
-uv run yachat evals check evals/support_assistant              # every case through the checks, judged ones with EVALS_JUDGE_MODEL
+uv run yachat evals check evals/support_assistant              # every case through the checks every conversation must pass
 uv run yachat evals run --trials 3                             # metric thresholds; each case must pass all 3 runs
-uv run yachat evals calibrate                                  # how often the judge agrees with evals/<agent>/labels.yaml
+uv run yachat evals calibrate                                  # how often the judge agrees with replies people rated
 ```
 
-Rate conversations by hand in the console's **Review** tab; the ratings become `labels.yaml` and replay cases.
+- **Generated sets**: targets come from the policy (finish the flow, give up, a bad answer per field, each rule and a
+  near miss, out of scope, asking for a person, each language). The model only plays the user.
+- **Judged checks** (staying in scope, following rules) need `EVALS_JUDGE_MODEL`, any litellm model id. The judge
+  quotes the reply for every verdict, and code decides pass or fail.
+- **People rating**: in the console's **Review** tab, mark replies pass or fail and score whole conversations. The
+  ratings download as `labels.yaml` for `calibrate`, and failed conversations as replay cases.
+- **In CI**, run both `evals run` and `evals check`.
 
-Targets come from the policy (finish the flow, give up, a bad answer per field, each rule and a near miss, out of
-scope, asking for a person, each language); the model only plays the user. In CI, run both `evals run` and
-`evals check`. The judge quotes the reply for every verdict, and code decides pass or fail.
 [Evals](docs/EVALS.md) has the details.
 
 ## Examples
@@ -174,7 +176,7 @@ contextual rules, Parlant; for programmatic multi-agent graphs, LangGraph; for a
 | look up the CLI, API, settings, deployment or a fix | [Reference](docs/REFERENCE.md) |
 | run and debug it locally | [Developer guide](docs/DEVELOPER_GUIDE.md) |
 | understand the runtime | [Architecture](docs/ARCHITECTURE.md) |
-| measure quality | [Evals](docs/EVALS.md) |
+| test, rate and measure quality | [Evals](docs/EVALS.md) |
 
 ## Contributing
 

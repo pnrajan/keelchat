@@ -328,6 +328,12 @@ class IntentDetector:
         if st.completed:
             log.info("verdict on a completed session", intents=[i.intent for i in v.items])
             return ctx
+        if q is None and st.data.get("resumed"):
+            # the first message back from a person, with no question open ("ok thanks"): meant for them, so it answers
+            # nothing, counts as nothing and prefills nothing. The flow asks its current question.
+            ctx.verdict = AnswerVerdict("answered", intent="new_answer", reason="back from a person", skipped=True)
+            log.info("verdict", reason="back from a person: not read as an answer or a question")
+            return ctx
         log.info(
             "verdict",
             message=redact_pii(ctx.text),

@@ -199,6 +199,7 @@ async def test_the_receiver_reports_back_on_its_callback_and_the_conversation_re
     r = await say(rt, s.id, "ok thanks")
     assert r.route != "handoff" and r.state.open_question is not None and r.state.open_question.field.startswith("full_name")
     assert "Jane Doe" in r.outbound.text  # confirms the person's answer instead of asking from scratch
+    assert r.state.digressions == 0 and "resumed" not in r.state.data  # "ok thanks" was for the person: nothing counted
     events = await rt.audit.query("default", session_id=s.id, kinds=["handoff"])
     assert {"resumed", "resolved"} <= {e.decision for e in events}
 
