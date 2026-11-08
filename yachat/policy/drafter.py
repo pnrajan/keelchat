@@ -87,24 +87,64 @@ def catalog(tenant: str, datasets: Mapping[str, DatasetKind]) -> str:
     return json.dumps(body, indent=1)
 
 
+#: where a policy's YAML starts: a comment or a top-level key
+_YAML_START = re.compile(r"^(#|[a-z_]+:)", re.MULTILINE)
+
+
 def _yaml_only(text: str) -> str:
+    """The YAML in a reply: inside a fence if there is one, else from the first comment or top-level key (a model may
+    say something first)."""
     fenced = re.search(r"```(?:ya?ml)?\n(.*?)```", text, re.DOTALL)
-    return (fenced.group(1) if fenced else text).strip() + "\n"
+    if fenced:
+        return fenced.group(1).strip() + "\n"
+    start = _YAML_START.search(text)
+    return text[start.start() if start else 0 :].strip() + "\n"
 
 
 async def draft_policy(llm: LLMClient, models: ModelConfig, description: str, tenant: str, datasets: Mapping[str, DatasetKind]) -> Draft:
     messages = [{"role": "user", "content": f"Catalog:\n{catalog(tenant, datasets)}\n\n" + untrusted("description", description)}]
+    return await _until_it_builds(llm, models, "policy_draft", SYSTEM, messages, tenant, datasets)
+
+
+REVISE = """You revise an agent policy (YAML) so the agent stops making the mistakes people reported when they rated its
+conversations. Reply with the whole revised YAML only.
+- Change as little as possible: keep every key, step and comment the feedback does not touch, and the same `agent`.
+- Fix the cause, not the one conversation. Prefer, in this order: reword the `then` of a rule that did not do its job;
+  add a rule (`rules:` items with `name` in snake_case, `when` the situation in the user's words, `then` what the reply
+  must do); tighten the charter's out-of-scope sentence; reword a field's `ask` or `expect`.
+- Never remove guardrails, the consent step, memory consent or handoff.
+- Begin the YAML with one comment line per change: `# change: <what changed> (for: <the feedback it answers>)`.
+- If the feedback asks for nothing the policy can fix, return it unchanged with no change lines."""
+
+#: change lines the revision starts with
+CHANGE = re.compile(r"^#\s*change:\s*(.+)$", re.MULTILINE)
+
+
+async def revise_policy(
+    llm: LLMClient, models: ModelConfig, yaml: str, feedback: list[str], tenant: str, datasets: Mapping[str, DatasetKind]
+) -> tuple[Draft, list[str]]:
+    """The policy rewritten to answer what people reported (`feedback`, one line per problem), checked by the build and
+    repaired from its errors like a draft. Returns the draft and its change lines. Never registered or saved."""
+    content = untrusted("policy", yaml) + "\n\n" + untrusted("feedback", "\n".join(f"- {f}" for f in feedback))
+    d = await _until_it_builds(llm, models, "policy_revise", REVISE, [{"role": "user", "content": content}], tenant, datasets)
+    return d, [m.strip() for m in CHANGE.findall(d.yaml)]
+
+
+async def _until_it_builds(
+    llm: LLMClient, models: ModelConfig, purpose: str, system: str, messages: list[dict[str, str]], tenant: str, datasets: Mapping[str, DatasetKind]
+) -> Draft:
+    """The model's YAML, fed the build's errors (YAML paths) until it builds or the attempts run out."""
     text, errors = "", list[PolicyError]()
     for attempt in range(1, DRAFT_ATTEMPTS + 1):
-        req = LLMRequest("policy_draft", models.generate, SYSTEM, messages, max_tokens=2000, effort="medium")
+        req = LLMRequest(purpose, models.generate, system, messages, max_tokens=2000, effort="medium")
         text = _yaml_only(await llm.complete(req))
         try:
             build(text, tenant=tenant, datasets=datasets)
-            log.info("policy drafted", attempts=attempt)
+            log.info("policy drafted", purpose=purpose, attempts=attempt)
             return Draft(text, [], attempt)
         except PolicyValidationError as e:
             errors = e.errors
-        log.info("draft repair", attempt=attempt, errors=len(errors), first=[f"{x.path}: {x.message}"[:160] for x in errors[:3]])
+        log.info("draft repair", purpose=purpose, attempt=attempt, errors=len(errors), first=[f"{x.path}: {x.message}"[:160] for x in errors[:3]])
         problems = "\n".join(f"- {x.path}: {x.message}" for x in errors)
         hint = ""
         if any("valid string" in x.message for x in errors):  # YAML reads bare yes/no/on/off as true/false

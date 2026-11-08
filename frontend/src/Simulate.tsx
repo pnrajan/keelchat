@@ -41,11 +41,11 @@ export default function Simulate({ agent, onResult }: { agent: string | null; on
             <input id={`sim-name-${r.id}`} className="compact" value={r.name} aria-label="Name" maxLength={40}
               onChange={(e) => set(r.id, { name: e.target.value.replace(/[^A-Za-z0-9_-]/g, "_") })} />
             <select className="compact" aria-label="Kind" value={r.kind} onChange={(e) => set(r.id, { kind: e.target.value as Row["kind"] })}>
-              <option value="persona">Persona (model plays it)</option><option value="script">Scripted messages</option>
+              <option value="persona" title="The model plays this user">Persona</option><option value="script" title="One message per line, replayed as written">Script</option>
             </select>
-            {r.kind === "persona" && <label className="inline">max turns<input id={`sim-turns-${r.id}`} type="number" min={1} max={20} value={r.maxTurns}
+            {r.kind === "persona" && <label className="inline" title="Most turns the played user gets">turns<input id={`sim-turns-${r.id}`} type="number" min={1} max={20} value={r.maxTurns}
               onChange={(e) => set(r.id, { maxTurns: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })} /></label>}
-            <button className="ghost compact" aria-label="Remove" onClick={() => setRows((x) => x.filter((y) => y.id !== r.id))}>Remove</button>
+            <button className="ghost compact" aria-label={`Remove ${r.name}`} title="Remove" onClick={() => setRows((x) => x.filter((y) => y.id !== r.id))}>✕</button>
           </div>
           <textarea id={`sim-text-${r.id}`} rows={r.kind === "persona" ? 2 : 4} value={r.text} onChange={(e) => set(r.id, { text: e.target.value })}
             placeholder={r.kind === "persona" ? "Who this user is and what they want" : "One message per line"} aria-label="Persona or messages" />

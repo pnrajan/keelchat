@@ -22,7 +22,8 @@ The features behind a policy, with the YAML that turns each one on. Start with t
 | **Editor · test chat** | Edit the YAML with completion for keys, step names, tools and guardrails, docs on hover, and build errors marked on their lines as you type. **Build & try** compiles it and the chat pane talks to it. |
 | **Inspector** | For each turn: every stage with its timing, the intent verdict, the route, tool calls, the session state and what was remembered. |
 | **Simulate** | Model-played personas and scripted replays against the policy, on fake tools. |
-| **Review** | Rate the test chat or a simulated conversation: each reply in scope or not, each matched rule followed or not, an overall score from 1 to 5. Download the ratings as judge labels and the failed conversations as replay cases. |
+| **Test** | Tests kept with the agent: save a conversation as one, draft them from the policy, run them all on the current build, download them as a replay set. |
+| **Review** | Rate the test chat or a simulated conversation: each reply in scope or not, each matched rule followed or not, an overall score from 1 to 5. Download the ratings as judge labels and the failed conversations as replay cases, or let the model suggest policy changes that answer them. |
 | **Versions** | Save a build as a version, compare versions line by line, roll back, copy an agent. |
 | **Channels** | What to paste or configure for the website widget, a link, WordPress, WhatsApp, SMS, Slack and phone. |
 | **Publish · results** | Publish an agent as a widget and app. For surveys: scores over time, splits and themes. |

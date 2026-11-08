@@ -146,14 +146,36 @@ Use them three ways:
    `note`. Add the cases to `replay.yaml`; `yachat evals check` judges them on every change.
 3. **Fix the policy.** The tab counts failures per check. A rule that fails often needs its `then` reworded or split;
    out-of-scope replies need the charter's scope tightened; a low score with no failed check means a check is missing,
-   so turn the note into a rule or a rubric.
+   so turn the note into a rule or a rubric. **Suggest policy changes** does this for you: the model reads the failed
+   replies (with the raters' notes) and the low scores with a note, revises the policy in the editor as little as it
+   can, and starts the YAML with one `# change:` line per edit naming the feedback it answers. The build checks the
+   revision and the model repairs its errors, like a drafted policy. **Open in editor** replaces the editor text;
+   nothing is saved until you build it, run the tests and save a version.
 
 A conversation rated again after it grew (more chat) counts once in the downloads: its newest rating. Eval folders use
 the agent name with `_` for `-` (`support-assistant` → `evals/support_assistant/`).
 
 API: `POST` and `GET /v1/tenants/{t}/agents/{agent}/reviews` (send a saved rating's `id` to change it; the list shows
-the newest 500), and `GET .../reviews/labels.yaml` or `.../replay.yaml`. Saving needs a key that may build; reading,
-one that may read.
+the newest 500), `GET .../reviews/labels.yaml` or `.../replay.yaml`, and `POST .../reviews/suggest` (`{yaml}`, the
+policy to revise; the active version when omitted). Saving needs a key that may build; reading, one that may read.
+
+## Tests kept with the agent
+
+The console's **Test** tab keeps test conversations with the agent, in the store (Postgres when configured), so a bot
+built in the console has tests without a folder on disk.
+
+- **Save as test**: pick the test chat or a simulated conversation. The test replays what the user said; with **Expect
+  the same ending** it also expects the conversation to finish (or not) and exit the same way.
+- **Draft tests from the policy**: `yachat evals generate` on the server, for targets that have no drafted test yet.
+  Each drafted case shows whether it passes now; **Keep** the ones you want.
+- **Run**: every test (or one) on the agent's current build, on sample tools, like a simulation. A test passes when its
+  `expect` holds and the checks every conversation must pass do; the judged checks run when the server sets
+  `EVALS_JUDGE_MODEL`.
+- **Download replay.yaml**: the tests as a replay set, for `evals/<agent>/` and CI.
+
+The launch checklist counts these tests as well as an eval set under `evals/`. API: `POST`, `GET .../agents/{agent}/tests`,
+`DELETE .../tests/{id}`, `POST .../tests/run` (`{ids}` optional, up to 50), `POST .../tests/draft` (`{redo}`),
+`GET .../tests.yaml`. Names are unique per agent.
 
 ## Calibration
 

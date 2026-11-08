@@ -17,6 +17,7 @@ from yachat.datasets.store import DatasetStore
 from yachat.state import store
 from yachat.state.models import (
     AgentSummary,
+    AgentTest,
     AuditEvent,
     AuditKind,
     Embed,
@@ -33,6 +34,7 @@ from yachat.state.models import (
 )
 from yachat.state.store import (
     AUDIT_COLUMNS,
+    AgentTestStore,
     AgentVersionStore,
     AuditStore,
     BudgetStore,
@@ -226,6 +228,15 @@ CREATE TABLE IF NOT EXISTS reviews (
     PRIMARY KEY (tenant, id)
 );
 CREATE INDEX IF NOT EXISTS reviews_tenant_agent ON reviews (tenant, agent, created_at DESC);
+CREATE TABLE IF NOT EXISTS agent_tests (
+    tenant TEXT NOT NULL,
+    id TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    test JSONB NOT NULL,
+    PRIMARY KEY (tenant, id)
+);
+CREATE INDEX IF NOT EXISTS agent_tests_tenant_agent ON agent_tests (tenant, agent, created_at);
 -- tables created before tenancy keyed rows without the tenant, so two tenants overwrote each other: re-key them.
 -- The old key was unique on (user_id, agent, item), so the wider key cannot conflict.
 DO $$
@@ -967,3 +978,35 @@ class PostgresReviewStore(_Pooled, ReviewStore):
         async with (await self.pool).acquire() as con:
             rows = await con.fetch("SELECT review FROM reviews WHERE tenant=$1 AND agent=$2 ORDER BY created_at DESC LIMIT $3", tenant, agent, limit)
         return [Review.model_validate_json(r["review"]) for r in rows]
+
+
+class PostgresAgentTestStore(_Pooled, AgentTestStore):
+    """Tests kept with each agent in Postgres, one JSON row each."""
+
+    async def save(self, test: AgentTest) -> AgentTest:
+        async with (await self.pool).acquire() as con:
+            await con.execute(
+                "INSERT INTO agent_tests (tenant, id, agent, created_at, test) VALUES ($1,$2,$3,$4,$5::jsonb) "
+                "ON CONFLICT (tenant, id) DO UPDATE SET test=EXCLUDED.test WHERE agent_tests.agent = EXCLUDED.agent",
+                test.tenant,
+                test.id,
+                test.agent,
+                test.created_at,
+                test.model_dump_json(),
+            )
+        return test
+
+    async def get(self, tenant: str, test_id: str) -> AgentTest | None:
+        async with (await self.pool).acquire() as con:
+            row = await con.fetchrow("SELECT test FROM agent_tests WHERE tenant=$1 AND id=$2", tenant, test_id)
+        return AgentTest.model_validate_json(row["test"]) if row else None
+
+    async def list(self, tenant: str, agent: str) -> list[AgentTest]:
+        async with (await self.pool).acquire() as con:
+            rows = await con.fetch("SELECT test FROM agent_tests WHERE tenant=$1 AND agent=$2 ORDER BY created_at", tenant, agent)
+        return [AgentTest.model_validate_json(r["test"]) for r in rows]
+
+    async def delete(self, tenant: str, test_id: str) -> bool:
+        async with (await self.pool).acquire() as con:
+            res = await con.execute("DELETE FROM agent_tests WHERE tenant=$1 AND id=$2", tenant, test_id)
+        return str(res).endswith(" 1")

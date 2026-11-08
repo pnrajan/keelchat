@@ -32,10 +32,12 @@ from yachat.runtime.usage import LIMIT_REACHED, METER, Usage, charge_usd
 from yachat.state.memory_writer import MemorySnapshot, MemoryWriter
 from yachat.state.models import AuditEvent, Handoff, HandoffStatus, PolicyVersion, SessionState
 from yachat.state.store import (
+    AgentTestStore,
     AgentVersionStore,
     AuditStore,
     BudgetStore,
     HandoffStore,
+    InMemoryAgentTestStore,
     InMemoryAgentVersionStore,
     InMemoryAuditStore,
     InMemoryBudgetStore,
@@ -123,6 +125,7 @@ class Runtime:
         audit: AuditStore | None = None,
         handoffs: HandoffStore | None = None,
         reviews: ReviewStore | None = None,
+        tests: AgentTestStore | None = None,
         responses: ResponseStore | None = None,
         budgets: BudgetStore | None = None,
         limits: RateLimiter | None = None,
@@ -143,6 +146,7 @@ class Runtime:
         self.audit = audit or InMemoryAuditStore()
         self.handoffs = handoffs or InMemoryHandoffStore()
         self.reviews = reviews or InMemoryReviewStore()
+        self.tests = tests or InMemoryAgentTestStore()
         self.responses = responses or InMemoryResponseStore()
         self.budgets = budgets or InMemoryBudgetStore()
         self.limits = limits or InMemoryRateLimiter()  # public-traffic rate limits, shared by servers on Postgres

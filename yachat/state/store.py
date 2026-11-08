@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from yachat.policy.compiler import CompiledPolicy
 from yachat.state.models import (
     AgentSummary,
+    AgentTest,
     AuditEvent,
     AuditKind,
     Embed,
@@ -748,6 +749,44 @@ class InMemoryReviewStore(ReviewStore):
     async def list(self, tenant: str, agent: str, limit: int = 500) -> builtins.list[Review]:
         rows = [r.model_copy(deep=True) for (t, _), r in self._r.items() if t == tenant and r.agent == agent]
         return sorted(rows, key=lambda r: r.created_at, reverse=True)[:limit]
+
+
+class AgentTestStore(ABC):
+    """Test conversations kept with each agent (the console's Test tab)."""
+
+    @abstractmethod
+    async def save(self, test: AgentTest) -> AgentTest:
+        """Insert, or replace the test with the same id."""
+
+    @abstractmethod
+    async def get(self, tenant: str, test_id: str) -> AgentTest | None: ...
+
+    @abstractmethod
+    async def list(self, tenant: str, agent: str) -> builtins.list[AgentTest]:
+        """Oldest first: the order they run and export in."""
+
+    @abstractmethod
+    async def delete(self, tenant: str, test_id: str) -> bool: ...
+
+
+class InMemoryAgentTestStore(AgentTestStore):
+    def __init__(self) -> None:
+        self._t: dict[tuple[str, str], AgentTest] = {}
+
+    async def save(self, test: AgentTest) -> AgentTest:
+        self._t[(test.tenant, test.id)] = test.model_copy(deep=True)
+        return test
+
+    async def get(self, tenant: str, test_id: str) -> AgentTest | None:
+        t = self._t.get((tenant, test_id))
+        return t.model_copy(deep=True) if t else None
+
+    async def list(self, tenant: str, agent: str) -> builtins.list[AgentTest]:
+        rows = [t.model_copy(deep=True) for (tn, _), t in self._t.items() if tn == tenant and t.agent == agent]
+        return sorted(rows, key=lambda t: t.created_at)
+
+    async def delete(self, tenant: str, test_id: str) -> bool:
+        return self._t.pop((tenant, test_id), None) is not None
 
 
 class InMemoryHandoffStore(HandoffStore):

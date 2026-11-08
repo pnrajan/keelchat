@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
+from yachat.evals.case import ReplayCase
+
 
 def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
@@ -348,3 +350,18 @@ class Review(BaseModel):
             if rule and rule not in self.turns[x.turn - 1].rules:
                 raise ValueError(f"replies[{i}].check: rule {rule!r} did not match on turn {x.turn}")
         return self
+
+
+class AgentTest(BaseModel):
+    """A test conversation kept with the agent (the console's Test tab): run on every change, and exported as a replay
+    case for CI (`evals/<agent>/replay.yaml`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=lambda: new_id("tst"))
+    tenant: str
+    agent: str
+    #: where it came from: the test chat, a simulation, a rated conversation, drafted from the policy, or written
+    source: Literal["chat", "simulate", "review", "draft", "manual"] = "manual"
+    case: ReplayCase
+    created_at: datetime = Field(default_factory=now)

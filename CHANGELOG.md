@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
 - Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
+- Console **Test** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
+- **Suggest policy changes** from ratings: the model revises the policy to answer failed replies and low scores, each change named; checked by the build, never saved.
 - `--trials k` / `trials:` on evals: each case runs k times and passes only when every run does; flaky cases listed.
 - `rule_followed` judged part by part: each part of the rule that applies needs a quote from the reply; code decides.
 - `yachat evals calibrate`: the judge's agreement with replies a person labeled (`labels.yaml`).
@@ -24,6 +26,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Dashboards add up in DuckDB (now a core dependency).
 
 ### Changed
+- Support example accepts order numbers in any format (`#98765` as well as `ORD-12345`).
 - Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `yachat.evals`.
 
 ### Fixed

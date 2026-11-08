@@ -14,6 +14,8 @@ from yachat.state.models import Review
 LOW_SCORE = 2
 #: most ratings an export reads
 EXPORT_LIMIT = 10_000
+#: most problems one policy revision is asked to answer (newest first)
+FEEDBACK_LIMIT = 30
 
 
 def _latest(reviews: list[Review]) -> list[Review]:
@@ -56,6 +58,25 @@ def cases_yaml(reviews: list[Review]) -> str:
             why.append(f"scored {r.score}/5{f' ({r.note})' if r.note else ''}")
         cases.append({"name": _name(r), "messages": [t.user for t in r.turns[:upto]], "note": f"a person failed it: {'; '.join(why)}"})
     return _dump("cases", "yachat review: conversations a person failed (add to evals/<agent>/replay.yaml)", cases)
+
+
+def feedback(reviews: list[Review]) -> list[str]:
+    """What people reported, one line per failed reply and per low-scored conversation with a note, newest first, for a
+    policy revision. `reviews` is newest first."""
+    out: list[str] = []
+    for r in _latest(list(reversed(reviews)))[::-1]:
+        for x in sorted((x for x in r.replies if not x.ok), key=lambda x: x.turn):
+            t = r.turns[x.turn - 1]
+            check = "kept to the charter's scope" if x.check == "in_scope" else f"followed rule {x.check.partition(':')[2]}"
+            why = f"; the rater said: {x.note}" if x.note else ""
+            out.append(f'Not {check}. User: "{_clip(t.user)}" Agent: "{_clip(t.agent)}"{why}')
+        if r.score is not None and r.score <= LOW_SCORE and r.note:
+            out.append(f"A conversation scored {r.score}/5; the rater said: {r.note}")
+    return out[:FEEDBACK_LIMIT]
+
+
+def _clip(text: str, n: int = 300) -> str:
+    return text if len(text) <= n else text[: n - 1] + "…"
 
 
 def _name(r: Review) -> str:

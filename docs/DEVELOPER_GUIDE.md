@@ -46,6 +46,7 @@ There is no fake model. Tests, simulations and evals call the provider in `.env`
 | `./run.sh --sandbox` | the same, plus statistics code in a local Docker sandbox (builds `yachat-sandbox:latest` on first use) | analytics questions that need Python |
 | `./run.sh --build` | console built into `frontend/dist` and served by the API on :8000 | checking the production bundle |
 | `./run.sh --fake-tools` | API and console only; every tool uses its in-memory fake | runtime work that does not touch the services |
+| `scripts/try.sh` | built console and API, all in memory (ignores `DATABASE_URL` and `REDIS_URL`), with `support-assistant` saved and three tests; the next free port from 8000; `--judge` adds the judged checks | trying the Test and Review tabs |
 | `scripts/dev.sh --knowledge` / `--analytics` | one data service; fakes for the other tools | working on one service |
 | `scripts/knowledge.sh`, `scripts/analytics.sh` | one service on its own | service-only work, with `curl` |
 

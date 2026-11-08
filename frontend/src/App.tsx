@@ -10,6 +10,7 @@ import Handoffs from "./Handoffs";
 import Setup from "./Setup";
 import Simulate from "./Simulate";
 import Review, { Conversation } from "./Review";
+import Tests from "./Tests";
 import Rain from "./Rain";
 import Reach from "./Reach";
 import Install from "./Install";
@@ -18,8 +19,8 @@ import Versions from "./Versions";
 const PolicyEditor = lazy(() => import("./PolicyEditor"));  // CodeMirror is most of the bundle: load it on its own
 
 type Msg = { role: "user" | "agent"; text: string; meta?: string[]; analysis?: AnalysisResult | null; error?: boolean; handoff?: string; rules?: string[] };
-type Tab = "setup" | "analysis" | "trace" | "state" | "rendered" | "metrics" | "versions" | "simulate" | "review" | "handoffs" | "audit";
-const TABS: Tab[] = ["setup", "analysis", "trace", "state", "rendered", "metrics", "versions", "simulate", "review", "handoffs", "audit"];
+type Tab = "setup" | "analysis" | "trace" | "state" | "rendered" | "metrics" | "versions" | "simulate" | "test" | "review" | "handoffs" | "audit";
+const TABS: Tab[] = ["setup", "analysis", "trace", "state", "rendered", "metrics", "versions", "simulate", "test", "review", "handoffs", "audit"];
 
 const TEMPLATES = [
   { id: "hiring", label: "Hiring assistant", yaml: EXAMPLE_POLICY },
@@ -241,17 +242,21 @@ export default function App() {
   const analysis = latestAnalysis(last?.outbound.items);
   const verification = latestVerification(last?.outbound.items);
   const totalMs = last ? Math.max(1, ...last.trace.filter((t) => !t.skipped).map((t) => t.ms)) : 1;
-  // conversations the Review tab can rate: this test chat (each user message with the reply to it) and the last simulation
+  // conversations the Review and Test tabs work on: this test chat (each user message with the reply to it) and the last simulation
   const chatTurns = msgs.flatMap((m, i) => {
     const r = msgs[i + 1];
     return m.role === "user" && r?.role === "agent" && !r.error ? [{ user: m.text, agent: r.text, rules: r.rules ?? [] }] : [];
   });
   const reviewable: Conversation[] = [
-    ...(session && chatTurns.length ? [{ source: "chat" as const, id: session.id, label: "Test chat", policy_hash: session.policy_hash, turns: chatTurns }] : []),
+    ...(session && chatTurns.length ? [{
+      source: "chat" as const, id: session.id, label: "Test chat", policy_hash: session.policy_hash, turns: chatTurns,
+      outcome: state ? { completed: state.completed === true, exit_reason: typeof state.exit_reason === "string" ? state.exit_reason : null } : undefined,
+    }] : []),
     ...(simRun && simRun.agent === built?.agent
       ? simRun.result.conversations.filter((c) => c.turn_log.length).map((c) => ({
         source: "simulate" as const, id: `${c.name.slice(0, 100)}-${c.session_id.slice(-6)}`, label: `Simulated: ${c.name}`, policy_hash: simRun.result.policy_hash,
         turns: c.turn_log.map((t) => ({ user: t.user, agent: t.agent, rules: t.rules })),
+        outcome: { completed: c.completed, exit_reason: c.exit_reason },
       }))
       : []),
   ];
@@ -447,7 +452,7 @@ export default function App() {
             ))}
           </div>
           <div className="inspector">
-            {tab === "setup" && <Panel><Setup policy={policy} refresh={savedTick} onChange={setPolicy} schema={schema} onSave={() => void saveVersion()} onAddStep={addStep} /></Panel>}
+            {tab === "setup" && <Panel><Setup policy={policy} refresh={savedTick} onChange={setPolicy} schema={schema} onSave={() => void saveVersion()} onAddStep={addStep} onTests={() => setTab("test")} /></Panel>}
             {tab === "analysis" && <Panel key={last?.turn_id}><Analysis result={analysis} verification={verification} /></Panel>}
             {tab === "trace" && (last ? (
               <div className="trace">
@@ -464,7 +469,9 @@ export default function App() {
             {tab === "rendered" && (last ? <pre className="code">{JSON.stringify({ outbound: last.outbound, rendered: last.rendered }, null, 2)}</pre> : <div className="empty">Nothing rendered yet.</div>)}
             {tab === "metrics" && (metrics ? <pre className="code">{JSON.stringify(metrics, null, 2)}</pre> : <div className="empty">Loading…</div>)}
             {tab === "simulate" && <Panel><Simulate agent={built?.agent ?? null} onResult={(result) => built && setSimRun({ agent: built.agent, result })} /></Panel>}
-            {tab === "review" && <Panel><Review agent={built?.agent ?? null} conversations={reviewable} /></Panel>}
+            {tab === "test" && <Panel><Tests agent={built?.agent ?? null} conversations={reviewable} /></Panel>}
+            {tab === "review" && <Panel><Review agent={built?.agent ?? null} conversations={reviewable} policy={policy}
+              onRevised={(yaml) => { load(yaml); setNotice({ kind: "ok", text: "The suggested revision is in the editor. Build & try, run the tests, then save." }); }} /></Panel>}
             {tab === "handoffs" && <Panel><Handoffs focus={focusHandoff} onChange={countHandoffs} /></Panel>}
             {tab === "audit" && <Panel><Audit key={session?.id ?? "none"} agent={built?.agent ?? live.agent} session={session?.id ?? null} /></Panel>}
             {tab === "versions" && (

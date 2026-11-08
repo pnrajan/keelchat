@@ -82,7 +82,7 @@ A change is verified when `uv run pytest`, `uv run ruff check .` and `uv run myp
 ```
 yachat/
   policy/        models, loader, validator (YAML paths), compiler (CompiledPolicy), defaults, memory_types, durations, errors,
-                 schema (editor JSON Schema), drafter (policy from a description)
+                 schema (editor JSON Schema), drafter (policy from a description; revised from ratings)
   registry/      core (@tool/@action/@node/@guardrail/@preprocessor, REGISTRY, manifest), discovery, contract,
                  mcp (MCP servers → `<alias>.<tool>`), tenant_tools (Tool Registry API HTTP tools)
   runtime/       context (TurnContext), pipeline (stages, timing, short-circuit), llm (Anthropic), litellm_client,
@@ -94,7 +94,7 @@ yachat/
   capabilities/  tools.py (+actions), guardrails.py, nodes/ (greet_consent, job_search, form_fill, survey, conversation_survey (objectives), knowledge, analytics, exit, handoff),
                  preprocessors/ (receiver, opt_out, handoff_request, language, shorthand, entities, input_guardrails)
   channels/      base, web, slack, sms (STOP), whatsapp (list messages), whatsapp_cloud (Cloud API)
-  state/         models (SessionState, MemoryRecord, PolicyVersion, AuditEvent, Handoff, Review), store (ports + fakes; saved policy
+  state/         models (SessionState, MemoryRecord, PolicyVersion, AuditEvent, Handoff, Review, AgentTest), store (ports + fakes; saved policy
                  versions, audit log, handoff inbox), flow
                  (StepGraph), memory_writer, redis_store, postgres_store (memory, tenant tools, datasets, versions, audit, handoffs, embeds), iceberg_store (audit archive), mem0_store (memory),
                  artifacts (file store port: S3, folder, memory; uploads, documents)
@@ -109,11 +109,11 @@ yachat/
   testing/fakes.py  FakeTools (tool backends only; the model is never faked)
   scaffold.py    `yachat new agent|package` starter files; __init__.py re-exports the extension API (`from yachat import tool, node, ...`)
   logging.py     JSON logs (session_id, turn_id, policy_hash, stage, latency_ms), Metrics; tracing.py (Sentry spans); voice.py (speech in/out ports)
-  evals/         replay (scripts + played personas on sim/harness), metrics (DeepEval, Ragas, rule_followed, thresholds gate), judge (litellm), checks (every conversation), generate (sets from the policy), calibrate (judge vs labels), review (ratings → labels, cases), run, online
+  evals/         replay (scripts + played personas on sim/harness), metrics (DeepEval, Ragas, rule_followed, thresholds gate), judge (litellm), checks (every conversation), generate (sets from the policy), calibrate (judge vs labels), review (ratings → labels, cases, feedback for revisions), case (ReplayCase, Expect), run, online
 evals/           <agent>/ sets: replay.yaml (fixtures, cases, expect), generated.yaml, labels.yaml, thresholds.yaml (policy, minimums, rubrics, trials)
 examples/        policies (support, booking, concierge, hiring, surveys, analyst, coach), data/, sim_script.yaml, contrib_tool/,
                  extensions/booking_caps (example tool, guardrail and channel package)
-frontend/        React test console (policy editor, chat, trace/state inspector, simulate, review, versions, channels, results, handoff inbox)
+frontend/        React test console (policy editor, chat, trace/state inspector, simulate, tests, review, versions, channels, results, handoff inbox)
 plugins/yachat/  Claude Code plugin (.mcp.json → /mcp, build-agent skill); .claude-plugin/marketplace.json lists it
 docs/            DEVELOPER_GUIDE.md, ARCHITECTURE.md, WRITING_AN_AGENT.md, ADDING_A_CAPABILITY.md, EVALS.md
 scripts/        dev.sh, knowledge.sh, analytics.sh, db.sh (docker compose Redis+Postgres); run.sh at the root;

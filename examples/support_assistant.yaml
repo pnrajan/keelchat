@@ -11,7 +11,7 @@ flow:
       fields:
         - name: order_number
           ask: What is your order number?
-          expect: An order number such as ORD-12345
+          expect: An order number in any format, such as ORD-12345 or #98765
         - name: issue
           ask: What went wrong with the order?
           expect: A short description of the problem

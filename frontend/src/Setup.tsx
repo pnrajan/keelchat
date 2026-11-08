@@ -5,7 +5,7 @@ import { api, Readiness } from "./api";
 import { Field, moveStep, readConfig, removeStep, setKey, setStep } from "./policyDoc";
 import { flowSteps, type Root } from "./policySchema";
 
-type Props = { policy: string; refresh: number; onChange: (yaml: string) => void; schema: Root | null; onSave: () => void; onAddStep: (name: string) => void };
+type Props = { policy: string; refresh: number; onChange: (yaml: string) => void; schema: Root | null; onSave: () => void; onAddStep: (name: string) => void; onTests: () => void };
 
 const AREAS: Record<string, string> = { policy: "Policy", connections: "Connections", safety: "Safety", launch: "Launch" };
 const MARK = { ok: "✓", warning: "!", missing: "✕" } as const;
@@ -16,7 +16,7 @@ function enumOf(schema: Root | null, ...path: string[]): string[] {
   return ((s as { enum?: string[] } | undefined)?.enum ?? []).map(String);
 }
 
-export default function Setup({ policy, refresh, onChange, schema, onSave, onAddStep }: Props) {
+export default function Setup({ policy, refresh, onChange, schema, onSave, onAddStep, onTests }: Props) {
   const cfg = readConfig(policy);
   const [report, setReport] = useState<Readiness | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
@@ -52,8 +52,9 @@ export default function Setup({ policy, refresh, onChange, schema, onSave, onAdd
     else if (action === "guardrails") setFocus("setup-guardrails");
     else if (action.startsWith("add_step:")) onAddStep(action.slice(9));
     else if (action === "add_step") setFocus("setup-add-step");
+    else if (action === "tests") onTests();
   }
-  const fixLabel: Record<string, string> = { save: "Save version", charter: "Edit charter", guardrails: "Choose checks", add_step: "Add a step" };
+  const fixLabel: Record<string, string> = { save: "Save version", charter: "Edit charter", guardrails: "Choose checks", add_step: "Add a step", tests: "Add tests" };
 
   const setFields = (i: number, fields: Field[]) =>
     onChange(setStep(policy, i, "fields", fields.map((f) => ({ name: f.name, ask: f.ask, expect: f.expect, ...(f.optional ? { optional: true } : {}) }))));

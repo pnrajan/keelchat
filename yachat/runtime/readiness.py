@@ -19,7 +19,7 @@ from yachat.policy.errors import PolicyValidationError
 from yachat.policy.templates import BLANK
 from yachat.registry.core import REGISTRY
 from yachat.runtime.llm_factory import TOOL_BACKENDS
-from yachat.state.store import AgentVersionStore
+from yachat.state.store import AgentTestStore, AgentVersionStore
 
 Status = Literal["ok", "warning", "missing"]
 Area = Literal["policy", "connections", "safety", "launch"]
@@ -182,8 +182,11 @@ def _structure_items(policy: CompiledPolicy) -> list[Item]:
     return out
 
 
-async def readiness(yaml: str, tenant: str, datasets: Mapping[str, DatasetKind], impls: set[str], versions: AgentVersionStore) -> Report:
-    """`impls`: tools this runtime has an implementation for without a backend URL (sample data)."""
+async def readiness(
+    yaml: str, tenant: str, datasets: Mapping[str, DatasetKind], impls: set[str], versions: AgentVersionStore, tests: AgentTestStore | None = None
+) -> Report:
+    """`impls`: tools this runtime has an implementation for without a backend URL (sample data). `tests`: the tests
+    kept with agents (the console's Test tab); an eval set under evals/ counts too."""
     items: list[Item] = []
     try:
         policy = build(yaml, tenant=tenant, datasets=datasets)
@@ -207,6 +210,7 @@ async def readiness(yaml: str, tenant: str, datasets: Mapping[str, DatasetKind],
             Item(id="saved", area="launch", status="missing", blocking=True, title="Not saved yet", detail="Save a version so it can be used.", fix="save")
         )
     has_tests = any((EVALS / policy.agent.replace("-", "_") / f).is_file() for f in ("replay.yaml", "generated.yaml"))
+    has_tests = has_tests or (tests is not None and bool(await tests.list(tenant, policy.agent)))
     items.append(
         Item(id="tests", area="launch", status="ok", title="Has test conversations")
         if has_tests
@@ -215,7 +219,7 @@ async def readiness(yaml: str, tenant: str, datasets: Mapping[str, DatasetKind],
             area="launch",
             status="missing",
             title="No test conversations",
-            detail="Add a replay set under evals/, or run `yachat evals generate`, so changes are checked before they go live.",
+            detail="Save conversations as tests, or draft them from the policy, in the Test tab, so changes are checked before they go live.",
             fix="tests",
         )
     )
