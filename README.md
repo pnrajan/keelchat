@@ -205,8 +205,9 @@ contextual rules, Parlant; for programmatic multi-agent graphs, LangGraph; for a
 
 ## Getting help
 
-- **Questions and bugs:** [open an issue](https://github.com/pnrajan/yachat/issues/new/choose); the bug template asks
-  for the policy, the messages and the trace that show it.
+- **Questions, ideas, a bot to show:** [Discussions](https://github.com/pnrajan/yachat/discussions).
+- **Bugs:** [open an issue](https://github.com/pnrajan/yachat/issues/new/choose); the bug template asks for the
+  policy, the messages and the trace that show it.
 - **Something not working locally:** [Troubleshooting](docs/REFERENCE.md#troubleshooting) covers the common fixes.
 - **Security:** please don't open a public issue; follow [SECURITY.md](SECURITY.md).
 

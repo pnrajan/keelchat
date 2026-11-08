@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or idea
+    url: https://github.com/pnrajan/yachat/discussions
+    about: Ask how to do something, share a bot, or float an idea before it becomes a feature request.
+  - name: Security vulnerability
+    url: https://github.com/pnrajan/yachat/blob/main/SECURITY.md
+    about: Please report vulnerabilities privately, not as a public issue.
