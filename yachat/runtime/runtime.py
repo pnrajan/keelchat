@@ -265,7 +265,8 @@ class Runtime:
         now = now or datetime.now(UTC)
         if resume:
             open_ = await self.sessions.find_open(user_id, agent, tenant)
-            if open_ is not None and now - open_.last_turn_at <= timedelta(days=policy.defaults.session_ttl_days):
+            same_build = policy_hash is None or (open_ is not None and open_.policy_hash == policy.hash)
+            if open_ is not None and same_build and now - open_.last_turn_at <= timedelta(days=policy.defaults.session_ttl_days):
                 log.info("session resumed", session_id=open_.id, age_days=round((now - open_.last_turn_at).total_seconds() / 86400, 1))
                 return open_
         state = SessionState(

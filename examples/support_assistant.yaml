@@ -19,6 +19,7 @@ flow:
           ask: What went wrong with the order?
           expect: A short description of the problem
           optional: true
+      closing: I've passed this to our support team. They'll email you about it within one working day.
 rules:                             # apply only on the messages they fit (docs/WRITING_AN_AGENT.md#rules)
   - name: damaged_item
     when: the customer says an item arrived damaged or broken

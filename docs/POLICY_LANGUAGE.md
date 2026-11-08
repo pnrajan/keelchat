@@ -67,7 +67,7 @@ until its job is done, then the next ready one starts.
 | Step | Does | Settings |
 |---|---|---|
 | `greet_consent` | Greets the person and asks consent to use and remember their answers. Put it first when `memory` is set. | none |
-| `form_fill` | Asks one field at a time, checks each answer against `expect`, then shows a review. | `fields`, `review`, `curious` |
+| `form_fill` | Asks one field at a time and checks each answer against `expect`. | `fields`, `review`, `curious`, `closing` |
 | `survey` | Asks fixed questions in order and records how each answer was captured. | `questions`, `closing` |
 | `conversation_survey` | Learns what you list as objectives in a natural conversation, skipping what was already said. | `objectives`, `max_questions`, `closing` |
 | `knowledge` | Answers questions from your documents, and says so when they don't cover one. | `dataset` |
@@ -96,8 +96,9 @@ Your own steps (registered in Python, see [Adding a capability](ADDING_A_CAPABIL
 | Key | Value | Default | Meaning |
 |---|---|---|---|
 | `fields` | list of fields | required | What to ask, in order. |
-| `review` | `true`/`false` | `true` | Show the answers for a final check (and a submit, when the step can submit). |
+| `review` | `true`/`false` | `true` | When the step can submit (a job picked earlier and the `submit_application` action), show the answers and wait for "submit". Otherwise the form simply ends. |
 | `curious` | `true`/`false` | `false` | After a valid but vague answer ("it's broken"), ask one follow-up for the detail that matters. |
+| `closing` | text | "That's everything I need." | Said once every field is answered: what happens next ("We'll email you a return label within a day."). |
 
 A field:
 

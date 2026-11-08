@@ -65,6 +65,8 @@ class FormFillConfig(CapabilityConfig):
     review: bool = True
     #: after a valid but thin answer, ask one follow-up for the detail that matters (at most once per field)
     curious: bool = False
+    #: said once every field is answered, e.g. what happens next ("We'll email you a return label within a day.")
+    closing: str = ""
 
 
 def pii_categories(f: FieldSpec) -> set[str]:
@@ -175,9 +177,10 @@ class FormFill(Node[FormFillConfig]):
         job = st.outputs.get("selected_job") or {}
         can_submit = self._cfg.review and ctx.services.actions is not None and bool(job)
         if not can_submit:
+            closing = self._cfg.closing.strip()
             return NodeResult(
-                prefix + "That's everything I need.",
-                goal="Say you have everything you need.",
+                prefix + (closing or "That's everything I need."),
+                goal=f"Say you have everything you need, then say what happens next, as given: {closing}" if closing else "Say you have everything you need.",
                 outputs={"form": dict(st.fields)},
                 complete=True,
                 allowed_pii=allowed,

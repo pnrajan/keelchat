@@ -136,3 +136,28 @@ async def test_a_follow_up_that_starts_with_no_is_still_kept() -> None:
     assert r.state.open_question and r.state.open_question.field == "issue__more", r.outbound.text
     r = await say(rt, s.id, "No power at all, the screen stays black")
     assert "No power at all" in r.state.fields["issue"], r.state.fields
+
+
+async def test_the_form_ends_with_its_closing() -> None:
+    rt, _ = await make_runtime(SUPPORT)
+    s = await rt.start_session("support-assistant", "u1")
+    for m in ("hi", "yes", "ORD-12345"):
+        await say(rt, s.id, m)
+    r = await say(rt, s.id, "the glass jug arrived cracked down the side")
+    assert r.state.completed and "email" in r.outbound.text.lower() and "working day" in r.outbound.text.lower(), r.outbound.text
+
+
+async def test_no_answer_says_how_to_reach_a_person_only_when_the_policy_allows_it() -> None:
+    benefits = [{"title": "Benefits", "text": "Health, dental and a 401k match from day one.", "source": "hr.md"}]
+
+    async def ask(policy: str) -> str:
+        rt, _ = await make_runtime(policy, tools=FakeTools(passages=benefits))
+        s = await rt.start_session("support-assistant", "u1")
+        for m in ("hi", "yes"):
+            await say(rt, s.id, m)
+        return (await say(rt, s.id, "do you ship to Canada?")).outbound.text.lower()
+
+    with_handoff = await ask(SUPPORT)
+    assert "person" in with_handoff or "colleague" in with_handoff or "human" in with_handoff, with_handoff
+    without = await ask(mutate(SUPPORT, lambda d: d.pop("handoff")))
+    assert "person" not in without and "human" not in without, without

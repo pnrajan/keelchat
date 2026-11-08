@@ -30,7 +30,7 @@ Interactive docs at `/docs`. The main routes:
 |---|---|
 | `POST /v1/agents`, `POST /v1/agents/validate`, `POST /v1/agents/draft`, `POST /v1/agents/edit` | compile a policy to try it, report its errors, draft one from a description, change one as asked in plain words (`{yaml, instruction}` → YAML, a line per change, errors left) |
 | `POST /v1/tenants/{t}/agents`, `GET .../agents/{agent}/versions`, `POST .../versions/{n}/activate` | save versions, list them, roll back |
-| `POST /v1/sessions`, `POST /v1/sessions/{id}/turns`, `GET /v1/sessions/{id}/state` | talk to an agent |
+| `POST /v1/sessions`, `POST /v1/sessions/{id}/turns`, `GET /v1/sessions/{id}/state` | talk to an agent; a new session picks up the user's unfinished one on the same build unless `resume: false` |
 | `POST /v1/tenants/{t}/agents/{agent}/simulate` | simulated users on fake tools |
 | `POST`, `GET /v1/tenants/{t}/agents/{agent}/reviews`, `GET .../reviews/labels.yaml`, `.../reviews/replay.yaml`, `POST .../reviews/suggest` | people's ratings of conversations; as judge labels and replay cases; policy changes that answer them |
 | `GET /v1/critic`, `POST /v1/tenants/{t}/agents/{agent}/critique` | the judge model; its verdict on one trial conversation (`{turns, yaml}`): problems by turn, policy and code fixes |

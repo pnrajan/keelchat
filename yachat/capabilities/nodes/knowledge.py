@@ -20,6 +20,18 @@ ANSWER_SCHEMA: dict[str, Any] = {
 #: shown instead of an answer the verifier could not confirm from the passages
 UNVERIFIED = "I couldn't confirm an answer to that from our documents."
 NO_ANSWER = "I don't have information on that."
+#: added to a non-answer when the policy hands off on request, so the user knows they can ask
+ASK_FOR_PERSON = "If you'd like a person to help with it, just say so."
+
+
+def _or_a_person(ctx: TurnContext, r: NodeResult) -> NodeResult:
+    """A reply with no answer, plus how to reach a person when the policy lets the user ask for one."""
+    h = ctx.policy.handoff
+    if h is None or "user_request" not in h.when:
+        return r
+    r.text = f"{r.text} {ASK_FOR_PERSON}"
+    r.goal = f"{r.goal} Then tell them they can ask for a person to help with it."
+    return r
 
 
 class KnowledgeConfig(CapabilityConfig):
@@ -89,12 +101,15 @@ class Knowledge(Node[KnowledgeConfig]):
             return NodeResult("I can't look that up right now, but let's continue.", goal="Say you can't look that up right now.")
         results = list(res.data or [])[:3]
         if not results:  # nothing to answer from, so nothing to reason about
-            return NodeResult(NO_ANSWER, goal="Say you don't have information on that.")
+            return _or_a_person(ctx, NodeResult(NO_ANSWER, goal="Say you don't have information on that."))
         task = _Answer(ctx, results, res.as_prompt_data())
         text, v = await verified(ctx.services.llm, ctx.services.models, task, repairs(ctx, "knowledge")["verify"])
         assert v is not None  # _Answer never settles early
         ctx.llm_calls += v.llm_calls + v.rounds  # the loop's calls plus one answer per round
         items: list[dict[str, Any]] = [{"type": "source", "title": r.get("title", "")} for r in results]
         items.append({"type": "verification", "detail": True, "title": "Verification", "verification": v.model_dump(mode="json")})
-        goal = "Give this answer from our documents as written." if v.passed else "Say you couldn't confirm an answer from the documents."
-        return NodeResult(text if v.passed else UNVERIFIED, goal=goal, items=items)
+        if v.passed and text != NO_ANSWER:
+            return NodeResult(text, goal="Give this answer from our documents as written.", items=items)
+        none = NO_ANSWER if v.passed else UNVERIFIED
+        goal = "Say you don't have information on that." if v.passed else "Say you couldn't confirm an answer from the documents."
+        return _or_a_person(ctx, NodeResult(none, goal=goal, items=items))

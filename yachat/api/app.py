@@ -145,6 +145,8 @@ class SessionCreate(Body):
     tenant: TenantId = "default"
     channel: str = "web"
     policy_hash: str | None = None
+    #: pick up the user's unfinished conversation with this agent (on the same build); false always starts afresh
+    resume: bool = True
 
 
 class ReviewIn(Body):
@@ -980,7 +982,7 @@ def create_app(
     async def create_session(body: SessionCreate, request: Request) -> dict[str, Any]:
         tenant = own(request, body.tenant)
         await sync_tenant_tools(tool_store, tenant)  # its policy may use a tool registered on another replica
-        s = await rt.start_session(body.agent, body.user_id, body.channel, body.policy_hash, tenant=tenant)
+        s = await rt.start_session(body.agent, body.user_id, body.channel, body.policy_hash, tenant=tenant, resume=body.resume)
         return {"id": s.id, "agent": s.agent, "policy_hash": s.policy_hash, "channel": s.channel, "language": s.language}
 
     async def owned_session(request: Request, session_id: str) -> SessionState:

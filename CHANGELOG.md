@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
+- `resume` on `POST /v1/sessions` (default true). The console's **New session** always starts afresh.
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
 - Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
@@ -42,6 +44,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `yachat.evals`.
 
 ### Fixed
+- A session is resumed only on the build it was asked for: a different `policy_hash` starts a new conversation instead of picking up an old one on another build.
+- When the documents don't answer a question and the policy hands off on request, the reply says the user can ask for a person.
 - A handoff trigger listed twice is rejected with its path (`handoff.when`).
 - Answers from documents that do not answer the question say so, instead of describing the documents.
 - After a person resolves a handoff, the user's next message continues the flow instead of counting as a digression.

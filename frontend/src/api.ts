@@ -224,9 +224,10 @@ export const api = {
   saveTemplate: (id: string, name: string, description: string, agent: string) =>
     req<BotType>("POST", `/v1/tenants/${T}/templates`, { id, name, description, agent }),
   schema: () => req<Record<string, unknown>>("GET", "/v1/schema"),
-  /** `policy_hash`: the build to talk to (the console tests what it just built, not the saved active version). */
+  /** `policy_hash`: the build to talk to (the console tests what it just built, not the saved active version). Always a
+   * fresh conversation: New session means new, even when this user has an unfinished one. */
   startSession: (agent: string, user_id: string, channel: string, policy_hash?: string) =>
-    req<{ id: string; agent: string; policy_hash: string; channel: string; language: string }>("POST", "/v1/sessions", { agent, user_id, channel, ...(policy_hash ? { policy_hash } : {}) }),
+    req<{ id: string; agent: string; policy_hash: string; channel: string; language: string }>("POST", "/v1/sessions", { agent, user_id, channel, resume: false, ...(policy_hash ? { policy_hash } : {}) }),
   turn: (sessionId: string, text: string, channel_message_id: string, action?: string) =>
     req<TurnResponse>("POST", `/v1/sessions/${sessionId}/turns`, action ? { text, channel_message_id, action } : { text, channel_message_id }),
   state: (sessionId: string) => req<Record<string, unknown>>("GET", `/v1/sessions/${sessionId}/state`),

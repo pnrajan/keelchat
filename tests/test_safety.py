@@ -179,3 +179,15 @@ async def test_pinned_model_tiers_override_runtime_defaults(policy_yaml):
     r = await say(rt, s.id, "yes")
     pins = (await rt.policies.get(s.policy_hash)).models
     assert r.outbound.text and {c.model for c in llm.calls} <= set(pins.values())  # every call used a pinned tier, not the defaults
+
+
+async def test_a_session_is_resumed_only_on_the_build_asked_for(policy_yaml):
+    rt, _ = await make_runtime(policy_yaml)
+    s = await rt.start_session("hiring-agent", "u1")
+    await say(rt, s.id, "hello")
+    assert (await rt.start_session("hiring-agent", "u1", policy_hash=s.policy_hash)).id == s.id  # same build: picked up
+    edited = build(policy_yaml.replace("Direct tone.", "Warm tone."))
+    await rt.register_policy(edited)
+    fresh = await rt.start_session("hiring-agent", "u1", policy_hash=edited.hash)  # another build: never the old chat
+    assert fresh.id != s.id and fresh.policy_hash == edited.hash and fresh.turns == []
+    assert (await rt.start_session("hiring-agent", "u1", policy_hash=edited.hash, resume=False)).id != fresh.id
