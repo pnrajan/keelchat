@@ -41,6 +41,8 @@ and describe the bot you want in plain words.
 
 ## Your first bot
 
+Save this as `my_bot.yaml`:
+
 ```yaml
 agent: support-assistant
 charter: >
@@ -63,9 +65,11 @@ It asks for consent, collects an order number, answers side questions from your 
 injection, removes personal details from replies, and hands over to a person when asked or stuck.
 
 ```bash
-uv run yachat build my_bot.yaml   # validate and compile
-uv run yachat serve               # HTTP API; interactive docs at /docs
+uv run yachat build my_bot.yaml   # validate and compile; errors name the YAML path
 ```
+
+To chat with it, paste it into the console's editor and press **Build & try**, or send it to the API with
+`POST /v1/agents` ([walkthrough](docs/DEVELOPER_GUIDE.md#one-conversation-end-to-end)).
 
 [The policy language](docs/POLICY_LANGUAGE.md) lists every key. [Examples](examples) has bots for bookings, surveys,
 hiring and data questions.
@@ -88,8 +92,8 @@ Type hints become the schema; the docstring is what the model reads. Allow it wi
 ## Test it
 
 ```bash
-uv run yachat evals generate my_bot.yaml          # a test set from the policy
-uv run yachat evals check evals/my_bot            # checks every conversation must pass
+uv run yachat evals generate my_bot.yaml           # a test set from the policy, in evals/<agent>/
+uv run yachat evals check evals/support_assistant  # the checks every conversation must pass
 ```
 
 In the console, **Test → Judge** has a stronger model (`YACHAT_MODEL_CRITIC`) review a chat and propose fixes.
@@ -110,6 +114,13 @@ In the console, **Test → Judge** has a stronger model (`YACHAT_MODEL_CRITIC`) 
 
 Questions go to [Discussions](https://github.com/pnrajan/yachat/discussions), bugs to
 [issues](https://github.com/pnrajan/yachat/issues/new/choose), vulnerabilities to [SECURITY.md](SECURITY.md).
-Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
+
+## Status
+
+Alpha (0.x): the policy language and APIs may still change between minor versions; [CHANGELOG.md](CHANGELOG.md)
+lists every change.
+
+## License
 
 [Apache-2.0](LICENSE)
