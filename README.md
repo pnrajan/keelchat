@@ -11,7 +11,7 @@
 
 [Quickstart](#quickstart) · [Examples](#examples) · [Documentation](#documentation) · [Contributing](CONTRIBUTING.md)
 
-<img src="docs/assets/console.jpg" alt="The yachat test console: the policy editor on the left, a test chat in the middle, and the launch checklist on the right" width="900">
+<img src="docs/assets/console.jpg" alt="The yachat test console: the support assistant's policy on the left, a test chat in the middle (consent, a damaged item, an order number), and the Inspector's launch checklist and settings on the right" width="900">
 
 </div>
 
@@ -144,9 +144,10 @@ uv run yachat evals calibrate                                  # how often the j
   near miss, out of scope, asking for a person, each language). The model only plays the user.
 - **Judged checks** (staying in scope, following rules) need `EVALS_JUDGE_MODEL`, any litellm model id. The judge
   quotes the reply for every verdict, and code decides pass or fail.
-- **In the console**: the **Test** tab keeps tests with the agent: save a chat as a test, draft them from the
-  policy, run them all on each build. In the **Review** tab people mark replies pass or fail and score conversations;
-  the ratings feed `calibrate`, and **Suggest policy changes** revises the policy to fix what they failed.
+- **In the console**, under **Test**: **Tests** keeps tests with the agent (save a chat as a test, draft them from the
+  policy, run them all on each build); **Rate** lets people mark replies pass or fail and score conversations, which
+  feeds `calibrate`, and **Suggest policy changes** revises the policy to fix what they failed; **Judge** has a
+  stronger model review a chat (see below).
 - **In CI**, run both `evals run` and `evals check`.
 
 [Evals](docs/EVALS.md) has the details.

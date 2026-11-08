@@ -133,7 +133,7 @@ Metric names:
 
 ## People rating conversations
 
-The console's **Review** tab is where people judge the agent. Pick the test chat or a simulated conversation, then mark
+The console's **Rate** tab (Inspector → Test) is where people judge the agent. Pick the test chat or a simulated conversation, then mark
 each reply in scope or not, and each rule that matched on it followed or not, with an optional reason. Give the
 conversation an overall score (1 bad, 5 great) and a note. Ratings are kept per agent (Postgres when configured).
 
