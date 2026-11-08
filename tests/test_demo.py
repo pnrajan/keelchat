@@ -19,3 +19,14 @@ def test_a_bot_without_documents_or_handoff_is_not_asked_for_them() -> None:
     needs = {n.name for n in from_policy(build("agent: greeter\ncharter: 'Say hello. Out of scope: everything else.'\nflow: [greet_consent]\n"))}
     assert "Your documents" not in needs and "Somewhere for handed-over chats" not in needs
     assert "A model key" in needs
+
+
+def test_the_landing_page_yaml_builds() -> None:
+    """site/index.html shows a bot; it must be one the build accepts."""
+    import html
+    import re
+
+    page = (ROOT / "site" / "index.html").read_text()
+    shown = re.search(r'<pre><span class="k">agent:.*?</pre>', page, re.S)
+    assert shown is not None
+    assert build(html.unescape(re.sub(r"<[^>]+>", "", shown.group(0)))).agent == "support-assistant"
