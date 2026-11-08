@@ -32,6 +32,13 @@ def main(argv: list[str] | None = None) -> int:
     evs = ev.add_subparsers(dest="evals_cmd", required=True)
     evr = evs.add_parser("run", help="run eval sets (default: every evals/<agent>/ here); CI gate")
     evr.add_argument("agent_dirs", nargs="*")
+    evc = evs.add_parser("check", help="run eval sets against the checks every conversation must pass (judged ones with EVALS_JUDGE_MODEL)")
+    evc.add_argument("agent_dirs", nargs="*")
+    evg = evs.add_parser("generate", help="generate an eval set from a policy: one case per target reached, failures shortened")
+    evg.add_argument("policy", help="policy YAML")
+    evg.add_argument("--dir", default=None, help="eval set folder (default: evals/<agent>/)")
+    evg.add_argument("--only", nargs="*", default=None, help="targets whose id starts with these, e.g. rule: handed_off")
+    evg.add_argument("--rounds", type=int, default=None, help="tries per target")
     evx = evs.add_parser("export", help="export a live session as a replay test case")
     evx.add_argument("session_id")
     evx.add_argument("--out", default=None, help="replay.yaml to append to (prints when omitted)")
@@ -91,8 +98,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "evals":
         from yachat.evals.run import main as evals_main
 
-        if args.evals_cmd == "run":
-            return evals_main(list(args.agent_dirs))
+        if args.evals_cmd in ("run", "check"):
+            return evals_main(list(args.agent_dirs), scores=args.evals_cmd == "run")
+        if args.evals_cmd == "generate":
+            from yachat.evals.generate import main as generate_main
+
+            return generate_main(args.policy, args.dir, args.only, args.rounds)
         from yachat.evals.online import export_replay
         from yachat.state.models import SessionState
 

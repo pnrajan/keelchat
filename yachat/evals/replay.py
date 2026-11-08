@@ -33,6 +33,9 @@ class Expect(BaseModel):
     language: str | None = None
     #: turn number (from 1) → the rules that must match on it, exactly; `[]` means none may
     rules: dict[int, list[str]] | None = None
+    #: rules that must match on some turn / on no turn (when the turn is not known, e.g. a played persona)
+    rules_fired: list[str] | None = None
+    rules_not_fired: list[str] | None = None
 
 
 class ReplayCase(BaseModel):
@@ -49,6 +52,8 @@ class ReplayCase(BaseModel):
     expected_tools: list[str] = Field(default_factory=list)
     expect: Expect = Field(default_factory=Expect)
     chatbot_role: str = ""
+    #: why the case exists, e.g. what a generated case covers or the check it failed
+    note: str = ""
 
     @model_validator(mode="after")
     def _one_kind(self) -> ReplayCase:
@@ -100,7 +105,7 @@ class ReplayResult:
     @property
     def expectation_failures(self) -> list[str]:
         out = []
-        for k in self.case.expect.model_fields_set - {"rules"}:
+        for k in self.case.expect.model_fields_set - {"rules", "rules_fired", "rules_not_fired"}:
             want, got = getattr(self.case.expect, k), getattr(self.state, k)
             ok = all(got.get(kk) == vv for kk, vv in want.items()) if isinstance(want, dict) and isinstance(got, dict) else got == want
             if not ok:
@@ -109,6 +114,11 @@ class ReplayResult:
             got_rules = self.turns[n - 1].rules if 0 < n <= len(self.turns) else None
             if got_rules is None or sorted(got_rules) != sorted(want_rules):
                 out.append(f"rules on turn {n}: expected {want_rules!r}, got {got_rules!r}")
+        fired = {n for t in self.turns for n in t.rules}
+        if missing := [n for n in self.case.expect.rules_fired or [] if n not in fired]:
+            out.append(f"rules never matched: {missing}")
+        if wrong := [n for n in self.case.expect.rules_not_fired or [] if n in fired]:
+            out.append(f"rules matched but should not have: {wrong}")
         if self.case.expected_tools:
             used = {t for turn in self.turns for t in turn.tools}
             if missing := [t for t in self.case.expected_tools if t not in used]:
@@ -138,6 +148,19 @@ class ReplayResult:
 
 def load_set(path: str | Path) -> ReplaySet:
     return ReplaySet.model_validate(yaml.safe_load(Path(path).read_text()))
+
+
+#: cases `yachat evals generate` wrote, next to the hand-written replay.yaml
+GENERATED = "generated.yaml"
+
+
+def load_agent_set(agent_dir: str | Path) -> ReplaySet:
+    """An eval set folder's cases: replay.yaml (fixtures and hand-written cases) plus generated.yaml, either optional."""
+    d = Path(agent_dir)
+    found = [load_set(p) for p in (d / "replay.yaml", d / GENERATED) if p.is_file()]
+    if not found:
+        raise FileNotFoundError(f"{d}: no replay.yaml or {GENERATED}")
+    return ReplaySet(fixtures=found[0].fixtures, cases=[c for s in found for c in s.cases])
 
 
 def load_cases(path: str | Path) -> list[ReplayCase]:

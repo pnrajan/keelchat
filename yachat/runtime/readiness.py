@@ -206,7 +206,7 @@ async def readiness(yaml: str, tenant: str, datasets: Mapping[str, DatasetKind],
         items.append(
             Item(id="saved", area="launch", status="missing", blocking=True, title="Not saved yet", detail="Save a version so it can be used.", fix="save")
         )
-    has_tests = (EVALS / policy.agent.replace("-", "_") / "replay.yaml").is_file()
+    has_tests = any((EVALS / policy.agent.replace("-", "_") / f).is_file() for f in ("replay.yaml", "generated.yaml"))
     items.append(
         Item(id="tests", area="launch", status="ok", title="Has test conversations")
         if has_tests
@@ -215,7 +215,7 @@ async def readiness(yaml: str, tenant: str, datasets: Mapping[str, DatasetKind],
             area="launch",
             status="missing",
             title="No test conversations",
-            detail="Add a replay set under evals/ so changes are checked before they go live.",
+            detail="Add a replay set under evals/, or run `yachat evals generate`, so changes are checked before they go live.",
             fix="tests",
         )
     )

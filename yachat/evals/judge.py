@@ -7,6 +7,8 @@ import asyncio
 import os
 from typing import Any
 
+from pydantic import BaseModel
+
 from yachat.runtime.litellm_client import LiteLLMClient
 from yachat.runtime.llm import LLMRequest
 
@@ -22,6 +24,12 @@ def judge_model_from_env() -> str | None:
 async def _structured(client: LiteLLMClient, model: str, prompt: str, schema: Any) -> Any:
     req = LLMRequest("judge", model, SYSTEM, [{"role": "user", "content": prompt}], max_tokens=MAX_TOKENS)
     return schema.model_validate(await client.structured(req, schema.model_json_schema()))
+
+
+async def structured_verdict[T: BaseModel](model: str, prompt: str, schema: type[T]) -> T:
+    """One judge call answered as `schema`."""
+    out: T = await _structured(LiteLLMClient(), model, prompt, schema)
+    return out
 
 
 def deepeval_judge(model: str) -> Any:

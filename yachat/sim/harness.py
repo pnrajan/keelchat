@@ -37,6 +37,10 @@ class TurnLog:
     rules: list[str] = dc_field(default_factory=list)
     route: str | None = None
     llm_calls: int = 0
+    #: stages that failed on this turn (the reply fell back), e.g. `intent_detector: LLMError`
+    errors: list[str] = dc_field(default_factory=list)
+    #: form fields re-asked on this turn (their count went up; the session clears it once the field is answered)
+    reasked: list[str] = dc_field(default_factory=list)
 
 
 @dataclass
@@ -146,13 +150,16 @@ async def _drive(
     digressions_seen, llm, tools, i = 0, 0, 0, 0
     while (msg := await next_message(i, transcript)) is not None:
         calls: list[tuple[str, str]] = []
+        before = dict((await rt.session_state(s.id)).reasks)
         token = _TOOL_LOG.set(calls)
         try:
             last = await rt.turn(s.id, InboundMessage(text=msg, channel=channel, user_id=user, channel_message_id=f"{name}-{i}"))
         finally:
             _TOOL_LOG.reset(token)
         transcript.append({"user": msg, "agent": last.outbound.text})
-        turn_log.append(TurnLog(msg, last.outbound.text, [n for n, _ in calls], [o for _, o in calls], list(last.rules), last.route, last.llm_calls))
+        names, outputs = [n for n, _ in calls], [o for _, o in calls]
+        reasked = [f for f, n in last.state.reasks.items() if n > before.get(f, 0)]
+        turn_log.append(TurnLog(msg, last.outbound.text, names, outputs, list(last.rules), last.route, last.llm_calls, list(last.errors), reasked))
         digressions_seen = max(digressions_seen, last.state.digressions)
         llm += last.llm_calls
         tools += last.tool_calls

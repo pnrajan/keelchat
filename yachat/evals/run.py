@@ -11,11 +11,11 @@ from dataclasses import field as dc_field
 from pathlib import Path
 from typing import Any
 
+from yachat.evals.checks import check, code_checks, rules_by_name
 from yachat.evals.judge import deepeval_judge, judge_model_from_env, ragas_judge
-from yachat.evals.metrics import CATALOGUE, RAGAS, RULE_FOLLOWED, MetricScore, Thresholds, build_metric, gate, ragas_metric, rule_metric
-from yachat.evals.replay import ReplayResult, load_set, run_set
+from yachat.evals.metrics import CATALOGUE, RAGAS, RULE_FOLLOWED, MetricScore, Thresholds, build_metric, earlier, gate, ragas_metric, rule_metric
+from yachat.evals.replay import ReplayResult, load_agent_set, run_set
 from yachat.policy.compiler import CompiledPolicy, build
-from yachat.policy.models import Rule
 from yachat.sim.harness import TurnLog
 
 #: inputs a turn gives a Ragas metric
@@ -30,6 +30,8 @@ class EvalReport:
     agent: str
     cases: int
     expectation_failures: dict[str, list[str]] = dc_field(default_factory=dict)
+    #: case → checks every conversation must pass (yachat.evals.checks)
+    check_failures: dict[str, list[str]] = dc_field(default_factory=dict)
     metric_scores: list[MetricScore] = dc_field(default_factory=list)
     gate_failures: list[str] = dc_field(default_factory=list)
     judged: bool = False
@@ -38,7 +40,7 @@ class EvalReport:
 
     @property
     def ok(self) -> bool:
-        return not self.expectation_failures and not self.gate_failures
+        return not self.expectation_failures and not self.check_failures and not self.gate_failures
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -47,6 +49,7 @@ class EvalReport:
             "ok": self.ok,
             "judged": self.judged,
             "expectation_failures": self.expectation_failures,
+            "check_failures": self.check_failures,
             "metric_scores": [asdict(s) for s in self.metric_scores],
             "gate_failures": self.gate_failures,
             "uncalibrated": self.uncalibrated,
@@ -92,10 +95,6 @@ def _context(t: TurnLog, tools: list[str] | None) -> list[str]:
     return [o for n, o in zip(t.tools, t.tool_outputs, strict=True) if tools is None or n in tools]
 
 
-def _rules(policy: CompiledPolicy) -> dict[str, Rule]:
-    return {r.name: r for r in [*policy.rules, *(r for s in policy.steps for r in s.rules)]}
-
-
 async def score(results: list[ReplayResult], thresholds: Thresholds, policy: CompiledPolicy, model: str) -> list[MetricScore]:
     """Each metric averaged over what it measures: conversations, turns, rule turns or turns with tool output."""
     deepeval_llm = ragas_llm = None
@@ -124,11 +123,12 @@ async def score(results: list[ReplayResult], thresholds: Thresholds, policy: Com
             from deepeval.test_case import LLMTestCase
 
             deepeval_llm = deepeval_llm or deepeval_judge(model)
-            rules = _rules(policy)
+            rules = rules_by_name(policy)
             for r in results:
-                for t in r.turns:
+                for i, t in enumerate(r.turns):
+                    case = LLMTestCase(input=t.user, actual_output=t.agent, context=earlier(r.turns, i))
                     for rule in (rules[n] for n in t.rules if n in rules):
-                        await avg.add(_deepeval(rule_metric(rule.then, minimum, deepeval_llm), LLMTestCase(input=t.user, actual_output=t.agent)))
+                        await avg.add(_deepeval(rule_metric(rule.then, minimum, deepeval_llm), case))
         else:
             deepeval_llm = deepeval_llm or deepeval_judge(model)
             try:
@@ -148,26 +148,30 @@ async def score(results: list[ReplayResult], thresholds: Thresholds, policy: Com
 FROM_ENV = "env"
 
 
-async def evaluate(agent_dir: str | Path, judge: str | None = FROM_ENV) -> EvalReport:
-    """`judge` is the judge model id; None checks expectations only; the default reads EVALS_JUDGE_MODEL."""
+async def evaluate(agent_dir: str | Path, judge: str | None = FROM_ENV, scores: bool = True) -> EvalReport:
+    """`judge` is the judge model id; None checks in code only; the default reads EVALS_JUDGE_MODEL. With `scores`, the
+    judge scores the thresholds' metrics; without, it runs the judged checks on every turn instead (`yachat evals check`)."""
     agent_dir = Path(agent_dir)
     thresholds = Thresholds.load(agent_dir / "thresholds.yaml")
     policy = build((agent_dir / thresholds.policy).read_text())
-    results = await run_set(policy, load_set(agent_dir / "replay.yaml"))
+    results = await run_set(policy, load_agent_set(agent_dir))
     report = EvalReport(agent=policy.agent, cases=len(results))
+    model = judge_model_from_env() if judge == FROM_ENV else judge
     for r in results:
         if r.expectation_failures:
             report.expectation_failures[r.case.name] = r.expectation_failures
-    model = judge_model_from_env() if judge == FROM_ENV else judge
-    if model:
-        report.judged = True
+        found = code_checks(policy, r) if scores or not model else [v for v in await check(policy, r, model) if v.check != "expect"]
+        if found:
+            report.check_failures[r.case.name] = [str(v) for v in found]
+    report.judged = bool(model)
+    if model and scores:
         report.metric_scores = await score(results, thresholds, policy, model)
         report.gate_failures = gate(report.metric_scores, thresholds)
         report.uncalibrated = [m for m in thresholds.minimums if m not in thresholds.calibration]
     return report
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str], scores: bool = True) -> int:
     """Each argument is an eval set folder; none: every folder under ./evals with a thresholds.yaml."""
     agent_dirs = [Path(a) for a in argv] or sorted(p.parent for p in Path("evals").glob("*/thresholds.yaml"))
     if not agent_dirs:
@@ -175,7 +179,7 @@ def main(argv: list[str]) -> int:
         return 2
     ok = True
     for d in agent_dirs:
-        report = asyncio.run(evaluate(d))
+        report = asyncio.run(evaluate(d, scores=scores))
         print(json.dumps(report.to_dict(), indent=2))
         ok = ok and report.ok
     return 0 if ok else 1
