@@ -196,6 +196,42 @@ flow:
   checks it before it is sent.
 - A tenant whose plan allows only small models stays on small models.
 
+### Thinking before it replies, and asking when an answer is thin
+
+Two settings make a step more careful. Both are off by default because each adds a model call.
+
+```yaml
+flow:
+  - form_fill:
+      think: true      # plan each reply before writing it
+      curious: true    # one follow-up when an answer is too thin to act on
+      fields: [...]
+```
+
+- `think: true` (any step; always on for `high_stakes` turns) plans the reply first: what the user needs, what is
+  not known (never assumed), which matched rules apply, and the reply's steps. Code adds any matched rule the plan
+  left out, so a rule's `then` is never forgotten. The plan shows in the console's **Trace** tab, and replies that
+  had one are marked *planned* in the chat.
+- `curious: true` (form steps) checks each valid answer for the detail a person handling it would need. When one is
+  missing ("it's broken": broken how?), the answer is kept and one short follow-up asks for it; what they add is
+  appended. Code allows one follow-up per field and never asks about ids, numbers, names, dates or yes/no answers.
+  Drafted tests (`yachat evals generate`, the console's Test tab) cover each such field.
+
+### Small talk
+
+```yaml
+small_talk: brief    # off (default) | brief | warm
+```
+
+A message that is only friendly chit-chat ("how's your day going?", "lovely weather!") is answered in kind and the
+conversation goes back to the open question. `brief` replies in one short sentence; `warm` in one or two, picking up
+what they mentioned. It is not counted as wandering off, and is never taken as an answer to the open question. Code
+allows two such turns in a row; the third counts like any other detour (`limits.digressions`). With `off`, small talk
+counts as wandering off, as before. Tone still comes from the charter. Drafted tests cover it when it is on.
+
+Answers from documents are also held to the question: when the documents found do not answer it, the agent says it
+does not know, instead of describing what they contain.
+
 ## 6. Languages
 
 List the languages you can support end to end (prompts, tool output, human handoff). The runtime detects the

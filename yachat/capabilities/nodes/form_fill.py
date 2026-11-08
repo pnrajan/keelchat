@@ -16,8 +16,24 @@ EXPECT_SCHEMA: dict[str, Any] = {
     "required": ["valid", "normalized", "reason"],
     "additionalProperties": False,
 }
+#: with `curious`: also what a valid answer leaves out, and one question for it
+CURIOUS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {**EXPECT_SCHEMA["properties"], "missing": {"type": "string"}, "follow_up": {"type": "string"}},
+    "required": ["valid", "normalized", "reason", "missing", "follow_up"],
+    "additionalProperties": False,
+}
+CURIOUS = (
+    " If valid, also judge whether a person handling it could act on it without asking. Only when the answer names a "
+    'problem without saying what it is ("it\'s broken", "something\'s wrong", "doesn\'t work"): missing = what is '
+    "unclear, in a few words, and follow_up = one short, friendly question asking for it. An answer that says what "
+    'happened ("it never arrived", "wrong size sent", "the screen is cracked") is enough: leave both empty. Always '
+    "leave them empty for ids, numbers, codes, names, dates, contact details and yes/no answers."
+)
 PII_HINTS = {"address": ("address", "dirección"), "email": ("email", "e-mail"), "phone": ("phone", "mobile", "telephone"), "ssn": ("ssn", "social security")}
 CONFIRM = "__confirm"
+#: the follow-up on a thin answer (`curious`); one per field, counted in code
+MORE = "__more"
 REVIEW_FIELD = "final_review"
 #: the candidate's explicit instruction to send: a submit verb with at most a yes/please around it and "it" after it.
 #: Questions ("how do I apply?") and anything else ("send me a copy") are not an instruction to submit.
@@ -45,6 +61,8 @@ class FormFillConfig(CapabilityConfig):
     fields: list[FieldSpec] = Field(default_factory=list)
     #: show a final review and let the candidate submit (candidate-only action `submit_application`)
     review: bool = True
+    #: after a valid but thin answer, ask one follow-up for the detail that matters (at most once per field)
+    curious: bool = False
 
 
 def pii_categories(f: FieldSpec) -> set[str]:
@@ -63,11 +81,13 @@ class FormFill(Node[FormFillConfig]):
 
     config_model = FormFillConfig
 
-    async def _check(self, ctx: TurnContext, f: FieldSpec, value: str) -> tuple[bool, str, str]:
+    async def _check(self, ctx: TurnContext, f: FieldSpec, value: str, curious: bool = False) -> tuple[bool, str, str, str]:
+        """valid, normalized, reason, and (when `curious` and the field has not been followed up) a follow-up question."""
+        curious = curious and f.name not in ctx.state.data.get("probes", {})
         system = (
             f"Decide whether the value satisfies the expectation for field '{f.name}'. Expectation: {f.expect}. "
             "Return valid=true with normalized = the value as the user wrote it, trimmed, with only obvious typo or casing fixes; "
-            "otherwise valid=false and a short reason."
+            "otherwise valid=false and a short reason." + (CURIOUS if curious else "")
         )
         req = LLMRequest(
             "expect",
@@ -78,9 +98,10 @@ class FormFill(Node[FormFillConfig]):
             effort=ctx.services.models.effort_classify,
             metadata={"field": f.name, "value": value},
         )
-        out = await ctx.services.llm.structured(req, EXPECT_SCHEMA)
+        out = await ctx.services.llm.structured(req, CURIOUS_SCHEMA if curious else EXPECT_SCHEMA)
         ctx.llm_calls += 1
-        return bool(out.get("valid")), str(out.get("normalized") or value), str(out.get("reason", ""))
+        follow = str(out.get("follow_up") or "").strip() if curious and str(out.get("missing") or "").strip() else ""
+        return bool(out.get("valid")), str(out.get("normalized") or value), str(out.get("reason", "")), follow
 
     def _remembered(self, ctx: TurnContext, f: FieldSpec) -> tuple[Any, bool] | None:
         """(value, needs_confirmation) from memory, or None when absent/stale."""
@@ -196,6 +217,18 @@ class FormFill(Node[FormFillConfig]):
             ask = "Tell me what to change, or reply 'submit' to send it."
             return NodeResult(ask, goal="Ask what to change, or to reply 'submit' to send it.", ask=(REVIEW_FIELD, ask, "'submit', or a correction"))
 
+        if answers and q and q.field.endswith(MORE):  # the reply to a follow-up
+            fname = q.field[: -len(MORE)]
+            st.open_question = None
+            if set(answers) <= {q.field, fname}:  # more about the same thing: added to the field's answer
+                more = next(iter(answers.values())).strip()
+                if more and await affirm(ctx, more, q.ask) != "no":
+                    st.fields[fname] = f"{st.fields.get(fname) or ''}. {more}".strip(". ")
+                    ctx.validated_answers[fname] = st.fields[fname]
+                ctx.decide("answer", "followed_up", ref=fname)
+                return self._next(ctx, "Thanks.\n", allowed, "Thank them for the detail in a few words, without repeating it back.")
+            # they answered something else instead: the follow-up is dropped and the answer handled as usual
+
         if answers and q and q.field.endswith(CONFIRM):
             fname = q.field[: -len(CONFIRM)]
             value = next(iter(answers.values()))
@@ -225,13 +258,21 @@ class FormFill(Node[FormFillConfig]):
                 spec = by_name.get(fname)
                 if spec is None or fname in st.fields:
                     continue
-                valid, normalized, reason = await self._check(ctx, spec, value)
+                # curious only about the question just asked: an answer given ahead of its question is never followed up
+                asked = q is not None and q.field == fname and len(answers) == 1
+                valid, normalized, reason, follow = await self._check(ctx, spec, value, config.curious and asked)
                 if valid:
                     st.fields[fname] = normalized
                     ctx.validated_answers[fname] = normalized
                     st.reasks.pop(fname, None)
                     allowed |= pii_categories(spec)
                     got.append(f"{_label(fname)}: {normalized}")
+                    if follow:  # thin but valid: kept, and one question for what it leaves out (never asked twice)
+                        st.data.setdefault("probes", {})[fname] = 1
+                        ctx.decide("answer", "probed", reason="thin answer", ref=fname)
+                        goal = f"Acknowledge their {_label(fname)} in a few words, then ask this follow-up in your own words: {follow}"
+                        more_q = (fname + MORE, follow, "more detail, or that there is nothing to add")
+                        return NodeResult(follow, goal=goal, ask=more_q, free_text=True, allowed_pii=allowed)
                 else:
                     r = await self._fail(ctx, spec, reason)
                     if r is not None:

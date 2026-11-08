@@ -47,6 +47,8 @@ class FlowStep(PolicyModel):
     model: Tier | None = None
     #: every reply of this step is written with the large model and checked before it is sent
     high_stakes: bool = False
+    #: the reply is planned before it is written (what the user needs, what is unknown, the rules it must follow)
+    think: bool = False
     settings: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
@@ -67,6 +69,7 @@ class FlowStep(PolicyModel):
                 rules=body.pop("rules", None) or [],
                 model=body.pop("model", None),
                 high_stakes=body.pop("high_stakes", False),
+                think=body.pop("think", False),
                 settings=body,
             )
         raise ValueError("a flow step is a name or a single-key mapping {name: settings}")
@@ -135,6 +138,9 @@ class Limits(PolicyModel):
 
 #: when a conversation is passed to a person: the user asks for one, or the flow reaches one of these dead ends
 HandoffTrigger = Literal["user_request", "max_reasks", "disengaged", "tool_unavailable"]
+#: friendly small talk ("how's your day?"): off (counted as wandering off), brief (one friendly line, then back to the
+#: task), warm (also picks up what they mentioned)
+SmallTalk = Literal["off", "brief", "warm"]
 #: the arguments every handoff notify tool takes (a follow-up message on an open ticket carries `ticket_id`)
 HANDOFF_ARGS = ("reason", "session_id", "agent", "fields", "transcript", "ticket_id")
 
@@ -164,6 +170,7 @@ class AgentPolicy(PolicyModel):
     handoff: HandoffSpec | None = None
     #: rules that apply on every turn
     rules: list[Rule] = Field(default_factory=list)
+    small_talk: SmallTalk = "off"
 
     @field_validator("flow", mode="before")
     @classmethod

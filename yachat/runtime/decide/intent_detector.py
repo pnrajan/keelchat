@@ -32,6 +32,15 @@ ROUTE_PLANNER = "__planner__"
 ROUTE_NUDGE = "__nudge__"
 DETECTOR_ERROR = "detector error"
 GREETING_ONLY = "greeting"
+SMALL_TALK = "small talk"
+#: small-talk turns in a row answered in kind; more count as wandering off (decided in code)
+SMALL_TALK_TURNS = 2
+#: asked only of agents with `small_talk` on, so other agents' prompts and schema stay as they are
+SMALL_TALK_FLAG = {
+    "type": "boolean",
+    "description": "the latest message is only friendly chit-chat, not about the task and giving no answer: pleasantries, thanks, "
+    "how are you, a joke, a remark about the weather, their day or their mood",
+}
 #: a message that is only a greeting: never off-topic and never counted as wandering off (decided in code)
 GREETING = re.compile(
     r"\s*(?:hi|hello|hey|hiya|howdy|yo|good (?:morning|afternoon|evening)|hola|buenos d[ií]as|buenas(?: tardes| noches)?|bonjour|salut|hallo|ol[aá])"
@@ -39,6 +48,8 @@ GREETING = re.compile(
     re.I,
 )
 ROUTE_REASK = "__reask__"
+#: small-talk turns in a row (session data)
+SMALL_TALK_KEY = "small_talk"
 INTENTS = ("new_answer", "edit", "enquiry", "off_topic")
 ORDER = {"edit": 0, "new_answer": 1, "enquiry": 2, "off_topic": 3}
 
@@ -87,6 +98,8 @@ def asks_wants_human(ctx: TurnContext) -> bool:
 
 def schema_for(ctx: TurnContext) -> dict[str, Any]:
     extra: dict[str, Any] = {"wants_to_stop": WANTS_TO_STOP, **({"wants_human": WANTS_HUMAN} if asks_wants_human(ctx) else {})}
+    if ctx.policy.small_talk != "off":
+        extra["small_talk"] = SMALL_TALK_FLAG
     if active := rules.active_rules(ctx):  # only agents with rules: other prompts and schemas stay as they are
         extra["rules"] = {
             "type": "array",
@@ -184,6 +197,12 @@ class IntentDetector:
     def _system(self, ctx: TurnContext) -> str:
         human = "\nSet wants_human only when the user asks to talk to a person rather than this assistant." if asks_wants_human(ctx) else ""
         stop = "\nSet wants_to_stop only when the user wants to end this conversation or stop all messages, not when they decline one question."
+        if ctx.policy.small_talk != "off":
+            stop += (
+                "\nSet small_talk when the message is only friendly chit-chat (how are you, a joke, the weather, their day); such a "
+                'message is never new_answer, even while a question is open. Example: asked "What is your order number?", user '
+                '"haha how\'s your day going?" -> small_talk=true, intents [off_topic] with no fields.'
+            )
         active = rules.active_rules(ctx)
         return self._task(ctx) + human + stop + (rules.prompt_section(active) if active else "")
 
@@ -266,6 +285,7 @@ class IntentDetector:
         v.reason = str(out.get("reason", ""))
         v.wants_human = bool(out.get("wants_human"))
         v.wants_to_stop = bool(out.get("wants_to_stop"))
+        v.small_talk = ctx.policy.small_talk != "off" and out.get("small_talk") is True
         reported = [m for m in out.get("rules") or [] if isinstance(m, dict)]
         ctx.rules = rules.resolve(rules.grounded(reported, ctx.text), rules.active_rules(ctx))
         for r in ctx.rules:
@@ -285,6 +305,8 @@ class IntentDetector:
                 ctx.errors.append(f"intent_detector: {e.__class__.__name__}")
                 ctx.verdict = AnswerVerdict("digressed", intent="enquiry", reason="detector error", items=[IntentItem("enquiry", text=ctx.text)], in_scope=True)
             if self._wants_human(ctx) or self._wants_to_stop(ctx):  # a quiet "please stop" is confirmed for every agent
+                return ctx
+            if self._small_talk(ctx):
                 return ctx
             if not ctx.verdict.in_scope or ctx.verdict.intent == "off_topic":
                 ctx.verdict.in_scope = False
@@ -351,6 +373,11 @@ class IntentDetector:
         for f, val in v.fields.items():  # answers given before they were asked are kept for the step that will ask them
             if f in known_fields(ctx) and f not in st.fields and f != (q.field if q else None) and f not in open_fields(ctx) and str(val or "").strip():
                 st.prefilled[f] = val
+        if self._small_talk(ctx):  # before answers: chit-chat read as a guess at the open field is not an answer
+            ctx.reask = True
+            ctx.route = ROUTE_REASK
+            return ctx
+        v = ctx.verdict
         if v.verdict == "answered":
             st.digressions = 0
             return ctx
@@ -395,6 +422,25 @@ class IntentDetector:
         ctx.reask = True
         self._answer_route(ctx, v, detour, f"{v.intent}; digressions={st.digressions}")
         return ctx
+
+    @staticmethod
+    def _small_talk(ctx: TurnContext) -> bool:
+        """Small talk the policy answers in kind: not counted as wandering off, up to SMALL_TALK_TURNS in a row."""
+        v, st = ctx.verdict, ctx.state
+        if v is None or not v.small_talk or v.edited_field:  # the flag decides ("how are you?" may read as a question or an answer)
+            st.data.pop(SMALL_TALK_KEY, None)  # in a row only
+            return False
+        n = int(st.data.get(SMALL_TALK_KEY, 0)) + 1
+        st.data[SMALL_TALK_KEY] = n
+        if n > SMALL_TALK_TURNS:  # enough chat: from here on it counts like any other detour (never as an answer)
+            ctx.verdict = replace(v, verdict="digressed", intent="off_topic", fields={})
+            log.info("small talk", turns=n, decision="counted", reason=f"more than {SMALL_TALK_TURNS} in a row")
+            return False
+        ctx.verdict = replace(v, verdict="digressed", fields={}, reason=SMALL_TALK, in_scope=True)
+        st.digressions = 0
+        ctx.decide("count", "small_talk", reason=f"{n} in a row; not counted as wandering off")
+        log.info("small talk", turns=n, decision="answered in kind")
+        return True
 
     @staticmethod
     def _wants_to_stop(ctx: TurnContext) -> bool:

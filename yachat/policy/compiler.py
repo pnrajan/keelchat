@@ -15,7 +15,7 @@ from yachat.policy.defaults import DEFAULTS, Defaults
 from yachat.policy.errors import PolicyValidationError
 from yachat.policy.loader import load_policy
 from yachat.policy.memory_types import type_to_schema
-from yachat.policy.models import AgentPolicy, HandoffSpec, Mode, Rule, Tier
+from yachat.policy.models import AgentPolicy, HandoffSpec, Mode, Rule, SmallTalk, Tier
 from yachat.policy.validator import resolve_repairs, resolved_requires, validate_policy
 from yachat.registry.core import REGISTRY
 
@@ -38,6 +38,7 @@ class CompiledStep(BaseModel):
     #: the model tier this step's work runs on; None: each job keeps its usual tier
     model: Tier | None = None
     high_stakes: bool = False
+    think: bool = False
 
 
 class CompiledMemoryItem(BaseModel):
@@ -77,6 +78,7 @@ class CompiledPolicy(BaseModel):
     handoff: HandoffSpec | None = None
     #: rules that apply on every turn
     rules: list[Rule] = Field(default_factory=list)
+    small_talk: SmallTalk = "off"
     compiled_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @property
@@ -168,6 +170,7 @@ def compile_policy(
                 rules=s.rules,
                 model=s.model,
                 high_stakes=s.high_stakes,
+                think=s.think,
             )
         )
         for t in spec.tools:
@@ -228,6 +231,7 @@ def compile_policy(
         "manifest": used,
         **({"handoff": _handoff_payload(policy.handoff)} if policy.handoff else {}),  # absent when unused: hashes stay stable
         **({"rules": [r.model_dump(mode="json") for r in policy.rules]} if policy.rules else {}),
+        **({"small_talk": policy.small_talk} if policy.small_talk != "off" else {}),  # absent when off: hashes stay stable
     }
     return CompiledPolicy(
         agent=policy.agent,
@@ -245,11 +249,12 @@ def compile_policy(
         hash=content_hash(payload),
         handoff=policy.handoff,
         rules=policy.rules,
+        small_talk=policy.small_talk,
     )
 
 
 #: step fields added after policies were first pinned: in the hash only when set, so existing hashes stay stable
-_LATER_STEP_FIELDS: dict[str, Any] = {"rules": [], "model": None, "high_stakes": False}
+_LATER_STEP_FIELDS: dict[str, Any] = {"rules": [], "model": None, "high_stakes": False, "think": False}
 
 
 def _handoff_payload(h: HandoffSpec) -> dict[str, Any]:

@@ -49,6 +49,7 @@ def _step_schema(name: str, defs: dict[str, Any]) -> dict[str, Any]:
         "rules": {**_rules(defs), "description": "rules that apply only while this step is asking"},
         "model": {"enum": ["small", "large"], "description": "run this step on the small (cheaper) or large (stronger) model"},
         "high_stakes": {"type": "boolean", "description": "write this step's replies with the large model and always check them"},
+        "think": {"type": "boolean", "description": "plan each reply before it is written: what the user needs, what is unknown, the rules it must follow"},
     }
     return {
         "type": "object",
@@ -102,6 +103,12 @@ def policy_json_schema() -> dict[str, Any]:
             "mode": _MODES,
             "handoff": handoff,
             "rules": {**_rules(defs), "description": "plain-language rules, used on any turn where their condition holds"},
+            "small_talk": {
+                "enum": ["off", "brief", "warm"],
+                "default": "off",
+                "description": "friendly small talk: off (counted as wandering off), brief (one friendly line, then back to the task), "
+                "warm (also picks up what they mentioned)",
+            },
         },
         "x-registry": REGISTRY.manifest().model_dump(mode="json"),
         "x-defaults": DEFAULTS.model_dump(mode="json"),

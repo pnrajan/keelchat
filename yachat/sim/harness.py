@@ -41,6 +41,8 @@ class TurnLog:
     errors: list[str] = dc_field(default_factory=list)
     #: form fields re-asked on this turn (their count went up; the session clears it once the field is answered)
     reasked: list[str] = dc_field(default_factory=list)
+    #: form fields followed up on this turn (a thin answer with `curious` on)
+    probed: list[str] = dc_field(default_factory=list)
 
 
 @dataclass
@@ -150,7 +152,8 @@ async def _drive(
     digressions_seen, llm, tools, i = 0, 0, 0, 0
     while (msg := await next_message(i, transcript)) is not None:
         calls: list[tuple[str, str]] = []
-        before = dict((await rt.session_state(s.id)).reasks)
+        prev = await rt.session_state(s.id)
+        before, probes_before = dict(prev.reasks), set(prev.data.get("probes", {}))
         token = _TOOL_LOG.set(calls)
         try:
             last = await rt.turn(s.id, InboundMessage(text=msg, channel=channel, user_id=user, channel_message_id=f"{name}-{i}"))
@@ -159,7 +162,8 @@ async def _drive(
         transcript.append({"user": msg, "agent": last.outbound.text})
         names, outputs = [n for n, _ in calls], [o for _, o in calls]
         reasked = [f for f, n in last.state.reasks.items() if n > before.get(f, 0)]
-        turn_log.append(TurnLog(msg, last.outbound.text, names, outputs, list(last.rules), last.route, last.llm_calls, list(last.errors), reasked))
+        probed = [f for f in last.state.data.get("probes", {}) if f not in probes_before]
+        turn_log.append(TurnLog(msg, last.outbound.text, names, outputs, list(last.rules), last.route, last.llm_calls, list(last.errors), reasked, probed))
         digressions_seen = max(digressions_seen, last.state.digressions)
         llm += last.llm_calls
         tools += last.tool_calls
