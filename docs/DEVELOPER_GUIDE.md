@@ -48,7 +48,7 @@ There is no fake model. Tests, simulations and evals call the provider in `.env`
 |---|---|---|
 | `./run.sh` | console (Vite, hot reload), API, Knowledge (indexes `examples/knowledge`), Analytics (registers `examples/data` as `sales`) | everyday development |
 | `./run.sh --sandbox` | the same, plus statistics code in a local Docker sandbox (builds `yachat-sandbox:latest` on first use) | analytics questions that need Python |
-| `./run.sh --build` | console built into `frontend/dist` and served by the API on :8000 | checking the production bundle |
+| `./run.sh --build` | the same services, with the console built into `frontend/dist` and served by the API at `http://127.0.0.1:8000/console/` (no Vite) | checking the production bundle |
 | `./run.sh --fake-tools` | API and console only; every tool uses its in-memory fake | runtime work that does not touch the services |
 | `scripts/try.sh` | built console and API, all in memory (ignores `DATABASE_URL` and `REDIS_URL`), with `support-assistant` saved and three tests; the next free port from 8000; `--judge` adds the judged checks | trying the Tests, Rate and Judge tabs |
 | `scripts/local.sh up` | the API with the built console, Redis and Postgres, all in Docker (`docker compose --profile app`); data kept in volumes; the next free ports from 8000, 6379 and 5432; `logs`, `down`, `reset` | trying it the way it deploys, with saved data |
