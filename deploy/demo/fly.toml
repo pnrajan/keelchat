@@ -1,9 +1,9 @@
 # The public demo on Fly.io: the support assistant as a chat page, on the smallest machine, stopped when idle.
 # Everything is in memory and set up again at each start (examples/demo/app.py). From the repo root:
 #
-#   fly apps create yachat-demo
-#   fly secrets set -c deploy/demo/fly.toml YACHAT_LLM=... <PROVIDER>_API_KEY=... YACHAT_API_KEY=$(openssl rand -hex 24)
-#   fly deploy -c deploy/demo/fly.toml .
+#   fly apps create yachat-demo         # once
+#   scripts/demo.sh --secrets           # once, or when the model or key changes: copies them from .env
+#   scripts/demo.sh                     # deploy the current checkout and check the live site
 #
 # YACHAT_API_KEY locks the console and API; visitors only reach the chat page, which limits conversations per
 # network, per conversation and per day (YACHAT_DEMO_DAILY). Set a spending cap with your model provider too.
