@@ -327,3 +327,28 @@ async def test_postgres_agent_test_store() -> None:
     assert (await store.get("pg-t", t.id)).agent == "pg-a" and await store.list("pg-t", "pg-b") == []
     assert await store.delete("pg-t", t.id) and not await store.delete("pg-t", t.id) and await store.list("pg-t", "pg-a") == []
     await pool.close()
+
+
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
+async def test_postgres_fix_task_store() -> None:
+    import asyncpg
+
+    from yachat.state.models import FixTask, ReviewTurn
+    from yachat.state.postgres_store import PostgresFixTaskStore, ensure_schema
+
+    try:
+        pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
+    except Exception as e:  # database down or missing: environment, not code
+        pytest.skip(f"postgres unreachable: {e.__class__.__name__}")
+    await ensure_schema(pool)
+    store = PostgresFixTaskStore(pool)
+    f = FixTask(tenant="pg-fx", agent="pg-a", title="t", problem="p", change="c", turns=[ReviewTurn(user="u", agent="a")])
+    await store.save(f)
+    await store.save(f.model_copy(update={"status": "done"}))
+    assert await store.list("pg-fx", status="open") == [] and [x.id for x in await store.list("pg-fx", "pg-a", "done")] == [f.id]
+    await store.save(f.model_copy(update={"agent": "pg-b", "status": "open"}))  # an id of another agent's task changes nothing
+    got = await store.get("pg-fx", f.id)
+    assert got is not None and got.agent == "pg-a" and got.status == "done" and await store.list("pg-fx", "pg-b") == []
+    async with pool.acquire() as con:
+        await con.execute("DELETE FROM fix_tasks WHERE tenant='pg-fx'")
+    await pool.close()

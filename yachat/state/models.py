@@ -365,3 +365,32 @@ class AgentTest(BaseModel):
     source: Literal["chat", "simulate", "review", "draft", "manual"] = "manual"
     case: ReplayCase
     created_at: datetime = Field(default_factory=now)
+
+
+class FixTask(BaseModel):
+    """A change only code can make, found when a stronger model judged a trial conversation: kept until a developer,
+    or Claude Code over MCP, makes it (and may file it as a GitHub issue)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=lambda: new_id("fix"))
+    tenant: str
+    agent: str
+    title: str = Field(min_length=1, max_length=200)
+    #: what went wrong in the conversation
+    problem: str = Field(min_length=1, max_length=4000)
+    #: what to change in the code
+    change: str = Field(min_length=1, max_length=4000)
+    #: the behaviour a test should pin (it fails before the fix)
+    test: str = Field(default="", max_length=2000)
+    #: where the change likely goes (a hint, not a promise)
+    files: list[str] = Field(default_factory=list, max_length=10)
+    #: the conversation that showed it
+    turns: list[ReviewTurn] = Field(min_length=1, max_length=50)
+    policy_hash: str = ""
+    status: Literal["open", "done", "dismissed"] = "open"
+    #: what was done, or why not
+    note: str = Field(default="", max_length=2000)
+    #: the GitHub issue it was filed as
+    issue: str = Field(default="", max_length=500)
+    created_at: datetime = Field(default_factory=now)

@@ -10,6 +10,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
 - Console **Test** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
 - [The policy language](docs/POLICY_LANGUAGE.md): every key, value and default in one page; a test keeps it in step with the build. Linked from Compose's Show YAML.
+- Console **Judge** tab: a stronger model (`YACHAT_MODEL_CRITIC`) judges a trial conversation; policy fixes applied
+  in the editor, code fixes kept as fix tasks (`/v1/tenants/{t}/fixes`). MCP tools `list_fix_tasks`, `get_fix_task`,
+  `update_fix_task`, and the plugin's **fix-findings** skill: GitHub issues, then one subagent per fix with a failing
+  test first.
+- Console Setup shows only what needs work; passed checks, step details and rarely used settings are folded.
 - Console Inspector in four groups (Setup, This reply, Test, More); stage timings folded.
 - Console **Compose** view: say what the bot should do, read what it will do in plain words (`/v1/agents/validate` now returns this summary), change it in plain words (`POST /v1/agents/edit`, checked by the build, listed before applying), then **Try it**. Fine-tune cards and the YAML are folded below.
 - The drafter writes `rules`, `handoff`, `small_talk`, `think` and `curious` when a description asks for them.

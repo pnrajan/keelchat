@@ -8,6 +8,7 @@ import Dashboard from "./Dashboard";
 import Usage from "./Usage";
 import Handoffs from "./Handoffs";
 import Setup from "./Setup";
+import Critic from "./Critic";
 import Simulate from "./Simulate";
 import Review, { Conversation } from "./Review";
 import Compose from "./Compose";
@@ -22,16 +23,16 @@ const PolicyEditor = lazy(() => import("./PolicyEditor"));  // CodeMirror is mos
 /** a reply's plan (`think: true` steps and high-stakes turns) */
 type Thought = { need: string; unknown: string; plan: string[]; rules: string[]; added_rules: string[] };
 type Msg = { role: "user" | "agent"; text: string; meta?: string[]; analysis?: AnalysisResult | null; error?: boolean; handoff?: string; rules?: string[] };
-type Tab = "setup" | "analysis" | "trace" | "state" | "rendered" | "metrics" | "versions" | "simulate" | "test" | "review" | "handoffs" | "audit";
+type Tab = "setup" | "analysis" | "trace" | "state" | "rendered" | "metrics" | "versions" | "simulate" | "test" | "review" | "critic" | "handoffs" | "audit";
 // the Inspector's tabs, in four groups: the group row on top, the group's own tabs under it
 const GROUPS: { label: string; tabs: Tab[] }[] = [
   { label: "Setup", tabs: ["setup"] },
   { label: "This reply", tabs: ["trace", "analysis", "state", "rendered"] },
-  { label: "Test", tabs: ["test", "simulate", "review"] },
+  { label: "Test", tabs: ["test", "simulate", "review", "critic"] },
   { label: "More", tabs: ["versions", "handoffs", "audit", "metrics"] },
 ];
 const TAB_LABEL: Record<Tab, string> = {
-  setup: "Setup", trace: "Why", analysis: "Analysis", state: "State", rendered: "Raw", test: "Tests", simulate: "Simulate", review: "Rate",
+  setup: "Setup", trace: "Why", analysis: "Analysis", state: "State", rendered: "Raw", test: "Tests", simulate: "Simulate", review: "Rate", critic: "Judge",
   versions: "Versions", handoffs: "Handoffs", audit: "Audit", metrics: "Metrics",
 };
 
@@ -527,6 +528,7 @@ export default function App() {
             {tab === "test" && <Panel><Tests agent={built?.agent ?? null} conversations={reviewable} /></Panel>}
             {tab === "review" && <Panel><Review agent={built?.agent ?? null} conversations={reviewable} policy={policy}
               onRevised={(yaml) => { load(yaml); setNotice({ kind: "ok", text: "The suggested revision is in the editor. Build & try, run the tests, then save." }); }} /></Panel>}
+            {tab === "critic" && <Panel><Critic agent={built?.agent ?? null} conversations={reviewable} policy={policy} onRevised={load} /></Panel>}
             {tab === "handoffs" && <Panel><Handoffs focus={focusHandoff} onChange={countHandoffs} /></Panel>}
             {tab === "audit" && <Panel><Audit key={session?.id ?? "none"} agent={built?.agent ?? live.agent} session={session?.id ?? null} /></Panel>}
             {tab === "versions" && (

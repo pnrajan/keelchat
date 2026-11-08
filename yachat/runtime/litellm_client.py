@@ -44,7 +44,7 @@ class LiteLLMClient(LLMClient):
             "model": model,
             "messages": [{"role": "system", "content": req.system}, *req.messages],
             "max_tokens": req.max_tokens,
-            "timeout": self.timeout_s,
+            "timeout": req.timeout_s or self.timeout_s,
             "num_retries": 4,  # litellm backs off on 429/5xx; provider TPM limits are hit by parallel tests and bursts
             **({"stop": req.stop} if req.stop else {}),
             **self.defaults,
@@ -71,12 +71,14 @@ class LiteLLMClient(LLMClient):
 
     async def structured(self, req: LLMRequest, schema: dict[str, Any]) -> dict[str, Any]:
         name = f"emit_{req.purpose}"
+        # newer Claude models refuse a forced tool choice (as the Anthropic client does, they are left to pick it)
+        choice: Any = "auto" if "claude" in req.model else {"type": "function", "function": {"name": name}}
         last: LLMError | None = None
         for attempt in range(2):  # open-weight models occasionally emit a truncated/malformed tool call; one retry
             resp = await self._call(
                 req,
                 tools=[{"type": "function", "function": {"name": name, "parameters": schema}}],
-                tool_choice={"type": "function", "function": {"name": name}},
+                tool_choice=choice,
             )
             calls = resp.choices[0].message.tool_calls or []
             if not calls:

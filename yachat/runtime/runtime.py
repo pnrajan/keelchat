@@ -36,11 +36,13 @@ from yachat.state.store import (
     AgentVersionStore,
     AuditStore,
     BudgetStore,
+    FixTaskStore,
     HandoffStore,
     InMemoryAgentTestStore,
     InMemoryAgentVersionStore,
     InMemoryAuditStore,
     InMemoryBudgetStore,
+    InMemoryFixTaskStore,
     InMemoryHandoffStore,
     InMemoryMemoryStore,
     InMemoryPolicyStore,
@@ -126,6 +128,7 @@ class Runtime:
         handoffs: HandoffStore | None = None,
         reviews: ReviewStore | None = None,
         tests: AgentTestStore | None = None,
+        fixes: FixTaskStore | None = None,
         responses: ResponseStore | None = None,
         budgets: BudgetStore | None = None,
         limits: RateLimiter | None = None,
@@ -147,6 +150,7 @@ class Runtime:
         self.handoffs = handoffs or InMemoryHandoffStore()
         self.reviews = reviews or InMemoryReviewStore()
         self.tests = tests or InMemoryAgentTestStore()
+        self.fixes = fixes or InMemoryFixTaskStore()
         self.responses = responses or InMemoryResponseStore()
         self.budgets = budgets or InMemoryBudgetStore()
         self.limits = limits or InMemoryRateLimiter()  # public-traffic rate limits, shared by servers on Postgres

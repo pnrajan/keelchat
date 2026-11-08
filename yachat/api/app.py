@@ -55,6 +55,7 @@ from yachat.state.models import (
     AuditEvent,
     AuditKind,
     Embed,
+    FixTask,
     Handoff,
     HandoffStatus,
     PolicyTemplate,
@@ -193,6 +194,33 @@ class TestDraftIn(Body):
     redo: bool = False
 
 
+class CritiqueIn(Body):
+    """A trial conversation for the critic model, and the policy it ran on (the agent's current one when omitted)."""
+
+    turns: list[ReviewTurn] = Field(min_length=1, max_length=50)
+    yaml: str | None = Field(default=None, max_length=100_000)
+
+
+class FixTaskIn(Body):
+    """A code fix the critic proposed, kept for a developer or Claude Code."""
+
+    title: str = Field(min_length=1, max_length=200)
+    problem: str = Field(min_length=1, max_length=4000)
+    change: str = Field(min_length=1, max_length=4000)
+    test: str = Field(default="", max_length=2000)
+    files: list[str] = Field(default_factory=list, max_length=10)
+    turns: list[ReviewTurn] = Field(min_length=1, max_length=50)
+    policy_hash: str = Field(default="", max_length=100)
+
+
+class FixTaskUpdate(Body):
+    """A fix task closed, reopened, noted or linked to its GitHub issue."""
+
+    status: Literal["open", "done", "dismissed"] | None = None
+    note: str | None = Field(default=None, max_length=2000)
+    issue: str | None = Field(default=None, pattern=r"^https://\S{1,480}$")
+
+
 class SuggestIn(Body):
     """The policy to revise (the editor's text); the agent's current policy when omitted."""
 
@@ -319,6 +347,7 @@ def stores_from_env() -> dict[str, Any]:
             PostgresAuditStore,
             PostgresBudgetStore,
             PostgresDatasetStore,
+            PostgresFixTaskStore,
             PostgresHandoffStore,
             PostgresMemoryStore,
             PostgresRateLimiter,
@@ -337,6 +366,7 @@ def stores_from_env() -> dict[str, Any]:
         out["handoffs"] = PostgresHandoffStore(url=url)
         out["reviews"] = PostgresReviewStore(url=url)
         out["tests"] = PostgresAgentTestStore(url=url)
+        out["fixes"] = PostgresFixTaskStore(url=url)
         out["responses"] = PostgresResponseStore(url=url)
         out["datasets"] = PostgresDatasetStore(url=url)
         out["versions"] = PostgresAgentVersionStore(url=url)
@@ -1309,6 +1339,63 @@ def create_app(
             draft, changes = await revise_policy(rt.llm, models, yaml_text, problems, tenant, catalog)
         errors = [{"path": e.path, "message": e.message} for e in draft.errors]
         return {"yaml": draft.yaml, "changes": changes, "feedback": problems, "errors": errors, "attempts": draft.attempts}
+
+    @app.get("/v1/critic")
+    async def critic_model() -> dict[str, Any]:
+        """The model that judges trial conversations (`YACHAT_MODEL_CRITIC`); null when none is set."""
+        return {"model": rt.models.critic or None}
+
+    @app.post("/v1/tenants/{tenant}/agents/{agent}/critique")
+    async def critique_conversation(tenant: TenantId, agent: str, body: CritiqueIn) -> dict[str, Any]:
+        """A stronger model's verdict on one trial conversation: problems by turn, and fixes, each for the policy
+        (send them to /v1/agents/edit) or for code (keep them as fix tasks). Nothing is saved."""
+        from yachat.evals.critic import critique
+
+        await reviewed_agent(tenant, agent)
+        yaml_text = body.yaml
+        if yaml_text is None:
+            active = await rt.versions.active(tenant, agent)
+            if active is None or not active.yaml:
+                raise HTTPException(422, "Send the policy the conversation ran on: this agent has no saved version.")
+            yaml_text = active.yaml
+        catalog = {d.name: d.kind for d in await rt.datasets.list(tenant)}
+        async with spending(tenant) as models:
+            if not models.critic:
+                raise HTTPException(422, "No critic model: set YACHAT_MODEL_CRITIC to a stronger model than the agent's.")
+            verdict = await critique(rt.llm, models, yaml_text, body.turns, tenant, catalog)
+        return verdict.model_dump(mode="json")
+
+    @app.post("/v1/tenants/{tenant}/agents/{agent}/fixes", status_code=201)
+    async def save_fix(tenant: TenantId, agent: str, body: FixTaskIn) -> dict[str, Any]:
+        """Keep a code fix for a developer, or for Claude Code to pick up over MCP."""
+        await reviewed_agent(tenant, agent)
+        return (await rt.fixes.save(FixTask(tenant=tenant, agent=agent, **body.model_dump()))).model_dump(mode="json")
+
+    @app.get("/v1/tenants/{tenant}/fixes")
+    async def list_fixes(tenant: TenantId, agent: str | None = None, status: Literal["open", "done", "dismissed"] | None = None) -> list[dict[str, Any]]:
+        """Fix tasks, newest first."""
+        return [f.model_dump(mode="json") for f in await rt.fixes.list(tenant, agent, status)]
+
+    async def saved_fix(tenant: str, fix_id: str) -> FixTask:
+        f = await rt.fixes.get(tenant, fix_id)
+        if f is None:
+            raise NotFound(f"fix task {fix_id!r}")
+        return f
+
+    @app.get("/v1/tenants/{tenant}/fixes/{fix_id}")
+    async def get_fix(tenant: TenantId, fix_id: str) -> dict[str, Any]:
+        """One fix task, with its text as a GitHub issue body."""
+        from yachat.evals.critic import issue_markdown
+
+        f = await saved_fix(tenant, fix_id)
+        return f.model_dump(mode="json") | {"issue_markdown": issue_markdown(f)}
+
+    @app.patch("/v1/tenants/{tenant}/fixes/{fix_id}")
+    async def update_fix(tenant: TenantId, fix_id: str, body: FixTaskUpdate) -> dict[str, Any]:
+        """Close, reopen or note a fix task, or link the GitHub issue it was filed as."""
+        f = await saved_fix(tenant, fix_id)
+        changed = f.model_copy(update=body.model_dump(exclude_none=True))
+        return (await rt.fixes.save(changed)).model_dump(mode="json")
 
     async def saved_test(tenant: str, agent: str, test_id: str) -> AgentTest:
         t = await rt.tests.get(tenant, test_id)

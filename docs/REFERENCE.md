@@ -33,6 +33,8 @@ Interactive docs at `/docs`. The main routes:
 | `POST /v1/sessions`, `POST /v1/sessions/{id}/turns`, `GET /v1/sessions/{id}/state` | talk to an agent |
 | `POST /v1/tenants/{t}/agents/{agent}/simulate` | simulated users on fake tools |
 | `POST`, `GET /v1/tenants/{t}/agents/{agent}/reviews`, `GET .../reviews/labels.yaml`, `.../reviews/replay.yaml`, `POST .../reviews/suggest` | people's ratings of conversations; as judge labels and replay cases; policy changes that answer them |
+| `GET /v1/critic`, `POST /v1/tenants/{t}/agents/{agent}/critique` | the judge model; its verdict on one trial conversation (`{turns, yaml}`): problems by turn, policy and code fixes |
+| `POST /v1/tenants/{t}/agents/{agent}/fixes`, `GET /v1/tenants/{t}/fixes?agent=&status=`, `GET`, `PATCH .../fixes/{id}` | code fixes kept for a developer or Claude Code; one with `issue_markdown`; close, note or link an issue |
 | `POST`, `GET /v1/tenants/{t}/agents/{agent}/tests`, `DELETE .../tests/{id}`, `POST .../tests/run`, `POST .../tests/draft`, `GET .../tests.yaml` | tests kept with the agent: save, run on the current build, draft from the policy, export |
 | `POST /v1/tenants/{t}/tools`, `PUT /v1/tenants/{t}/datasets/{name}` | register HTTP tools and datasets |
 | `POST /v1/tenants/{t}/agents/{agent}/embeds` | publish as a widget, link and app |
@@ -65,7 +67,8 @@ With `YACHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry a
 | Headroom → LiteLLM | add `HEADROOM_PROXY_URL`; context is compressed before the gateway |
 
 `YACHAT_MODEL_CLASSIFY` (intents, validation, planning) and `YACHAT_MODEL_GENERATE` (replies) are the two tiers, and
-`YACHAT_MODEL_VERIFY` checks reasoning and replies.
+`YACHAT_MODEL_VERIFY` checks reasoning and replies. `YACHAT_MODEL_CRITIC` names a stronger model that judges trial
+conversations in the console's Judge tab; unset, the tab explains how to turn it on.
 
 **Cost tracking** works with every layout. Each model call is recorded with its tokens in and out, cached tokens,
 time and cost, and summed by model, purpose, agent and day on the console's **Settings** page

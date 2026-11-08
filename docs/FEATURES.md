@@ -157,6 +157,26 @@ Claude uses the same tools the console does (`whoami`, `get_schema`, `list_bot_t
 `create_agent`, `get_policy`, `check_readiness`, `try_conversation`, `save_version`, `activate_version`). It acts only
 in the key's tenant, and only builds that pass are saved.
 
+The **fix-findings** skill works through what the judge found (below): `/yachat:fix-findings` lists the open fix
+tasks (`list_fix_tasks`, `get_fix_task`), files each as a GitHub issue with `gh` once you say yes, and hands each to a
+subagent in its own worktree that writes the failing test, makes the fix and runs the checks. It closes each task
+with `update_fix_task` and a note. Nothing is pushed without your yes.
+
+### Judge a trial conversation with a stronger model
+
+Set `YACHAT_MODEL_CRITIC` to a stronger model than the agent runs on. In the console, **Test → Judge** sends a test
+chat or a simulation, with the policy in the editor, to that model. It returns what went wrong on which turn, and
+fixes of two kinds:
+
+- **Fix in the policy** (a rule, the charter, a field's wording, a setting): tick them and **Apply to the policy**.
+  The drafter makes the change in the editor, the build checks it, and nothing is saved.
+- **Fix in code** (something the policy can't express, or a runtime bug): **Send to Claude Code** keeps it as a fix
+  task with the conversation, the change, likely files and the test that should fail first. The fix-findings skill
+  picks it up.
+
+Code checks what the model names: a problem or fix pointing at a turn that isn't in the conversation is dropped, and
+counts are capped.
+
 ### Any MCP client
 
 Point it at `$YACHAT_URL/mcp` (streamable HTTP) with `Authorization: Bearer <key>`. For Claude Code without the

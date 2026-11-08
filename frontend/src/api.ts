@@ -172,6 +172,13 @@ export type Review = {
 };
 export type ReviewIn = Omit<Review, "id" | "agent" | "created_at"> & { id?: string };
 /** the policy revised from people's ratings: change lines first, checked by the build */
+export type Finding = { turn: number; severity: "high" | "medium" | "low"; problem: string };
+export type Fix = { kind: "policy" | "code"; title: string; change: string; turns: number[]; files: string[]; test: string };
+export type Critique = { model: string; summary: string; findings: Finding[]; fixes: Fix[] };
+export type FixStatus = "open" | "done" | "dismissed";
+export type FixTask = Omit<Fix, "kind" | "turns"> & {
+  id: string; agent: string; problem: string; turns: ReviewTurn[]; policy_hash: string; status: FixStatus; note: string; issue: string; created_at: string;
+};
 export type Suggestion = { yaml: string; changes: string[]; feedback: string[]; errors: ValidationError[]; attempts: number };
 
 /** a replay case: scripted `messages`, or a `persona` the model plays; `expect` is checked in code when it ends */
@@ -237,6 +244,11 @@ export const api = {
     if (!r.ok) throw new Error(`export failed (${r.status})`);
     return r.text();
   },
+  critic: () => req<{ model: string | null }>("GET", "/v1/critic"),
+  critique: (agent: string, turns: ReviewTurn[], yaml: string) => req<Critique>("POST", `${agentPath(agent)}/critique`, { turns, yaml }),
+  saveFix: (agent: string, fix: Omit<FixTask, "id" | "agent" | "status" | "note" | "issue" | "created_at">) => req<FixTask>("POST", `${agentPath(agent)}/fixes`, fix),
+  fixes: (agent: string, status?: FixStatus) => req<FixTask[]>("GET", `/v1/tenants/${T}/fixes${query({ agent, status })}`),
+  updateFix: (id: string, change: { status?: FixStatus; note?: string }) => req<FixTask>("PATCH", `/v1/tenants/${T}/fixes/${encodeURIComponent(id)}`, change),
   suggest: (agent: string, yaml: string) => req<Suggestion>("POST", `${agentPath(agent)}/reviews/suggest`, { yaml }),
   tests: (agent: string) => req<AgentTest[]>("GET", `${agentPath(agent)}/tests`),
   saveTest: (agent: string, source: TestSource, c: TestCase, id?: string) =>

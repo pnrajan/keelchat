@@ -598,3 +598,16 @@ button.back { align-self: flex-start; }
 .setup-more .config { border-top: 0; padding-top: 0; }
 .readiness details ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
 .readiness details li { display: list-item; }
+.critic { display: flex; flex-direction: column; gap: 10px; }
+.critic-summary { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.findings, .fix-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.findings li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 12.5px; }
+.findings p, .fix-tasks p, .fix-card p { margin: 0; overflow-wrap: anywhere; }
+.findings .badge { justify-self: start; }
+.badge.sev-high { color: var(--err); background: var(--err-soft); }
+.badge.sev-medium { color: var(--warn); background: var(--warn-soft); }
+.fix-group { display: flex; flex-direction: column; gap: 8px; }
+.check.fix { align-items: flex-start; font-size: 12.5px; }
+.fix-card { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; }
+.fix-card code.file { margin-right: 6px; }
+.fix-tasks li { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 12.5px; }
