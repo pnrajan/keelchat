@@ -141,7 +141,9 @@ uv run yachat evals calibrate                                  # how often the j
   quotes the reply for every verdict, and code decides pass or fail.
 - **In the console**: the **Test** tab keeps tests with the agent: save a chat as a test, draft them from the
   policy, run them all on each build. In the **Review** tab people mark replies pass or fail and score conversations;
-  the ratings feed `calibrate`, and **Suggest policy changes** revises the policy to fix what they failed.
+  the ratings feed `calibrate`, and **Suggest policy changes** revises the policy to fix what they failed. The
+  **Judge** tab has a stronger model (`YACHAT_MODEL_CRITIC`) read a test chat: policy fixes go to the editor, code fixes
+  go to Claude Code (the plugin's `fix-findings` skill files issues and fixes them, failing test first).
 - **In CI**, run both `evals run` and `evals check`.
 
 [Evals](docs/EVALS.md) has the details.
