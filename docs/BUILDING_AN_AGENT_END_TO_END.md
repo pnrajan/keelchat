@@ -112,7 +112,7 @@ saved), and **Duplicate** in the Versions tab copies an agent you already have.
 
 ## 6. Shape the policy
 
-Open the **Setup** tab. Everything there edits the policy text, so the form, the YAML editor and the live check always
+Open the **Setup** tab (languages, safety checks, tools and limits are under **More settings**). Everything there edits the policy text, so the form, the YAML editor and the live check always
 agree. Comments in the YAML are kept.
 
 1. **Charter.** Turn the plan into three sentences:
@@ -124,8 +124,8 @@ agree. Comments in the YAML are kept.
    checks always run.
 4. **Extra tools:** tick `knowledge_search` and `order_lookup`. Steps bring their own tools; these are for questions at
    any point.
-5. **Steps:** keep **ask for consent** first (the agent remembers something, so consent is required). In **collect
-   details**, set the fields:
+5. **Steps:** keep **greet consent** first (the agent remembers something, so consent is required). In **form
+   fill**, set the fields:
 
    | Field | What to ask | What counts as an answer |
    |---|---|---|
@@ -158,8 +158,8 @@ flow:
   - greet_consent
   - form_fill:
       fields:
-        - {name: order_number, ask: What is your order number?, expect: "An order number: ORD- and five digits"}
-        - {name: issue, ask: What went wrong with the order?, expect: A short description of the problem}
+        - {name: order_number, ask: "What is your order number?", expect: "An order number: ORD- and five digits"}
+        - {name: issue, ask: "What went wrong with the order?", expect: A short description of the problem}
 guardrails: {input: [prompt_injection, sql_injection], output: [pii, no_legal_advice]}
 limits: {reasks: 3, digressions: 3}
 memory:
@@ -178,7 +178,7 @@ Policy, Connections, Safety and Launch; a button next to it jumps to the fix.
 
 | You may see | What to do |
 |---|---|
-| ✕ *N problems in the policy* | the editor marks each on its line; fix them first |
+| ✕ *N problem(s) in the policy* | the editor marks each on its line; fix them first |
 | ✕ *order_lookup is not connected* | the agent would say it is unavailable; register the tool (step 4) |
 | ! *knowledge_search uses sample data* | set `KNOWLEDGE_URL` to the real Knowledge Service |
 | ✕ *It remembers answers but never asks for consent* | **Add greet consent** puts the step first |

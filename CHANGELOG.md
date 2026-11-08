@@ -13,8 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `resume` on `POST /v1/sessions` (default true). The console's **New session** always starts afresh.
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
-- Console **Review** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
-- Console **Test** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
+- Console **Rate** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
+- Console **Tests** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
 - [The policy language](docs/POLICY_LANGUAGE.md): every key, value and default in one page; a test keeps it in step with the build. Linked from Compose's Show YAML.
 - Console **Judge** tab: a stronger model (`YACHAT_MODEL_CRITIC`) judges a trial conversation; policy fixes applied
   in the editor, code fixes kept as fix tasks (`/v1/tenants/{t}/fixes`). MCP tools `list_fix_tasks`, `get_fix_task`,
@@ -24,7 +24,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Console Inspector in four groups (Setup, This reply, Test, More); stage timings folded.
 - Console **Compose** view: say what the bot should do, read what it will do in plain words (`/v1/agents/validate` now returns this summary), change it in plain words (`POST /v1/agents/edit`, checked by the build, listed before applying), then **Try it**. Fine-tune cards and the YAML are folded below.
 - The drafter writes `rules`, `handoff`, `small_talk`, `think` and `curious` when a description asks for them.
-- `think: true` on a step: the reply is planned first (need, what is unknown, the rules it must follow); code adds any matched rule the plan missed; the plan shows in the Trace tab.
+- `think: true` on a step: the reply is planned first (need, what is unknown, the rules it must follow); code adds any matched rule the plan missed; the plan shows in the Why tab.
 - `small_talk: off | brief | warm` on a policy: chit-chat answered in kind, then back to the question; not counted and never read as an answer, up to two turns in a row (counted in code).
 - `curious: true` on form steps: one follow-up when a valid answer is too thin to act on, counted in code (one per field); drafted tests cover it.
 - **Suggest policy changes** from ratings: the model revises the policy to answer failed replies and low scores, each change named; checked by the build, never saved.

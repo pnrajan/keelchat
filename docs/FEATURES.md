@@ -1,7 +1,7 @@
 # What a bot can do
 
 The features behind a policy, with the YAML that turns each one on. Start with the
-[README](../README.md) for the quickstart; every policy key is in [WRITING_AN_AGENT.md](WRITING_AN_AGENT.md).
+[README](../README.md) for the quickstart; every policy key is in [POLICY_LANGUAGE.md](POLICY_LANGUAGE.md).
 
 - [The test console](#the-test-console)
 - [Channels](#channels)
@@ -30,7 +30,7 @@ cleaner YAML on the first try. The README lists [where else it helps](../README.
 | **Editor · test chat** | Edit the YAML with completion for keys, step names, tools and guardrails, docs on hover, and build errors marked on their lines as you type. **Build & try** compiles it and the chat pane talks to it. |
 | **Inspector** | Four groups. **Setup**: the form editor and launch checklist. **This reply**: why it was chosen (the plan, when the step thinks first, and each stage's timing), the session state, the raw response. **Test**: tests, simulations, rating, the judge. **More**: versions, handoffs, the audit log, metrics. |
 | **Simulate** | Model-played personas and scripted replays against the policy, on fake tools. |
-| **Test** | Tests kept with the agent: save a conversation as one, draft them from the policy, run them all on the current build, download them as a replay set. |
+| **Tests** | Tests kept with the agent: save a conversation as one, draft them from the policy, run them all on the current build, download them as a replay set. |
 | **Rate** | Rate the test chat or a simulated conversation: each reply in scope or not, each matched rule followed or not, an overall score from 1 to 5. Download the ratings as judge labels and the failed conversations as replay cases, or let the model suggest policy changes that answer them. |
 | **Judge** | A stronger model (`YACHAT_MODEL_CRITIC`) reviews the test chat or a simulation: what went wrong on which turn, policy fixes you apply in the editor, and code fixes sent to Claude Code. See [below](#judge-a-trial-conversation-with-a-stronger-model). |
 | **Versions** | Save a build as a version, compare versions line by line, roll back, copy an agent. |
@@ -153,7 +153,8 @@ claude
 ```
 
 ```text
-/plugin install yachat --marketplace pnrajan/yachat
+/plugin marketplace add pnrajan/yachat
+/plugin install yachat@yachat
 ```
 
 Then ask in plain words:
