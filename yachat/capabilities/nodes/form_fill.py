@@ -34,6 +34,8 @@ PII_HINTS = {"address": ("address", "dirección"), "email": ("email", "e-mail"),
 CONFIRM = "__confirm"
 #: the follow-up on a thin answer (`curious`); one per field, counted in code
 MORE = "__more"
+#: a reply to the follow-up that adds nothing
+NOTHING_MORE = re.compile(r"\s*(?:no(?:pe)?|nothing(?: (?:else|more))?|that'?s (?:it|all)|not really|n/?a|-)[\s.!]*", re.I)
 REVIEW_FIELD = "final_review"
 #: the candidate's explicit instruction to send: a submit verb with at most a yes/please around it and "it" after it.
 #: Questions ("how do I apply?") and anything else ("send me a copy") are not an instruction to submit.
@@ -222,7 +224,7 @@ class FormFill(Node[FormFillConfig]):
             st.open_question = None
             if set(answers) <= {q.field, fname}:  # more about the same thing: added to the field's answer
                 more = next(iter(answers.values())).strip()
-                if more and await affirm(ctx, more, q.ask) != "no":
+                if more and not NOTHING_MORE.fullmatch(more):  # "No power at all" is a detail; only a bare "no" adds nothing
                     st.fields[fname] = f"{st.fields.get(fname) or ''}. {more}".strip(". ")
                     ctx.validated_answers[fname] = st.fields[fname]
                 ctx.decide("answer", "followed_up", ref=fname)

@@ -21,7 +21,7 @@ log = get_logger("drafter")
 DRAFT_ATTEMPTS = 3
 
 SYSTEM = """You write agent policies: one YAML file that defines a goal-oriented chatbot. Reply with the YAML only.
-Keys (no others): agent, charter, languages, tools, flow, guardrails, limits, memory, mode.
+Keys (no others): agent, charter, languages, tools, flow, guardrails, limits, memory, mode, rules, handoff, small_talk.
 - agent: lowercase id with dashes. charter: 2-4 sentences: what the bot helps with, its tone, and what is out of scope.
 - flow: the steps in order, each a step name from the catalog, or `- name: {settings}` with that step's settings.
   Use only steps, tools, guardrails and datasets named in the catalog. A step that needs a dataset must name one of
@@ -36,6 +36,13 @@ Keys (no others): agent, charter, languages, tools, flow, guardrails, limits, me
   question as a 0-10 scale); that is what gets an NPS score.
 - Add `memory` only when the description asks to remember something about people between conversations; a survey
   needs none.
+- rules: only for situations the description names: `- {name: snake_case, when: the situation in the user's words,
+  then: what the reply must do}`.
+- handoff: when the description wants a person reachable: `handoff: {when: [user_request]}` (also max_reasks).
+  Never list `handoff` or `exit` as flow steps: the runtime runs them.
+- small_talk: brief when the description asks for a friendly or chatty bot; omit otherwise.
+- A step may take `think: true` (plan replies first; for nuanced or sensitive steps) and a form step `curious: true`
+  (one follow-up on a vague answer, e.g. a problem description); add them only when the description asks for care.
 - Keep it short: only what the description asks for. Omit keys whose defaults are fine.
 Example:
 agent: support-assistant
@@ -104,6 +111,62 @@ def _yaml_only(text: str) -> str:
 async def draft_policy(llm: LLMClient, models: ModelConfig, description: str, tenant: str, datasets: Mapping[str, DatasetKind]) -> Draft:
     messages = [{"role": "user", "content": f"Catalog:\n{catalog(tenant, datasets)}\n\n" + untrusted("description", description)}]
     return await _until_it_builds(llm, models, "policy_draft", SYSTEM, messages, tenant, datasets)
+
+
+EDIT = """You change an agent policy (YAML) as the owner asks. Reply with the whole changed YAML only.
+- The reply is the policy file itself: top-level keys, never nested under another key.
+- Do exactly what is asked and nothing else: keep every other key, step, field, rule and comment as written, and the
+  same `agent` unless asked to rename it.
+- Use only steps, tools, guardrails and datasets in the catalog; settings follow each step's `format`.
+- Keys you may use: agent, charter, languages, tools, flow, guardrails, limits, memory, mode, rules, handoff, small_talk.
+  A rule is `{name: snake_case, when: the situation in the user's words, then: what the reply must do}`; a step may
+  take `think`, `model` (small|large), `high_stakes` and `rules`; a form step `curious`.
+- To let people reach a person, set the top-level `handoff: {when: [user_request]}` (add max_reasks or disengaged
+  when asked); to hand off in a situation ("refunds over $100"), add a rule whose `then` offers a person and include
+  user_request. Never add `handoff` or `exit` as flow steps: the runtime runs them.
+- Begin the YAML with one comment line per change, in plain words for a non-technical owner (no key names):
+  `# change: <what changed>`."""
+
+#: what the owner asks, at most
+EDIT_LIMIT = 2_000
+
+
+async def edit_policy(
+    llm: LLMClient, models: ModelConfig, yaml: str, instruction: str, tenant: str, datasets: Mapping[str, DatasetKind]
+) -> tuple[Draft, list[str]]:
+    """The policy changed as the owner asks in plain words, checked by the build and repaired from its errors. Returns
+    the draft (its change lines removed) and the change lines. Never registered or saved."""
+    content = f"Catalog:\n{catalog(tenant, datasets)}\n\n" + untrusted("policy", yaml) + "\n\n" + untrusted("request", instruction[:EDIT_LIMIT])
+    d = await _until_it_builds(llm, models, "policy_edit", EDIT, [{"role": "user", "content": content}], tenant, datasets)
+    d.yaml, changes = new_changes(yaml, d.yaml)
+    header = _header(yaml)
+    if header and not d.yaml.startswith("#"):  # the file's opening comments are the owner's: kept as written
+        d.yaml = header + d.yaml
+    return d, changes
+
+
+def new_changes(before: str, after: str) -> tuple[str, list[str]]:
+    """The change lines `after` adds, taken out of it (they are shown, not kept). Lines already in `before` (e.g. from a
+    revision suggested by ratings) are not this edit's: they stay where they are."""
+    earlier = {m.strip() for m in CHANGE.findall(before)}
+    changes, kept = [], []
+    for line in after.splitlines(keepends=True):
+        m = CHANGE.match(line)
+        if m and m.group(1).strip() not in earlier:
+            changes.append(m.group(1).strip())
+        else:
+            kept.append(line)
+    return "".join(kept).lstrip("\n"), changes
+
+
+def _header(yaml: str) -> str:
+    """The comment lines a policy file opens with."""
+    lines = []
+    for line in yaml.splitlines(keepends=True):
+        if not line.lstrip().startswith("#"):
+            break
+        lines.append(line)
+    return "".join(lines)
 
 
 REVISE = """You revise an agent policy (YAML) so the agent stops making the mistakes people reported when they rated its

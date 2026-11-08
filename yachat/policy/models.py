@@ -156,6 +156,13 @@ class HandoffSpec(PolicyModel):
     #: with no callback by then, the assistant takes the conversation back at the user's next message; None: it waits
     timeout: Duration | None = None
 
+    @field_validator("when")
+    @classmethod
+    def _once(cls, v: list[HandoffTrigger]) -> list[HandoffTrigger]:
+        if dupes := sorted({w for w in v if v.count(w) > 1}):
+            raise ValueError(f"listed twice: {', '.join(dupes)}")
+        return v
+
 
 class AgentPolicy(PolicyModel):
     agent: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")

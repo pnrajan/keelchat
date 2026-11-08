@@ -107,7 +107,8 @@ async def test_only_valid_builds_are_saved():
         assert r.status_code == 200 and [e["path"] for e in r.json()["errors"]] == ["limits.reasks"]
         r = await c.post("/v1/agents/validate", json={"yaml": "agent: [unclosed"})
         assert r.json()["errors"][0]["path"].startswith("line 1")
-        assert (await c.post("/v1/agents/validate", json={"yaml": SUPPORT})).json() == {"errors": [], "agent": "support-assistant"}
+        r = (await c.post("/v1/agents/validate", json={"yaml": SUPPORT})).json()
+        assert r["errors"] == [] and r["agent"] == "support-assistant" and r["summary"]
         assert (await c.post("/v1/sessions", json={"agent": "support-assistant", "user_id": "u"})).status_code == 404  # validate registers nothing
 
 
@@ -170,3 +171,30 @@ async def test_sessions_follow_the_shared_active_version_and_keep_their_pinned_o
     await a.activate_version("default", "hiring-agent", v2.version)
     r = await say(replica(), s1.id, "hello")
     assert r.state.policy_hash == v1.hash and r.outbound.text
+
+
+async def test_a_policy_is_changed_as_asked_in_plain_words() -> None:
+    from tests.helpers import make_runtime
+    from yachat.policy.compiler import build
+    from yachat.state.store import InMemoryTenantToolStore
+
+    support = (ROOT / "examples" / "support_assistant.yaml").read_text()
+    rt, _ = await make_runtime(support)
+    async with AsyncClient(transport=ASGITransport(app=create_app(rt, tool_store=InMemoryTenantToolStore())), base_url="http://t") as c:
+        r = (await c.post("/v1/agents/edit", json={"yaml": support, "instruction": "Also ask for their email address"})).json()
+    assert r["errors"] == [] and r["changes"], r
+    p = build(r["yaml"])
+    fields = [f["name"] for s in p.steps for f in s.settings.get("fields") or []]
+    assert p.agent == "support-assistant" and any("email" in f for f in fields) and "order_number" in fields
+    assert [x.name for x in p.rules] == ["damaged_item"]  # nothing else changed
+    assert r["yaml"].startswith("# A generic support assistant") and "# change:" not in r["yaml"]
+
+
+def test_the_plain_summary_lists_rules_and_small_talk() -> None:
+    from tests.conftest import ROOT
+    from yachat.policy.compiler import build
+    from yachat.policy.summary import plain_summary
+
+    lines = plain_summary(build((ROOT / "examples" / "support_assistant.yaml").read_text()))
+    assert "When the customer says an item arrived damaged or broken: say a free replacement can be sent" in " ".join(lines)
+    assert any("small talk" in x for x in lines) and any(x.startswith("Passes the chat to you when") for x in lines)

@@ -199,8 +199,11 @@ export const api = {
   whoami: async () => { const w = await req<{ tenant: string; admin: boolean }>("GET", "/v1/whoami"); T = w.tenant; return w; },
   health: () => req<{ status: string }>("GET", "/health"),
   uploadAgent: (yaml: string) => req<Built>("POST", "/v1/agents", { yaml }),
-  validate: (yaml: string) => req<{ errors: ValidationError[]; agent: string | null }>("POST", "/v1/agents/validate", { yaml }),
+  validate: (yaml: string) => req<{ errors: ValidationError[]; agent: string | null; summary: string[] }>("POST", "/v1/agents/validate", { yaml }),
   draft: (description: string) => req<{ yaml: string; errors: ValidationError[]; attempts: number }>("POST", "/v1/agents/draft", { description }),
+  /** the policy changed as asked in plain words; checked by the build, never saved */
+  editPolicy: (yaml: string, instruction: string) =>
+    req<{ yaml: string; changes: string[]; errors: ValidationError[]; attempts: number }>("POST", "/v1/agents/edit", { yaml, instruction, tenant: T }),
   saveVersion: (yaml: string, note: string) => req<PolicyVersion>("POST", `/v1/tenants/${T}/agents`, { yaml, note }),
   agents: () => req<AgentSummary[]>("GET", `/v1/tenants/${T}/agents`),
   versions: (agent: string) => req<PolicyVersion[]>("GET", `${agentPath(agent)}/versions`),

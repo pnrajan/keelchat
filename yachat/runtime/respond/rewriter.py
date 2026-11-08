@@ -224,7 +224,7 @@ class Rewriter:
         system = ctx.system_prompt + "\n" + SYSTEM.format(language=language)
         check = verifies(ctx, step) or rules.high_stakes(ctx, step)
         models = rules.models_for(ctx, step)
-        question = f"Ask for {q.field.replace('_', ' ')} (sample wording: {q.ask})" if asks and q is not None else ""
+        question = f"End with the question: {q.ask}" if asks and q is not None else ""
         if thinks(ctx, step) and (thought := await self._think(ctx, models, brief, question)):
             brief += "\nPlan (follow it):\n" + "\n".join(f"- {x}" for x in thought.plan)
             if thought.unknown:

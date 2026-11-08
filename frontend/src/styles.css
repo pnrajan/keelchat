@@ -544,3 +544,57 @@ button { white-space: nowrap; }
 .thought { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--border); border-left: 3px solid var(--phosphor, var(--accent)); border-radius: var(--radius-sm); background: var(--surface-2); }
 .thought h3 { margin: 0; font-size: 13px; }
 .thought ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+
+/* Compose: one calm column. Say what the bot does, read it back in plain words, change it in plain words. */
+.compose { display: flex; justify-content: center; padding-block: 28px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.compose-col { width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 18px; }
+.compose-hero h1 { margin: 24px 0 6px; font-size: 28px; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; }
+.compose-hero p { margin: 0; font-size: 15px; }
+textarea.compose-big { font-size: 16px; line-height: 1.5; padding: 14px 16px; border-radius: var(--radius); min-height: 120px; }
+button.big { padding: 10px 20px; font-size: 15px; }
+input.big { padding: 10px 12px; font-size: 15px; }
+.compose-or { display: flex; flex-direction: column; gap: 6px; }
+button.example { text-align: left; white-space: normal; padding: 10px 12px; font-size: 13.5px; line-height: 1.45; color: var(--text); background: var(--surface); border-color: var(--border); }
+.chips-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bot-card { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+.bot-card h1 { margin: 2px 0 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.bot-purpose { margin: 0; font-size: 15px; line-height: 1.55; max-width: 65ch; }
+.bot-h { margin: 4px 0 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.bot-does { margin: 0; padding-left: 20px; list-style: disc; display: flex; flex-direction: column; gap: 5px; font-size: 14px; line-height: 1.5; }
+.compose-ask { display: flex; flex-direction: column; gap: 10px; }
+.callout.change ul { font-size: 14px; }
+.callout.change details { margin-top: 6px; }
+.compose-more { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0 16px; }
+.compose-more[open] { padding-bottom: 16px; }
+.compose-more > summary, .compose-card > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 12px 0; cursor: pointer; list-style: none; }
+.compose-more > summary::-webkit-details-marker, .compose-card > summary::-webkit-details-marker { display: none; }
+.compose-more > summary::before, .compose-card > summary::before { content: "▸"; color: var(--faint); width: 10px; }
+.compose-more[open] > summary::before, .compose-card[open] > summary::before { content: "▾"; }
+.compose-more .editor { min-height: 420px; }
+.fine-tune { display: flex; flex-direction: column; gap: 8px; }
+.compose-card { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); padding: 0 12px; }
+.compose-card[open] { padding-bottom: 12px; background: var(--surface); }
+.compose-card > * + * { margin-top: 8px; }
+label.inline-field { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; flex: none; font-size: 12.5px; color: var(--text); }
+.inline-field select, .inline-field input { width: auto; }
+.compose-steps th, .compose-steps td { text-align: left; font-size: 12.5px; }
+.compose-steps td:nth-child(n+2), .compose-steps th:nth-child(n+2) { text-align: center; }
+.rule-edit { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.rule-edit label { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.rule-edit .field-row input.compact { flex: 1; }
+input.narrow { width: 64px; }
+.compose { position: relative; z-index: 1; overflow: auto; flex: 1; min-height: 0; align-items: flex-start; }
+button.back { align-self: flex-start; }
+
+/* Inspector: four groups, then the group's own tabs as a quiet row */
+.tabs button .count { margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; background: var(--warn-soft); color: var(--warn); }
+.subtabs { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 4px 2px; border-bottom: 1px solid var(--border); }
+.subtabs button { border: 0; background: transparent; padding: 4px 0 6px; font-size: 12px; color: var(--muted); border-radius: 0; }
+.subtabs button:hover:not(:disabled) { background: transparent; color: var(--text); }
+.subtabs button.on { color: var(--text); font-weight: 550; box-shadow: inset 0 -2px 0 var(--phosphor); }
+.timing > summary { cursor: pointer; padding: 4px 0; }
+.setup-more { padding: 0 12px; background: var(--surface-2); }
+.setup-more[open] { padding-bottom: 12px; }
+.setup-more .config { border-top: 0; padding-top: 0; }
+.readiness details ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.readiness details li { display: list-item; }

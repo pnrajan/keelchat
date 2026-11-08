@@ -20,6 +20,7 @@ export default function Setup({ policy, refresh, onChange, schema, onSave, onAdd
   const cfg = readConfig(policy);
   const [report, setReport] = useState<Readiness | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
+  const [more, setMore] = useState(false);  // languages, checks, tools and limits stay folded until asked for
 
   useEffect(() => {  // the checklist follows the text, half a second after the last edit
     const t = window.setTimeout(() => { api.readiness(policy).then(setReport, () => setReport(null)); }, 500);
@@ -49,7 +50,7 @@ export default function Setup({ policy, refresh, onChange, schema, onSave, onAdd
   function fix(action: string) {
     if (action === "save") onSave();
     else if (action === "charter") setFocus("setup-charter");
-    else if (action === "guardrails") setFocus("setup-guardrails");
+    else if (action === "guardrails") { setMore(true); setFocus("setup-guardrails"); }
     else if (action.startsWith("add_step:")) onAddStep(action.slice(9));
     else if (action === "add_step") setFocus("setup-add-step");
     else if (action === "tests") onTests();
@@ -67,7 +68,7 @@ export default function Setup({ policy, refresh, onChange, schema, onSave, onAdd
           {report && <span className={`badge ${report.ready ? "ok" : "partial"}`}>{report.ready ? "ready" : `${report.score}%`}</span>}
         </div>
         {!report ? <p className="muted small">Checking…</p> : Object.keys(AREAS).map((area) => {
-          const items = report.items.filter((i) => i.area === area);
+          const items = report.items.filter((i) => i.area === area && i.status !== "ok");
           return items.length ? (
             <div key={area} className="area">
               <h4>{AREAS[area]}</h4>
@@ -83,6 +84,14 @@ export default function Setup({ policy, refresh, onChange, schema, onSave, onAdd
             </div>
           ) : null;
         })}
+        {report && (() => {
+          const passed = report.items.filter((i) => i.status === "ok");
+          return passed.length ? (
+            <details><summary>✓ {passed.length === report.items.length ? `All ${passed.length}` : passed.length} checks pass</summary>
+              <ul className="muted small">{passed.map((i) => <li key={i.id}>{i.title}</li>)}</ul>
+            </details>
+          ) : null;
+        })()}
       </section>
 
       <section className="config">
@@ -90,11 +99,56 @@ export default function Setup({ policy, refresh, onChange, schema, onSave, onAdd
         <label>Charter<span className="muted small">What it helps with, its tone, and what is out of scope.</span>
           <textarea id="setup-charter" rows={4} value={cfg.charter} onChange={(e) => onChange(setKey(policy, ["charter"], e.target.value))} />
         </label>
+
+
+        <fieldset>
+          <legend>Steps</legend>
+          {cfg.steps.length === 0 && <p className="muted small">No steps: the agent holds an open conversation.</p>}
+          <ol className="step-list">{cfg.steps.map((s, i) => (
+            <li key={`${i}-${s.name}`}>
+              <div className="row-between">
+                <strong>{i + 1}. {s.name.replace(/_/g, " ")}</strong>
+                <span className="step-actions">
+                  <button className="compact ghost" aria-label={`Move ${s.name} up`} disabled={i === 0} onClick={() => onChange(moveStep(policy, i, -1))}>↑</button>
+                  <button className="compact ghost" aria-label={`Move ${s.name} down`} disabled={i === cfg.steps.length - 1} onClick={() => onChange(moveStep(policy, i, 1))}>↓</button>
+                  <button className="compact ghost" aria-label={`Remove ${s.name}`} onClick={() => onChange(removeStep(policy, i))}>Remove</button>
+                </span>
+              </div>
+              <details><summary>{s.fields ? `${s.fields.length} question${s.fields.length === 1 ? "" : "s"}, ` : ""}{s.verify ? "replies checked" : "replies not checked"}</summary>
+              <label className="check"><input type="checkbox" checked={s.verify} onChange={() => onChange(setStep(policy, i, "verify", s.verify ? false : undefined))} />
+                Check replies before sending</label>
+              {s.fields && (
+                <div className="form-fields">
+                  {s.fields.map((f, j) => (
+                    <div key={j} className="form-field">
+                      <input aria-label="Field name" value={f.name} placeholder="field_name"
+                        onChange={(e) => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") } : x)))} />
+                      <input aria-label="What to ask" value={f.ask} placeholder="What to ask (the model phrases it)" onChange={(e) => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, ask: e.target.value } : x)))} />
+                      <input aria-label="What counts as an answer" value={f.expect} placeholder="What counts as a valid answer" onChange={(e) => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, expect: e.target.value } : x)))} />
+                      <div className="row-between">
+                        <label className="check"><input type="checkbox" checked={f.optional} onChange={() => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, optional: !x.optional } : x)))} />optional</label>
+                        <button className="compact ghost" onClick={() => setFields(i, s.fields!.filter((_, k) => k !== j))}>Remove field</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button className="compact" onClick={() => setFields(i, [...s.fields!, { name: `field_${s.fields!.length + 1}`, ask: "", expect: "", optional: false }])}>+ Add field</button>
+                </div>
+              )}
+              </details>
+            </li>
+          ))}</ol>
+          <select id="setup-add-step" className="compact" value="" disabled={!schema} onChange={(e) => e.target.value && onAddStep(e.target.value)} aria-label="Add a step">
+            <option value="">+ Add step</option>
+            {schema && flowSteps(schema).map((s) => <option key={s.name} value={s.name} title={s.description}>{s.name.replace(/_/g, " ")}: {s.description}</option>)}
+          </select>
+        </fieldset>
+        <details className="compose-more setup-more" open={more} onToggle={(e) => setMore((e.target as HTMLDetailsElement).open)}>
+          <summary>More settings <span className="muted small">languages, safety checks, tools, limits</span></summary>
+          <div className="config">
         <label>Languages<span className="muted small">Comma-separated codes, e.g. en, es.</span>
           <input id="setup-languages" value={cfg.languages.join(", ")}
             onChange={(e) => onChange(setKey(policy, ["languages"], e.target.value.split(",").map((s) => s.trim()).filter(Boolean)))} />
         </label>
-
         <fieldset id="setup-guardrails" tabIndex={-1}>
           <legend>Safety checks</legend>
           <div className="checks-row"><span className="muted small">On what users send</span>
@@ -123,46 +177,8 @@ export default function Setup({ policy, refresh, onChange, schema, onSave, onAdd
               onChange={(e) => onChange(setKey(policy, ["limits", "digressions"], e.target.value ? Number(e.target.value) : undefined))} /></label>
           </div>
         </fieldset>
-
-        <fieldset>
-          <legend>Steps</legend>
-          {cfg.steps.length === 0 && <p className="muted small">No steps: the agent holds an open conversation.</p>}
-          <ol className="step-list">{cfg.steps.map((s, i) => (
-            <li key={`${i}-${s.name}`}>
-              <div className="row-between">
-                <strong>{i + 1}. {s.name.replace(/_/g, " ")}</strong>
-                <span className="step-actions">
-                  <button className="compact ghost" aria-label={`Move ${s.name} up`} disabled={i === 0} onClick={() => onChange(moveStep(policy, i, -1))}>↑</button>
-                  <button className="compact ghost" aria-label={`Move ${s.name} down`} disabled={i === cfg.steps.length - 1} onClick={() => onChange(moveStep(policy, i, 1))}>↓</button>
-                  <button className="compact ghost" aria-label={`Remove ${s.name}`} onClick={() => onChange(removeStep(policy, i))}>Remove</button>
-                </span>
-              </div>
-              <label className="check"><input type="checkbox" checked={s.verify} onChange={() => onChange(setStep(policy, i, "verify", s.verify ? false : undefined))} />
-                Check replies before sending</label>
-              {s.fields && (
-                <div className="form-fields">
-                  {s.fields.map((f, j) => (
-                    <div key={j} className="form-field">
-                      <input aria-label="Field name" value={f.name} placeholder="field_name"
-                        onChange={(e) => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") } : x)))} />
-                      <input aria-label="What to ask" value={f.ask} placeholder="What to ask (the model phrases it)" onChange={(e) => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, ask: e.target.value } : x)))} />
-                      <input aria-label="What counts as an answer" value={f.expect} placeholder="What counts as a valid answer" onChange={(e) => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, expect: e.target.value } : x)))} />
-                      <div className="row-between">
-                        <label className="check"><input type="checkbox" checked={f.optional} onChange={() => setFields(i, s.fields!.map((x, k) => (k === j ? { ...x, optional: !x.optional } : x)))} />optional</label>
-                        <button className="compact ghost" onClick={() => setFields(i, s.fields!.filter((_, k) => k !== j))}>Remove field</button>
-                      </div>
-                    </div>
-                  ))}
-                  <button className="compact" onClick={() => setFields(i, [...s.fields!, { name: `field_${s.fields!.length + 1}`, ask: "", expect: "", optional: false }])}>+ Add field</button>
-                </div>
-              )}
-            </li>
-          ))}</ol>
-          <select id="setup-add-step" className="compact" value="" disabled={!schema} onChange={(e) => e.target.value && onAddStep(e.target.value)} aria-label="Add a step">
-            <option value="">+ Add step</option>
-            {schema && flowSteps(schema).map((s) => <option key={s.name} value={s.name} title={s.description}>{s.name.replace(/_/g, " ")}: {s.description}</option>)}
-          </select>
-        </fieldset>
+          </div>
+        </details>
         {cfg.memory > 0 && <p className="muted small">Remembers {cfg.memory} item{cfg.memory === 1 ? "" : "s"} per user (edit under <code>memory</code> in the YAML).</p>}
       </section>
     </div>

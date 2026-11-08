@@ -53,7 +53,9 @@ uv sync --all-extras
 ./run.sh                    # console on :5173, API on :8000
 ```
 
-Open http://127.0.0.1:5173, pick **Support assistant**, press **Build & try**, then **New session**, and chat. The
+Open http://127.0.0.1:5173. To make your own bot without writing YAML, open **Compose**: say what it should do, read
+back what it will do in plain words, and ask for changes the same way. To try the example, pick **Support assistant**, press **Build & try**, then
+**New session**, and chat. The
 **Inspector** shows why each reply was chosen; the **Test** tab saves the chat as a test, and **Review** rates it.
 `scripts/try.sh` starts the console with a sample agent and tests ready to run, no database needed.
 
@@ -174,6 +176,7 @@ contextual rules, Parlant; for programmatic multi-agent graphs, LangGraph; for a
 | I want to… | Read |
 |---|---|
 | write or tune a bot, and check it before launch | [Writing an agent](docs/WRITING_AN_AGENT.md) |
+| look up any key of the policy YAML | [The policy language](docs/POLICY_LANGUAGE.md) |
 | build one complex bot from plan to launch | [Building an agent end to end](docs/BUILDING_AN_AGENT_END_TO_END.md) |
 | use the console, channels, memory, handoff, documents, data or Claude | [What a bot can do](docs/FEATURES.md) |
 | add a tool, step, guardrail, channel or MCP server | [Adding a capability](docs/ADDING_A_CAPABILITY.md) |

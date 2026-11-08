@@ -68,4 +68,8 @@ def plain_summary(policy: CompiledPolicy) -> list[str]:
     if policy.memory:
         items = [_words(m.name) + (" (only with permission)" if m.sensitive else "") for m in policy.memory]
         out.append("Remembers between chats: " + ", ".join(items) + ".")
+    for r in [*policy.rules, *(r for s in policy.steps for r in s.rules)]:
+        out.append(f"When {r.when.rstrip('.')}: {r.then.rstrip('.')}.")
+    if policy.small_talk != "off":
+        out.append("Chats briefly when the customer makes small talk, then gets back to the task.")
     return out
