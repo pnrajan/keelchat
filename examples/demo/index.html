@@ -170,13 +170,12 @@
   </div>
   <div class="next">
     <h2>Run it on your machine</h2>
-    <p>You need Python 3.12+, uv, Node 20+ and one model key. Then open the console, paste the YAML into the editor and press
+    <p>You need macOS, Linux or WSL and one model key; <code>./setup.sh</code> installs the rest. Then open the console, paste the YAML into the editor and press
       <b>Build &amp; try</b>.</p>
     <div class="file">
       <div class="bar"><b>terminal</b><button class="ghost" type="button" data-copy-steps>Copy</button></div>
       <pre>git clone https://github.com/pnrajan/yachat &amp;&amp; cd yachat
-cp .env.example .env      # add one model key
-uv sync --all-extras
+./setup.sh                # installs what's missing, asks for your model key
 uv run yachat build my_bot.yaml   # check your file
 scripts/try.sh            # the console, with chat, tests and the judge</pre>
     </div>

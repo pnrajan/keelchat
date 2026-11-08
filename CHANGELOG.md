@@ -5,7 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
+
+- `./setup.sh`: checks for git, curl, uv, Node 20+ (and Docker with `--docker`) on macOS, Debian/Ubuntu, Fedora, Arch
+  and WSL, offers to install what's missing, writes `.env` with your model key and installs the dependencies.
+- `scripts/local.sh up|logs|down|reset`: the whole stack in Docker (API with the console, Redis, Postgres), on the next
+  free ports, with data kept in volumes.- `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
 - `resume` on `POST /v1/sessions` (default true). The console's **New session** always starts afresh.
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
@@ -45,6 +49,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The Docker image sets `HOME` for the unprivileged user, so connecting to Postgres no longer fails on
+  `/root/.postgresql` permissions.
 - The plain-words summary reads each rule as one sentence: "When the user describes ...", not "When The user ...".
 - A session is resumed only on the build it was asked for: a different `policy_hash` starts a new conversation instead of picking up an old one on another build.
 - When the documents don't answer a question and the policy hands off on request, the reply says the user can ask for a person.

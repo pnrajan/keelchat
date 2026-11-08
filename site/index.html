@@ -93,12 +93,12 @@
     <h2>Run it yourself</h2>
     <div class="copy">
       <pre id="steps">git clone https://github.com/pnrajan/yachat &amp;&amp; cd yachat
-cp .env.example .env      # add one model key
-uv sync --all-extras
+./setup.sh                # installs what's missing, asks for your model key
 scripts/try.sh            # the console, with a sample bot</pre>
       <button type="button" id="copy">Copy</button>
     </div>
-    <p>Needs Python 3.12+, <a href="https://docs.astral.sh/uv/">uv</a>, Node 20+ and a model key.
+    <p>Needs macOS, Linux or WSL and a model key; <code>setup.sh</code> installs the rest. Or run it all in Docker with
+      <code>scripts/local.sh up</code>.
       <a href="https://github.com/pnrajan/yachat#quickstart">Quickstart</a> ·
       <a href="https://github.com/pnrajan/yachat/blob/main/docs/POLICY_LANGUAGE.md">Every YAML key</a></p>
   </section>

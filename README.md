@@ -53,14 +53,17 @@ plain words. See [Use with Claude](docs/FEATURES.md#use-with-claude).
 
 ## Quickstart
 
-Needs Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 20+ and one model key.
+Needs macOS, Linux or WSL 2, and one model key. `setup.sh` checks for git, uv and Node 20+, offers to install
+what's missing (Homebrew, apt, dnf or pacman), and asks for your key.
 
 ```bash
 git clone https://github.com/pnrajan/yachat && cd yachat
-cp .env.example .env        # set YACHAT_LLM and its *_API_KEY
-uv sync --all-extras
+./setup.sh                  # --docker to also set up Docker; --check to only report
 scripts/try.sh              # the console with a sample bot, everything in memory
 ```
+
+Or run the whole stack in Docker (API, console, Redis and Postgres, with data that survives restarts):
+`scripts/local.sh up`.
 
 Open **Compose** and describe a bot, or pick **Support assistant**, press **Build & try**, then **New session**, and
 chat. The **Inspector** shows why each reply was chosen.

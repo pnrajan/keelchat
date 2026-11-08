@@ -1,16 +1,36 @@
 # Local infrastructure: `docker compose up -d` gives Redis (sessions) and Postgres (memory) on localhost.
 # Point the app at them with the REDIS_URL / DATABASE_URL lines in .env.example. Data persists in named volumes.
+# The whole stack in Docker (the API and console too): `scripts/local.sh up` (the `app` profile).
 services:
+  yachat:
+    profiles: [app]
+    build: .
+    image: yachat:local
+    ports: ["${YACHAT_PORT:-8000}:8080"]
+    env_file: [.env]  # the model and its key; the lines below win for the stores
+    environment:
+      DATABASE_URL: postgresql://yachat:yachat@postgres:5432/yachat
+      REDIS_URL: redis://redis:6379/0
+      YACHAT_TOOLS: ${YACHAT_TOOLS:-fake}  # tools without a backend URL answer with sample data
+    depends_on:
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["${REDIS_PORT:-6379}:6379"]
     volumes: ["redis-data:/data"]
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10}
 
   postgres:
     image: postgres:16-alpine
-    ports: ["5432:5432"]
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
     environment:
       POSTGRES_USER: yachat
       POSTGRES_PASSWORD: yachat

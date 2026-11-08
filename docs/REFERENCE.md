@@ -147,6 +147,9 @@ Where the code lives: the structure map in [`CLAUDE.md`](../CLAUDE.md#4-structur
 | API exits at start with a database error | `DATABASE_URL` names a missing database: `scripts/db.sh up`, or leave it empty |
 | **Save version** is disabled | the editor found problems; only valid builds are saved. Fix the marked lines |
 | Console shows "API offline" | the API process is down: check the terminal running `./run.sh` |
+| `./setup.sh` stops on a missing tool | it lists what's missing and the command it would run: rerun with `--yes`, or install those yourself. On Windows, run it inside WSL 2 |
+| `scripts/local.sh up` says Docker is not running | start Docker Desktop (macOS, Windows) or `sudo systemctl start docker` (Linux) |
+| `scripts/local.sh up`: the API container exits | `scripts/local.sh logs`; usually no model key in `.env` |
 
 Every log line carries `session_id`, so `grep <session_id>` follows one conversation. More in
 [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md#debugging).
