@@ -11,9 +11,9 @@ from dataclasses import field as dc_field
 from pathlib import Path
 from typing import Any
 
-from yachat.evals.checks import check, code_checks, rules_by_name
+from yachat.evals.checks import check, code_checks, rule_followed, rules_by_name
 from yachat.evals.judge import deepeval_judge, judge_model_from_env, ragas_judge
-from yachat.evals.metrics import CATALOGUE, RAGAS, RULE_FOLLOWED, MetricScore, Thresholds, build_metric, earlier, gate, ragas_metric, rule_metric
+from yachat.evals.metrics import CATALOGUE, RAGAS, RULE_FOLLOWED, MetricScore, Thresholds, build_metric, gate, ragas_metric
 from yachat.evals.replay import ReplayResult, load_agent_set, run_set
 from yachat.policy.compiler import CompiledPolicy, build
 from yachat.sim.harness import TurnLog
@@ -142,15 +142,11 @@ async def score(results: list[ReplayResult], thresholds: Thresholds, policy: Com
                         inputs = {"user_input": t.user, "response": t.agent, "retrieved_contexts": context}
                         await avg.add(_ragas(metric, **{k: v for k, v in inputs.items() if k in needs}))
         elif name == RULE_FOLLOWED:
-            from deepeval.test_case import LLMTestCase
-
-            deepeval_llm = deepeval_llm or deepeval_judge(model)
             rules = rules_by_name(policy)
             for r in results:
                 for i, t in enumerate(r.turns):
-                    case = LLMTestCase(input=t.user, actual_output=t.agent, context=earlier(r.turns, i))
                     for rule in (rules[n] for n in t.rules if n in rules):
-                        await avg.add(_deepeval(rule_metric(rule.then, minimum, deepeval_llm), case))
+                        await avg.add(rule_followed(model, rule, r.turns, i))
         else:
             deepeval_llm = deepeval_llm or deepeval_judge(model)
             try:

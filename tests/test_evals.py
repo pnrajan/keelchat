@@ -135,7 +135,16 @@ async def test_judged_ragas_and_rule_scores() -> None:
     good = {
         s.metric: s
         for s in await score(
-            [one("Sorry about that! We can send a free replacement, and you have 30 days to return it.", ["damaged_item"], [passage])], th, policy, model
+            [
+                one(
+                    "Sorry about that! We can send a free replacement, and you have 30 days to return it. What is your order number?",
+                    ["damaged_item"],
+                    [passage],
+                )
+            ],
+            th,
+            policy,
+            model,
         )
     }
     bad = {s.metric: s for s in await score([one("You have 90 days and we will pay for a new kitchen.", ["damaged_item"], [passage])], th, policy, model)}

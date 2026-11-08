@@ -89,6 +89,22 @@ def test_written_set_loads_with_the_hand_written_one(tmp_path: Path) -> None:
     assert merged.cases[1].expect.exit_reason == "handed_off"
     th = Thresholds.load(tmp_path / "thresholds.yaml")  # written because the folder had none
     assert (tmp_path / th.policy).resolve() == SUPPORT.resolve() and th.minimums == {}
+    # a later run for other targets (`--only`) keeps this case; a rerun of the same target replaces it
+    write(tmp_path, SUPPORT, GenerateReport("support-assistant", ["completed"], cases=[ReplayCase(name="gen_completed", messages=["hi"])]))
+    assert [c.name for c in load_agent_set(tmp_path).cases] == ["mine", "gen_handed_off", "gen_completed"]
+    write(tmp_path, SUPPORT, GenerateReport("support-assistant", ["handed_off"]))
+    assert [c.name for c in load_agent_set(tmp_path).cases] == ["mine", "gen_completed"]
+    (tmp_path / "generated.yaml").write_text(yaml.safe_dump({"cases": [{"name": "mine", "messages": ["x"]}]}))
+    with pytest.raises(ValueError, match="used twice"):
+        load_agent_set(tmp_path)
+
+
+def test_a_quote_counts_despite_case_spacing_and_curly_punctuation() -> None:
+    from yachat.evals.checks import _quoted
+
+    reply = "We’ll send a free replacement — what’s your   order number?"
+    assert _quoted("we'll send a free replacement - what's your order number?", reply)
+    assert not _quoted("we'll send a refund", reply) and not _quoted("  ", reply)
 
 
 async def test_generate_plays_a_target_and_keeps_or_reports_it() -> None:
@@ -97,8 +113,11 @@ async def test_generate_plays_a_target_and_keeps_or_reports_it() -> None:
     assert report.targets == ["handed_off"]
     if report.cases:
         (case,) = report.cases
-        assert case.name == "gen_handed_off" and case.messages and not case.persona and case.expect.exit_reason == "handed_off"
-        assert case.note.startswith(("covers", "fails"))
+        assert case.name == "gen_handed_off" and case.messages and not case.persona
+        if case.note.startswith("covers"):  # stable: replayed as a script it still reaches the target
+            assert case.expect.exit_reason == "handed_off"
+        else:  # failing, or reached only as played: nothing is expected of it
+            assert case.note.startswith(("fails", "covered")) and case.expect == Expect()
     else:
         assert report.not_reached["handed_off"]
 

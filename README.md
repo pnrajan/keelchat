@@ -34,7 +34,8 @@ runs every bot, and keeps the counting, safety checks and channel rules in code 
   through a LiteLLM gateway. Web widget, WhatsApp, SMS, Slack and phone.
 - **Tested without writing answers.** Every conversation is checked against the policy: no errors, loops or broken
   limits, replies in scope, rules followed. `yachat evals generate` plays users against each part of the policy and
-  turns failures into short replay scripts.
+  turns failures into short replay scripts. Cases can run several times to catch flaky ones, and the judge is
+  measured against replies a person labeled.
 - **Handoff that comes back.** A person takes over through the inbox or your helpdesk; when they resolve the ticket,
   the bot tells the user and resumes the conversation.
 - **Laptop to production.** Runs with only a model key, every store in memory; add Redis, Postgres and S3 for
@@ -126,12 +127,14 @@ walks through it.
 ```bash
 uv run yachat evals generate examples/support_assistant.yaml   # a test set from the policy: evals/support_assistant/generated.yaml
 uv run yachat evals check evals/support_assistant              # every case through the checks, judged ones with EVALS_JUDGE_MODEL
-uv run yachat evals run --trials 3                             # the CI gate; each case must pass all 3 runs
-uv run yachat evals calibrate                                  # how often the judge agrees with replies you labeled
+uv run yachat evals run --trials 3                             # metric thresholds; each case must pass all 3 runs
+uv run yachat evals calibrate                                  # how often the judge agrees with evals/<agent>/labels.yaml
 ```
 
 Targets come from the policy (finish the flow, give up, a bad answer per field, each rule and a near miss, out of
-scope, asking for a person, each language); the model only plays the user. [Evals](docs/EVALS.md) has the details.
+scope, asking for a person, each language); the model only plays the user. In CI, run both `evals run` and
+`evals check`. The judge quotes the reply for every verdict, and code decides pass or fail.
+[Evals](docs/EVALS.md) has the details.
 
 ## Examples
 

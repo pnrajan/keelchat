@@ -34,7 +34,14 @@ def main(argv: list[str] | None = None) -> int:
     evc = evs.add_parser("check", help="run eval sets against the checks every conversation must pass (judged ones with EVALS_JUDGE_MODEL)")
     for e in (evr, evc):
         e.add_argument("agent_dirs", nargs="*")
-        e.add_argument("--trials", type=int, default=None, help="runs per case; a case passes only when every run does (default: thresholds.yaml trials)")
+        e.add_argument(
+            "--trials",
+            type=int,
+            default=None,
+            choices=range(1, 21),
+            metavar="1-20",
+            help="runs per case; a case passes only when every run does (default: thresholds.yaml trials)",
+        )
     evk = evs.add_parser("calibrate", help="how often the judge agrees with replies a person labeled (evals/<agent>/labels.yaml)")
     evk.add_argument("agent_dirs", nargs="*")
     evg = evs.add_parser("generate", help="generate an eval set from a policy: one case per target reached, failures shortened")

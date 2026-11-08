@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 from yachat.evals.checks import check, rules_by_name
-from yachat.evals.replay import GENERATED, PARALLEL, Expect, Fixtures, ReplayCase, ReplayResult, run_case
+from yachat.evals.replay import GENERATED, PARALLEL, Expect, Fixtures, ReplayCase, ReplayResult, load_set, run_case
 from yachat.policy.compiler import CompiledPolicy
 
 #: turns a played user gets to reach a target
@@ -188,9 +188,9 @@ async def generate(
                 progress(f"FAIL {t.id}: {', '.join(sorted(names))} ({len(short)} messages)")
             return None
         if not r.expectation_failures and _reached(t, r, cov):
-            # the script must reach the target without the played user steering: replay it once
+            # the script must reach the target without the played user steering, and still pass: replay it once
             replay = await run_case(policy, ReplayCase(name=_name(t.id), messages=script, expect=t.expect), fixtures=fixtures)
-            stable = not replay.expectation_failures and _reached(t, replay, covered(policy, replay))
+            stable = not await check(policy, replay, judge) and _reached(t, replay, covered(policy, replay))
             note = f"covers {t.id}" if stable else f"covered {t.id} as played; the script alone does not, so nothing is expected"
             report.cases.append(ReplayCase(name=_name(t.id), messages=script, expect=t.expect if stable else Expect(), note=note))
             if progress:
@@ -206,6 +206,8 @@ async def generate(
                     why = await asyncio.wait_for(attempt(t), TRY_TIMEOUT_S)
                 except TimeoutError:
                     why = f"a try took over {TRY_TIMEOUT_S:.0f}s"
+                except Exception as e:  # a provider error ends this try, never the whole run
+                    why = f"the try failed: {e.__class__.__name__}"
             if why is None:
                 return
         report.not_reached[t.id] = why or ""
@@ -220,12 +222,15 @@ async def generate(
 
 
 def write(agent_dir: str | Path, policy_path: str | Path, report: GenerateReport) -> Path:
-    """generated.yaml (replaced each run: review it as a diff), and a thresholds.yaml naming the policy if the folder
-    has none, so `yachat evals run|check` work on it at once."""
+    """generated.yaml: this run's targets are replaced, cases for other targets (an earlier run with `--only`) kept;
+    review it as a diff. Also a thresholds.yaml naming the policy if the folder has none, so `yachat evals run|check`
+    work on it at once."""
     d = Path(agent_dir)
     d.mkdir(parents=True, exist_ok=True)
-    cases = [c.model_dump(mode="json", exclude_defaults=True) for c in report.cases]
     out = d / GENERATED
+    redone = {_name(t) for t in report.targets}
+    kept = [c for c in load_set(out).cases if c.name not in redone] if out.is_file() else []
+    cases = [c.model_dump(mode="json", exclude_defaults=True) for c in [*kept, *report.cases]]
     out.write_text(f"# yachat evals generate: {report.summary().splitlines()[0]}\n" + yaml.safe_dump({"cases": cases}, sort_keys=False, allow_unicode=True))
     th = d / "thresholds.yaml"
     if not th.is_file():
@@ -236,7 +241,6 @@ def write(agent_dir: str | Path, policy_path: str | Path, report: GenerateReport
 def main(policy_path: str, agent_dir: str | None = None, only: list[str] | None = None, rounds: int | None = None) -> int:
     """`yachat evals generate`: writes the set, prints the summary; 1 when a generated case fails."""
     from yachat.evals.judge import judge_model_from_env
-    from yachat.evals.replay import load_set
     from yachat.policy.compiler import build
 
     policy = build(Path(policy_path).read_text())

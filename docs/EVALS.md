@@ -55,10 +55,11 @@ conversation needs no expected answers to be a test:
 | `within_limits` | re-asks, digressions or nudges went past the policy's limits | code |
 | `language_allowed` | the conversation ended in a language the policy does not list | code |
 | `in_scope` | a reply does work the charter puts out of scope; the judge must quote the sentence, and a quote not in the reply does not count | judge |
-| `rule_followed:<rule>` | on a turn where the rule matched, the reply does not do its `then` (earlier turns count as known) | judge |
+| `rule_followed:<rule>` | on a turn where the rule matched, the reply leaves out a part of its `then` that applies; each part done needs a quote from the reply (earlier turns count as known) | judge |
 
 `yachat evals run` applies the code checks. `yachat evals check` applies the judged ones too (when
-`EVALS_JUDGE_MODEL` is set) instead of scoring the thresholds' metrics:
+`EVALS_JUDGE_MODEL` is set) instead of scoring the thresholds' metrics. Generated cases kept for an `in_scope` or
+`rule_followed` failure carry no `expect`, so only `evals check` catches them again: run both in CI.
 
 ```bash
 uv run yachat evals check evals/support_assistant
@@ -77,11 +78,13 @@ uv run yachat evals generate examples/support_assistant.yaml --only rule: handed
 2. **The model plays a user aiming at each target**, on the simulator, with the set's `fixtures`. It writes only what
    the user says; what a case must achieve (`expect`) comes from the target.
 3. **Every conversation goes through the checks.** One that fails is shortened: messages are dropped while the replayed
-   script still fails, so it becomes a short script. One that reaches its target is replayed once as a script; it keeps its `expect` only if the script reaches the target on its own. One that misses
-   it is tried again, then reported with the reason (the played user may not have done it, or the agent did not
-   respond to it).
-4. **Output**: `generated.yaml` next to `replay.yaml`, replaced on each run, so review it as a diff and commit what you
-   keep. `evals run` and `evals check` read both files. A `thresholds.yaml` naming the policy is written if the folder
+   script still fails, so it becomes a short script. One that reaches its target is replayed once as a script; it
+   keeps its `expect` only if the script reaches the target on its own and passes the checks. One that misses it is
+   tried again, then reported with the reason (the played user may not have done it, the agent did not respond to
+   it, or the provider failed).
+4. **Output**: `generated.yaml` next to `replay.yaml`. A run replaces the cases of the targets it played and keeps
+   the rest (so `--only` adds to the file), so review it as a diff and commit what you keep. `evals run` and
+   `evals check` read both files; a case name used in both is an error. A `thresholds.yaml` naming the policy is written if the folder
    has none. The command exits 1 when a generated case fails.
 
 ### `thresholds.yaml`
@@ -99,7 +102,7 @@ rubrics:
 options:                           # extra arguments a DeepEval metric needs
   non_advice: {advice_types: [medical]}
 trials: 3                          # runs per case (default 1); a case passes only when every run does
-calibration: {in_scope: 1.0, rule_followed: 0.9}    # from `yachat evals calibrate`
+calibration: {in_scope: 0.95, rule_followed: 0.95}  # from `yachat evals calibrate`
 ```
 
 Metric names:
@@ -109,14 +112,14 @@ Metric names:
 | `conversation_completeness`, `knowledge_retention`, `role_adherence`, `conversation_relevancy` | each conversation | DeepEval |
 | `faithfulness`, `task_completion`, `pii_leakage`, `non_advice`, `role_violation`, `tool_correctness`, `argument_correctness` | each agent turn, with that turn's tool output as context | DeepEval |
 | a name under `rubrics:` | each conversation (ConversationalGEval with your criteria) | DeepEval |
-| `rule_followed` | each turn where a policy rule matched: does the reply do the rule's `then` | DeepEval GEval |
+| `rule_followed` | each turn where a policy rule matched: the judge splits the rule's `then` into parts and quotes where the reply does each; code passes it only when every part that applies is done | judge (yachat) |
 | `ragas.<Metric>` | each turn with output from a `context_tools` tool: `user_input`, `response`, `retrieved_contexts`. Reference-free ones work: `Faithfulness`, `ResponseGroundedness`, `ContextPrecisionWithoutReference`, `AnswerRelevancy` needs embeddings and is not supported | Ragas |
 
 - **Gate**: each metric's average must reach its minimum; an unknown name fails the build (typo guard). A metric with
   nothing to score (no rule matched, no tool output) reports "no score produced" and fails, so a set that gates
   `rule_followed` must include a case where a rule fires.
 - **Calibration**: the report lists gated metrics with no `calibration` entry under `uncalibrated`; their scores
-  still gate, but treat a failure as a prompt to look, not proof (see below).
+  still gate, but treat a failure as a prompt to look, not proof (see [Calibration](#calibration)).
 - **Trials**: the model answers differently each run, so one pass proves little. With `trials: k` (or `--trials k`
   on `evals run` and `evals check`) each case runs k times and passes only when every run does (pass^k). The report
   gives `passed_every_trial`, and `flaky` lists cases that passed some runs but not all; each failure says which
@@ -128,9 +131,10 @@ Metric names:
 - **Simulate first**: the console's **Simulate** tab and `yachat simulate` run the same kinds of conversations
   without expectations or scores, to explore an agent before you write its set.
 
-## Calibration (required before a judged check gates)
+## Calibration
 
-A judge can be wrong. Before trusting `in_scope` or `rule_followed`, measure how often it agrees with a person:
+A judge can be wrong. `in_scope` and `rule_followed` failures fail `evals check` either way; calibration tells you how
+far to trust them. Measure how often the judge agrees with a person:
 
 1. In `evals/<agent>/labels.yaml`, write replies and mark each one pass or fail by hand. Aim for 20+ per check,
    about half of them failing, close calls included. The last turn is the reply judged; earlier turns are context.
@@ -147,17 +151,20 @@ A judge can be wrong. Before trusting `in_scope` or `rule_followed`, measure how
 
 2. Run `EVALS_JUDGE_MODEL=... uv run yachat evals calibrate evals/<agent>`. It runs the same judged checks on every
    label and prints the agreement per check, how often the judge was too lenient or too strict, and each
-   disagreement with the judge's reason. It exits 1 when a check agrees less than 80%.
-3. Copy the printed `calibration:` block into `thresholds.yaml`. The judge varies too: run it twice and record the lower figure. Rerun it when you change the judge model or the
-   prompts in `yachat/evals/checks.py` and `metrics.py`.
+   disagreement with the judge's reason. It exits 1 when a check agrees less than 80% or a label could not be judged.
+3. Copy the printed `calibration:` block into `thresholds.yaml`. The judge varies too: run it twice and record the
+   lower figure. Rerun it when you change the judge model or the prompts in `yachat/evals/checks.py`.
 
-A disagreement means either the judge or the label is wrong: fix the label, or treat that check as advice until the
-judge improves. Metrics with no `calibration` entry are listed under `uncalibrated` in the report.
+A disagreement means either the judge or the label is wrong: fix the label, or check that check's failures by hand
+until the judge improves. Metrics with no `calibration` entry are listed under `uncalibrated` in the report.
+
+Labels written together with the judge's prompt flatter it. The support labels below were, so treat their figures as
+a ceiling until labels from real conversations are added.
 
 | Agent | Check | Labels | Agreement | Judge | Date |
 |---|---|---|---|---|---|
-| support-assistant | `in_scope` | 20 | 100% | Qwen3.5-27B | 2026-11-05 |
-| support-assistant | `rule_followed` | 20 | 90–95% over two runs; misses were all too lenient, passing replies that do only part of the rule | Qwen3.5-27B | 2026-11-05 |
+| support-assistant | `in_scope` | 20 | 95–100% over two runs | Qwen3.5-27B | 2026-11-05 |
+| support-assistant | `rule_followed` | 20 | 95–100% over two runs (90–95% before the rule was judged part by part) | Qwen3.5-27B | 2026-11-05 |
 
 ## Online (production)
 

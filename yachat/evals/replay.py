@@ -160,7 +160,10 @@ def load_agent_set(agent_dir: str | Path) -> ReplaySet:
     found = [load_set(p) for p in (d / "replay.yaml", d / GENERATED) if p.is_file()]
     if not found:
         raise FileNotFoundError(f"{d}: no replay.yaml or {GENERATED}")
-    return ReplaySet(fixtures=found[0].fixtures, cases=[c for s in found for c in s.cases])
+    cases = [c for s in found for c in s.cases]
+    if dupes := sorted({c.name for c in cases if [x.name for x in cases].count(c.name) > 1}):
+        raise ValueError(f"{d}: case names used twice across replay.yaml and {GENERATED}: {dupes}")
+    return ReplaySet(fixtures=found[0].fixtures, cases=cases)
 
 
 def load_cases(path: str | Path) -> list[ReplayCase]:
