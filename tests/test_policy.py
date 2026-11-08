@@ -272,6 +272,7 @@ def test_the_language_reference_names_every_key_the_build_accepts() -> None:
     name is a gap in it."""
     from tests.conftest import ROOT
     from yachat.policy.schema import policy_json_schema
+    from yachat.registry.core import REGISTRY
 
     doc = (ROOT / "docs" / "POLICY_LANGUAGE.md").read_text()
     s = policy_json_schema()
@@ -280,6 +281,8 @@ def test_the_language_reference_names_every_key_the_build_accepts() -> None:
         keys |= set(s["properties"][k]["properties"])
     for alt in s["properties"]["flow"]["items"]["oneOf"][1:]:
         ((name, body),) = alt["properties"].items()
+        if not REGISTRY.node(name).cls.__module__.startswith("yachat."):
+            continue  # a package's own step (e.g. booking_caps, registered by another test) documents itself
         keys.add(name)
         for part in [body, *body.get("anyOf", [])]:
             keys |= set(part.get("properties") or {})
