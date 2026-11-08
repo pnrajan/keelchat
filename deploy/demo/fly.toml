@@ -1,0 +1,45 @@
+# The public demo on Fly.io: the support assistant as a chat page, on the smallest machine, stopped when idle.
+# Everything is in memory and set up again at each start (examples/demo/app.py). From the repo root:
+#
+#   fly apps create yachat-demo
+#   fly secrets set -c deploy/demo/fly.toml YACHAT_LLM=... <PROVIDER>_API_KEY=... YACHAT_API_KEY=$(openssl rand -hex 24)
+#   fly deploy -c deploy/demo/fly.toml .
+#
+# YACHAT_API_KEY locks the console and API; visitors only reach the chat page, which limits conversations per
+# network, per conversation and per day (YACHAT_DEMO_DAILY). Set a spending cap with your model provider too.
+
+app = "yachat-demo"
+primary_region = "iad"
+swap_size_mb = 512  # the app uses about 220 MB of the 256; swap absorbs bursts instead of a restart
+
+[build]
+  dockerfile = "../../Dockerfile"
+
+[env]
+  DATABASE_URL = ""
+  REDIS_URL = ""
+  YACHAT_TOOLS = "fake"
+  YACHAT_CLIENT_IP_HEADER = "Fly-Client-IP"
+  YACHAT_DEMO_DAILY = "300"
+
+[processes]
+  app = "uvicorn examples.demo.app:create_app --factory --host 0.0.0.0 --port 8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
