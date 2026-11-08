@@ -16,6 +16,10 @@ flow:
           ask: What went wrong with the order?
           expect: A short description of the problem
           optional: true
+rules:                             # apply only on the messages they fit (docs/WRITING_AN_AGENT.md#rules)
+  - name: damaged_item
+    when: the customer says an item arrived damaged or broken
+    then: say a free replacement can be sent, and ask for the order number if it is not known yet
 guardrails:
   input: [prompt_injection, sql_injection]
   output: [pii, profanity, no_legal_advice]

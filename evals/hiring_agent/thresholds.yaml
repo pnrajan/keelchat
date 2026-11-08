@@ -1,4 +1,4 @@
-agent: hiring-agent
+policy: ../../examples/hiring_agent.yaml
 minimums:
   conversation_completeness: 0.7
   knowledge_retention: 0.7
@@ -11,4 +11,12 @@ minimums:
   confirm_before_switching: 0.8
   job_text_as_posted: 0.8
   natural_tone: 0.7
+rubrics:   # this agent's own judged checks (ConversationalGEval criteria)
+  no_language_switch_on_names: The assistant never changes the conversation language because the user wrote a name or address in another language.
+  confirm_before_switching: Before switching language the assistant asks for confirmation and switches only after the user says yes.
+  job_text_as_posted: Job titles, locations and pay are shown exactly as the tool returned them (not translated), labeled as posted.
+  natural_tone: >-
+    The assistant sounds like a helpful person, not a form: it acknowledges what the user says, varies its wording, does
+    not repeat boilerplate or echo values back field by field, asks one clear question at a time, never shows internal
+    tags, ids or system terms, and does not ask for something the user already said.
 calibration: {}   # metric → agreement with the human-labeled set; fill in before using a metric as a gate (docs/EVALS.md)

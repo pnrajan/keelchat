@@ -32,3 +32,14 @@ cases:
   - name: edit_location
     messages: ["hello", "yes", "backend engineer in austin", "1", "Actually, I meant Dallas"]
     expect: {fields: {location: "Dallas"}}
+  # users who write differently (formerly the built-in scripted personas)
+  - name: spanish_typos
+    messages: ["hola, busco trabjo en austin", "sí", "enfermera en austin", "1", "Ana Ruiz", "12 Elm St, Austin TX 78704", "sí"]
+    expect: {language: es}
+  - name: sms_shorthand
+    channel: sms
+    messages: ["hi", "yes", "u hav wrk 2mrw nr me", "1", "Jo Lee", "9 Oak Ave, Dallas TX 75201", "yes"]
+    expected_tools: [job_search]
+  - name: chatty_non_serious
+    messages: ["hello", "yes", "engineer", "1", "what about parking?", "do you have a gym?", "is there a cafeteria?", "and the dress code?"]
+    expect: {exit_reason: disengaged}

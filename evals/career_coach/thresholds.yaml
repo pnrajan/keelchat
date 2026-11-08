@@ -1,7 +1,8 @@
-agent: career-coach
-minimums:
+policy: ../../examples/career_coach.yaml
+minimums:   # no conversation_relevancy: it scores a correct out-of-scope refusal as irrelevant
   role_adherence: 0.8
-  conversation_relevancy: 0.7
   faithfulness: 0.8
   non_advice: 0.9
+options:
+  non_advice: {advice_types: [medical]}   # the charter's no-medical-advice line
 calibration: {}

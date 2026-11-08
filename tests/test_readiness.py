@@ -11,7 +11,8 @@ from yachat.runtime.runtime import Runtime
 from yachat.state.store import InMemoryAgentVersionStore, InMemoryTenantToolStore
 from yachat.testing.fakes import FakeTools
 
-SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text()
+#: renamed so it has no eval set under evals/: a new agent
+SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text().replace("agent: support-assistant", "agent: new-support", 1)
 
 
 def edited(text: str, **changes: object) -> str:

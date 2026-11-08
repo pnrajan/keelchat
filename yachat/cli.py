@@ -28,9 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("serve", help="run the runtime API")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
-    ev = sub.add_parser("evals", help="evaluation harness (DeepEval)")
+    ev = sub.add_parser("evals", help="evaluation harness (DeepEval, Ragas); install yachat[evals]")
     evs = ev.add_subparsers(dest="evals_cmd", required=True)
-    evr = evs.add_parser("run", help="offline replay set + personas; CI gate")
+    evr = evs.add_parser("run", help="run eval sets (default: every evals/<agent>/ here); CI gate")
     evr.add_argument("agent_dirs", nargs="*")
     evx = evs.add_parser("export", help="export a live session as a replay test case")
     evx.add_argument("session_id")
@@ -89,11 +89,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(REGISTRY.manifest().model_dump(mode="json"), indent=2))
         return 0
     if args.cmd == "evals":
-        from evals.run import main as evals_main
+        from yachat.evals.run import main as evals_main
 
         if args.evals_cmd == "run":
             return evals_main(list(args.agent_dirs))
-        from evals.online import export_replay
+        from yachat.evals.online import export_replay
         from yachat.state.models import SessionState
 
         if not args.state_file:

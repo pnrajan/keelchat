@@ -78,6 +78,13 @@ audit = [
 mem0 = [
     "mem0ai>=0.1.100",
 ]
+#: `yachat evals run`: DeepEval and Ragas metrics scored by a judge model over litellm
+evals = [
+    "deepeval>=3.0",
+    "langchain-community>=0.4,<0.4.2",  # ragas 0.4.3 imports chat_models.vertexai, removed in 0.4.2
+    "litellm>=1.50",
+    "ragas>=0.4,<0.5",  # tested range; lift with the langchain-community cap once ragas drops that import
+]
 
 [project.urls]
 Homepage = "https://github.com/pnrajan/yachat"
@@ -122,6 +129,8 @@ dev = [
     "pypdf>=5.0",
     "python-multipart>=0.0.9",
     "cryptography>=43",
+    "ragas>=0.4,<0.5",
+    "langchain-community>=0.4,<0.4.2",
 ]
 
 [build-system]

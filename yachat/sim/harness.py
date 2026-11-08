@@ -4,6 +4,9 @@ Reports exit reasons, re-ask rates, digressions, handoffs and each conversation'
 from __future__ import annotations
 
 import asyncio
+import json
+from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 from dataclasses import field as dc_field
 from datetime import UTC, datetime
@@ -15,11 +18,25 @@ import yaml
 from yachat.policy.compiler import CompiledPolicy, build
 from yachat.runtime.audit import AuditSummary, audit_db, summarize
 from yachat.runtime.context import InboundMessage
+from yachat.runtime.decide.tool_gateway import to_plain
 from yachat.runtime.llm import LLMClient, LLMRequest, ModelConfig
 from yachat.runtime.llm_factory import llm_from_env
 from yachat.runtime.runtime import Runtime
 from yachat.state.models import AuditEvent
 from yachat.testing.fakes import FakeTools
+
+
+@dataclass
+class TurnLog:
+    """One turn as the evals score it: what the tools returned (the retrieved context) and which rules matched."""
+
+    user: str
+    agent: str
+    tools: list[str] = dc_field(default_factory=list)
+    tool_outputs: list[str] = dc_field(default_factory=list)
+    rules: list[str] = dc_field(default_factory=list)
+    route: str | None = None
+    llm_calls: int = 0
 
 
 @dataclass
@@ -38,6 +55,9 @@ class ConversationReport:
     persona: str = ""
     #: the platform's decisions in this conversation, oldest first (the audit log of the simulated session)
     decisions: list[dict[str, Any]] = dc_field(default_factory=list)
+    #: each turn's tools, tool output and matched rules
+    turn_log: list[TurnLog] = dc_field(default_factory=list)
+    session_id: str = ""
 
 
 @dataclass
@@ -100,13 +120,39 @@ async def persona_message(
     return text or None, bool(out.get("done"))
 
 
-async def _drive(rt: Runtime, policy: CompiledPolicy, name: str, channel: str, next_message: Any, persona: str = "") -> ConversationReport:
-    s = await rt.start_session(policy.agent, f"sim-{name}", channel, resume=False, tenant=policy.tenant)
+#: the current turn's (tool, output) pairs; set per turn so conversations running at once keep their own
+_TOOL_LOG: ContextVar[list[tuple[str, str]] | None] = ContextVar("sim_tool_log", default=None)
+#: longest tool output kept per call
+TOOL_OUTPUT_CHARS = 2000
+
+
+def _recorded(name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
+    async def call(**kwargs: Any) -> Any:
+        out = await fn(**kwargs)
+        if (log := _TOOL_LOG.get()) is not None:
+            log.append((name, json.dumps(to_plain(out), ensure_ascii=False, default=str)[:TOOL_OUTPUT_CHARS]))  # as the gateway hands it on
+        return out
+
+    return call
+
+
+async def _drive(
+    rt: Runtime, policy: CompiledPolicy, name: str, channel: str, next_message: Any, persona: str = "", user_id: str | None = None
+) -> ConversationReport:
+    user = user_id or f"sim-{name}"
+    s = await rt.start_session(policy.agent, user, channel, resume=False, tenant=policy.tenant)
     transcript: list[dict[str, str]] = []
+    turn_log: list[TurnLog] = []
     digressions_seen, llm, tools, i = 0, 0, 0, 0
     while (msg := await next_message(i, transcript)) is not None:
-        last = await rt.turn(s.id, InboundMessage(text=msg, channel=channel, user_id=f"sim-{name}", channel_message_id=f"{name}-{i}"))
+        calls: list[tuple[str, str]] = []
+        token = _TOOL_LOG.set(calls)
+        try:
+            last = await rt.turn(s.id, InboundMessage(text=msg, channel=channel, user_id=user, channel_message_id=f"{name}-{i}"))
+        finally:
+            _TOOL_LOG.reset(token)
         transcript.append({"user": msg, "agent": last.outbound.text})
+        turn_log.append(TurnLog(msg, last.outbound.text, [n for n, _ in calls], [o for _, o in calls], list(last.rules), last.route, last.llm_calls))
         digressions_seen = max(digressions_seen, last.state.digressions)
         llm += last.llm_calls
         tools += last.tool_calls
@@ -128,6 +174,8 @@ async def _drive(rt: Runtime, policy: CompiledPolicy, name: str, channel: str, n
         transcript,
         persona=persona,
         decisions=[_decision(e) for e in events],
+        turn_log=turn_log,
+        session_id=s.id,
     )
 
 
@@ -135,14 +183,18 @@ def _decision(e: AuditEvent) -> dict[str, Any]:
     return e.model_dump(mode="json", include={"kind", "decision", "reason", "step", "field", "ok", "ref"})
 
 
-async def run_conversation(rt: Runtime, policy: CompiledPolicy, name: str, messages: list[str], channel: str = "web") -> ConversationReport:
+async def run_conversation(
+    rt: Runtime, policy: CompiledPolicy, name: str, messages: list[str], channel: str = "web", user_id: str | None = None
+) -> ConversationReport:
     async def scripted(i: int, _: list[dict[str, str]]) -> str | None:
         return messages[i] if i < len(messages) else None
 
-    return await _drive(rt, policy, name, channel, scripted)
+    return await _drive(rt, policy, name, channel, scripted, user_id=user_id)
 
 
-async def run_persona(rt: Runtime, policy: CompiledPolicy, name: str, persona: str, max_turns: int = 12, channel: str = "web") -> ConversationReport:
+async def run_persona(
+    rt: Runtime, policy: CompiledPolicy, name: str, persona: str, max_turns: int = 12, channel: str = "web", user_id: str | None = None
+) -> ConversationReport:
     """The configured model plays the user, turn by turn, until the persona stops or `max_turns` is reached."""
     cap, stopped = min(max_turns, MAX_PERSONA_TURNS), False
 
@@ -153,12 +205,14 @@ async def run_persona(rt: Runtime, policy: CompiledPolicy, name: str, persona: s
         text, stopped = await persona_message(rt.llm, rt.models, policy, persona, channel, transcript)
         return text
 
-    return await _drive(rt, policy, name, channel, played, persona=persona)
+    return await _drive(rt, policy, name, channel, played, persona=persona, user_id=user_id)
 
 
-def sim_runtime(llm: LLMClient, models: ModelConfig, **stores: Any) -> Runtime:
-    """A runtime of its own: fake tools (nothing is submitted or sent), its own sessions, memory, inbox and audit log."""
-    return Runtime(llm, FakeTools().impls(), models=models, **stores)
+def sim_runtime(llm: LLMClient, models: ModelConfig, fakes: FakeTools | None = None, **stores: Any) -> Runtime:
+    """A runtime of its own: fake tools (nothing is submitted or sent, each call's output is recorded per turn), its own
+    sessions, memory, inbox and audit log."""
+    tools = {n: _recorded(n, f) for n, f in (fakes or FakeTools()).impls().items()}
+    return Runtime(llm, tools, models=models, **stores)
 
 
 async def simulate(rt: Runtime, policy: CompiledPolicy, conversations: list[dict[str, Any]], parallel: int = 3) -> SimReport:

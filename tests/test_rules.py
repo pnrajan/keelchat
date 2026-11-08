@@ -24,6 +24,7 @@ SUPPORT = (Path(__file__).parent.parent / "examples" / "support_assistant.yaml")
 
 def with_rules(fn: Any) -> str:
     data = yaml.safe_load(SUPPORT)
+    data.pop("rules", None)  # the example's own rule; each test sets the rules it checks
     fn(data)
     return yaml.safe_dump(data, sort_keys=False)
 
@@ -36,7 +37,7 @@ def add_agent_rule(d: dict[str, Any]) -> None:
 
 
 def test_rules_compile_and_only_change_the_hash_when_present() -> None:
-    plain = build(SUPPORT)
+    plain = build(with_rules(lambda d: None))
     ruled = build(with_rules(add_agent_rule))
     assert ruled.rules[0].name == "damaged_item" and plain.rules == [] and ruled.hash != plain.hash
 

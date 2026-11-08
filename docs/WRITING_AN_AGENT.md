@@ -204,8 +204,9 @@ language, confirms before switching, keeps names and job text as written, and an
 ## 7. Evals before launch
 
 - Write the replay set first: happy path, every exit, one edit, one multi-intent message, one off-scope message, one
-  per language. `evals/<agent>/replay.yaml` with structural expectations.
-- Add personas for your real users (shorthand, typos, chatty, returning).
+  per language, and one per rule (`expect: {rules: {3: [damaged_item]}}`). `evals/<agent>/replay.yaml`.
+- Add personas for your real users (shorthand, typos, chatty, returning): `persona:` cases the model plays.
+- Score what matters with a judge: `rule_followed` for rules, `ragas.Faithfulness` for answers from documents.
 - Simulate before you ship: the console's **Simulate** tab (or `POST /v1/tenants/{t}/agents/{agent}/simulate`) runs
   scripted users or personas the model plays against the agent you built, on fake tools and stores of their own, and
   shows each conversation's outcome, transcript and decisions. `yachat simulate` scripts take `persona:` entries too.
