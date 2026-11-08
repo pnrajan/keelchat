@@ -177,6 +177,26 @@ fixes of two kinds:
 Code checks what the model names: a problem or fix pointing at a turn that isn't in the conversation is dropped, and
 counts are capped.
 
+```bash
+YACHAT_MODEL_CRITIC=claude-opus-5-5     # or any litellm id, e.g. openrouter/anthropic/claude-opus-5.5
+```
+
+Step by step:
+
+1. Have a trial chat (or run a simulation) and open **Test → Judge**.
+2. **Judge this conversation.** You get a short summary and the problems by turn, worst first: an off-topic question
+   answered as if it were in scope, a rule that matched but wasn't followed, a promise the bot can't keep.
+3. Tick the policy fixes and **Apply to the policy**. Try the change, then save a version.
+4. **Send to Claude Code** for each code fix.
+5. In your yachat checkout, run `/yachat:fix-findings` (the [plugin](../plugins/yachat)). Claude files each task as a
+   GitHub issue when you say yes, and gives each to its own subagent on its own branch: failing test, fix, checks.
+6. Save the chat as a test (**Test → Tests**) so every later build replays it.
+
+Why it is built this way: the bot runs on a model fast and cheap enough for every message, and a review can afford a
+stronger one. That model can still be wrong, so every fix goes through a step you approve: the build and your save
+for policy fixes, a failing test and your review for code fixes. The server never edits code; Claude Code does, in
+your checkout, on a branch.
+
 ### Any MCP client
 
 Point it at `$YACHAT_URL/mcp` (streamable HTTP) with `Authorization: Bearer <key>`. For Claude Code without the

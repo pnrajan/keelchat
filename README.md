@@ -55,12 +55,14 @@ uv sync --all-extras
 ./run.sh                    # console on :5173, API on :8000
 ```
 
-Open http://127.0.0.1:5173. To make your own bot without writing YAML, open **Compose**: say what it should do, read
-back what it will do in plain words, and ask for changes the same way. To try the example, pick **Support assistant**, press **Build & try**, then
-**New session**, and chat. The
-**Inspector** shows why each reply was chosen; under **Test**, **Tests** saves the chat as a test, **Rate** lets a
-person score it and **Judge** has a stronger model review it.
-`scripts/try.sh` starts the console with a sample agent and tests ready to run, no database needed.
+Open http://127.0.0.1:5173.
+
+- **Make your own bot without YAML:** open **Compose**, say what it should do, read back what it will do in plain
+  words, and ask for changes the same way.
+- **Try the example:** pick **Support assistant**, press **Build & try**, then **New session**, and chat. The
+  **Inspector** shows why each reply was chosen. Under **Test**, **Tests** saves the chat as a test, **Rate** lets a
+  person score it, and **Judge** has a stronger model review it.
+- **No database, no setup:** `scripts/try.sh` starts the console with a sample agent and tests ready to run.
 
 Prefer the terminal? `uv run yachat build examples/support_assistant.yaml` validates a policy and
 `uv run yachat serve` starts the API, with interactive docs at `/docs`. The
@@ -151,35 +153,15 @@ uv run yachat evals calibrate                                  # how often the j
 
 ## Improve it with a stronger judge
 
-Your bot runs on a model that is fast and cheap enough for every message. To review a conversation, you can afford a
-stronger one. Set it once:
+Set `YACHAT_MODEL_CRITIC` to a stronger model than the bot runs on, have a trial chat, and open **Test → Judge**. The
+judge says what went wrong on which turn and proposes fixes:
 
-```bash
-YACHAT_MODEL_CRITIC=claude-opus-5-5     # or any litellm id, e.g. openrouter/anthropic/claude-opus-5.5
-```
+- **Policy fixes** (a rule, the scope, a question's wording) go into the editor; you try them and save.
+- **Code fixes** (things the policy can't express) go to Claude Code as tasks. With the [yachat plugin](plugins/yachat),
+  `/yachat:fix-findings` files each as a GitHub issue and fixes it on its own branch, failing test first.
 
-Then, in the console:
-
-1. **Have a trial chat** (or run a simulation) and open **Test → Judge**.
-2. **Judge this conversation.** The stronger model reads the chat with the policy it ran on. It returns a short
-   summary and what went wrong on which turn, worst first: an off-topic question answered as if it were in scope, a
-   rule that matched but wasn't followed, a promise the bot can't keep.
-3. **Fix the policy.** Most problems are wording: a rule, the charter's scope, a question's `ask` or `expect`. Tick
-   those fixes and **Apply to the policy**. The change lands in the editor and is checked by the build; nothing is
-   saved until you try it and save a version.
-4. **Send code fixes to Claude Code.** Some problems the policy can't express: a step that doesn't exist yet, or the
-   runtime misreading an answer. **Send to Claude Code** keeps each one as a fix task with the conversation, the
-   change, the likely files and a test that should fail before the fix.
-5. **Let Claude Code do the fix.** With the [yachat plugin](plugins/yachat) installed, run `/yachat:fix-findings`
-   in your yachat checkout. Claude reads the open tasks over MCP, files each as a GitHub issue when you say yes, and
-   gives each one to its own subagent on its own branch. The subagent writes the failing test, makes the fix and runs
-   the checks. Nothing is pushed without your yes, and each task is closed with a link to its branch or PR.
-6. **Check it stays fixed.** Save the chat as a test (**Test → Tests**) so every later build replays it.
-
-Why it is built this way: a stronger model finds problems a person would take a while to spot, but it can still be
-wrong. So the server checks its answer (problems that point at turns the chat doesn't have are dropped). Every fix
-goes through a step you approve: the build and your save for policy fixes, a failing test and your review for code
-fixes. The server never edits code; Claude Code does that, in your checkout, on a branch.
+Nothing is saved, pushed or filed without your yes. [How the judge works](docs/FEATURES.md#judge-a-trial-conversation-with-a-stronger-model)
+has the steps and the reasons.
 
 ## Examples
 
@@ -220,6 +202,13 @@ contextual rules, Parlant; for programmatic multi-agent graphs, LangGraph; for a
 | understand the runtime | [Architecture](docs/ARCHITECTURE.md) |
 | test, rate and measure quality | [Evals](docs/EVALS.md) |
 | have a stronger model review chats and hand code fixes to Claude Code | [Judge a trial conversation](docs/FEATURES.md#judge-a-trial-conversation-with-a-stronger-model) |
+
+## Getting help
+
+- **Questions and bugs:** [open an issue](https://github.com/pnrajan/yachat/issues/new/choose); the bug template asks
+  for the policy, the messages and the trace that show it.
+- **Something not working locally:** [Troubleshooting](docs/REFERENCE.md#troubleshooting) covers the common fixes.
+- **Security:** please don't open a public issue; follow [SECURITY.md](SECURITY.md).
 
 ## Contributing
 
