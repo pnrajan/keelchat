@@ -22,6 +22,7 @@ from yachat.state.models import (
     AuditEvent,
     AuditKind,
     Embed,
+    FixTask,
     Handoff,
     HandoffLine,
     HandoffStatus,
@@ -787,6 +788,38 @@ class InMemoryAgentTestStore(AgentTestStore):
 
     async def delete(self, tenant: str, test_id: str) -> bool:
         return self._t.pop((tenant, test_id), None) is not None
+
+
+class FixTaskStore(ABC):
+    """Code changes the critic found, kept per tenant until someone makes them."""
+
+    @abstractmethod
+    async def save(self, task: FixTask) -> FixTask:
+        """Insert, or replace the task with the same id."""
+
+    @abstractmethod
+    async def get(self, tenant: str, task_id: str) -> FixTask | None: ...
+
+    @abstractmethod
+    async def list(self, tenant: str, agent: str | None = None, status: str | None = None, limit: int = 200) -> builtins.list[FixTask]:
+        """Newest first."""
+
+
+class InMemoryFixTaskStore(FixTaskStore):
+    def __init__(self) -> None:
+        self._f: dict[tuple[str, str], FixTask] = {}
+
+    async def save(self, task: FixTask) -> FixTask:
+        self._f[(task.tenant, task.id)] = task.model_copy(deep=True)
+        return task
+
+    async def get(self, tenant: str, task_id: str) -> FixTask | None:
+        f = self._f.get((tenant, task_id))
+        return f.model_copy(deep=True) if f else None
+
+    async def list(self, tenant: str, agent: str | None = None, status: str | None = None, limit: int = 200) -> builtins.list[FixTask]:
+        rows = [f.model_copy(deep=True) for (t, _), f in self._f.items() if t == tenant and agent in (None, f.agent) and status in (None, f.status)]
+        return sorted(rows, key=lambda f: f.created_at, reverse=True)[:limit]
 
 
 class InMemoryHandoffStore(HandoffStore):

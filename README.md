@@ -11,7 +11,7 @@
 
 [Quickstart](#quickstart) · [Examples](#examples) · [Documentation](#documentation) · [Contributing](CONTRIBUTING.md)
 
-<img src="docs/assets/console.jpg" alt="The yachat test console: the policy editor on the left, a test chat in the middle, and the launch checklist on the right" width="900">
+<img src="docs/assets/console.jpg" alt="The yachat test console: the support assistant's policy on the left, a test chat in the middle (consent, a damaged item, an order number), and the Inspector's launch checklist and settings on the right" width="900">
 
 </div>
 
@@ -37,6 +37,8 @@ runs every bot, and keeps the counting, safety checks and channel rules in code 
 - **Tested without writing answers.** Every conversation is checked against the policy: no errors, loops or broken
   limits, replies in scope, rules followed. Test sets are generated from the policy, and people rate conversations in
   the console to keep the judge honest.
+- **A stronger model reviews your trial chats.** It says what went wrong on which turn and proposes fixes: changes to
+  the policy go straight into the editor, and changes that need code become tasks Claude Code picks up and fixes.
 - **Handoff that comes back.** A person takes over through the inbox or your helpdesk; when they resolve the ticket,
   the bot tells the user and resumes the conversation.
 - **Laptop to production.** Runs with only a model key, every store in memory; add Redis, Postgres and S3 for
@@ -53,11 +55,14 @@ uv sync --all-extras
 ./run.sh                    # console on :5173, API on :8000
 ```
 
-Open http://127.0.0.1:5173. To make your own bot without writing YAML, open **Compose**: say what it should do, read
-back what it will do in plain words, and ask for changes the same way. To try the example, pick **Support assistant**, press **Build & try**, then
-**New session**, and chat. The
-**Inspector** shows why each reply was chosen; the **Test** tab saves the chat as a test, and **Review** rates it.
-`scripts/try.sh` starts the console with a sample agent and tests ready to run, no database needed.
+Open http://127.0.0.1:5173.
+
+- **Make your own bot without YAML:** open **Compose**, say what it should do, read back what it will do in plain
+  words, and ask for changes the same way.
+- **Try the example:** pick **Support assistant**, press **Build & try**, then **New session**, and chat. The
+  **Inspector** shows why each reply was chosen. Under **Test**, **Tests** saves the chat as a test, **Rate** lets a
+  person score it, and **Judge** has a stronger model review it.
+- **No database, no setup:** `scripts/try.sh` starts the console with a sample agent and tests ready to run.
 
 Prefer the terminal? `uv run yachat build examples/support_assistant.yaml` validates a policy and
 `uv run yachat serve` starts the API, with interactive docs at `/docs`. The
@@ -139,12 +144,25 @@ uv run yachat evals calibrate                                  # how often the j
   near miss, out of scope, asking for a person, each language). The model only plays the user.
 - **Judged checks** (staying in scope, following rules) need `EVALS_JUDGE_MODEL`, any litellm model id. The judge
   quotes the reply for every verdict, and code decides pass or fail.
-- **In the console**: the **Test** tab keeps tests with the agent: save a chat as a test, draft them from the
-  policy, run them all on each build. In the **Review** tab people mark replies pass or fail and score conversations;
-  the ratings feed `calibrate`, and **Suggest policy changes** revises the policy to fix what they failed.
+- **In the console**, under **Test**: **Tests** keeps tests with the agent (save a chat as a test, draft them from the
+  policy, run them all on each build); **Rate** lets people mark replies pass or fail and score conversations, which
+  feeds `calibrate`, and **Suggest policy changes** revises the policy to fix what they failed; **Judge** has a
+  stronger model review a chat (see below).
 - **In CI**, run both `evals run` and `evals check`.
 
 [Evals](docs/EVALS.md) has the details.
+
+## Improve it with a stronger judge
+
+Set `YACHAT_MODEL_CRITIC` to a stronger model than the bot runs on, have a trial chat, and open **Test → Judge**. The
+judge says what went wrong on which turn and proposes fixes:
+
+- **Policy fixes** (a rule, the scope, a question's wording) go into the editor; you try them and save.
+- **Code fixes** (things the policy can't express) go to Claude Code as tasks. With the [yachat plugin](plugins/yachat),
+  `/yachat:fix-findings` files each as a GitHub issue and fixes it on its own branch, failing test first.
+
+Nothing is saved, pushed or filed without your yes. [How the judge works](docs/FEATURES.md#judge-a-trial-conversation-with-a-stronger-model)
+has the steps and the reasons.
 
 ## Examples
 
@@ -184,6 +202,15 @@ contextual rules, Parlant; for programmatic multi-agent graphs, LangGraph; for a
 | run and debug it locally | [Developer guide](docs/DEVELOPER_GUIDE.md) |
 | understand the runtime | [Architecture](docs/ARCHITECTURE.md) |
 | test, rate and measure quality | [Evals](docs/EVALS.md) |
+| have a stronger model review chats and hand code fixes to Claude Code | [Judge a trial conversation](docs/FEATURES.md#judge-a-trial-conversation-with-a-stronger-model) |
+
+## Getting help
+
+- **Questions, ideas, a bot to show:** [Discussions](https://github.com/pnrajan/yachat/discussions).
+- **Bugs:** [open an issue](https://github.com/pnrajan/yachat/issues/new/choose); the bug template asks for the
+  policy, the messages and the trace that show it.
+- **Something not working locally:** [Troubleshooting](docs/REFERENCE.md#troubleshooting) covers the common fixes.
+- **Security:** please don't open a public issue; follow [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

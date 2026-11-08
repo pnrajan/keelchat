@@ -217,7 +217,7 @@ flow:
 
 - `think: true` (any step; always on for `high_stakes` turns) plans the reply first: what the user needs, what is
   not known (never assumed), which matched rules apply, and the reply's steps. Code adds any matched rule the plan
-  left out, so a rule's `then` is never forgotten. The plan shows in the console's **Trace** tab, and replies that
+  left out, so a rule's `then` is never forgotten. The plan shows in the console's **Why** tab (Inspector → This reply), and replies that
   had one are marked *planned* in the chat.
 - `curious: true` (form steps) checks each valid answer for the detail a person handling it would need. When one is
   missing ("it's broken": broken how?), the answer is kept and one short follow-up asks for it; what they add is

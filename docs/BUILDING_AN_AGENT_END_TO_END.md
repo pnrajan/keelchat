@@ -203,8 +203,8 @@ curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/tenants/acme/
 6. `can you tell me about Nike's sale?` → declined per the charter, then back on track.
 7. `¿puedo seguir en español?` → it confirms, then switches.
 
-The Inspector shows why each reply happened: **Trace** (every stage with its time and routing reason), **State** (what
-was collected), **Analysis** (verification of answers from documents). Read the replies as the customer would. When
+The Inspector's **This reply** group shows why each reply happened: **Why** (the plan, when the step thinks first,
+and every stage with its time), **State** (what was collected), **Analysis** (verification of answers from documents). Read the replies as the customer would. When
 one is wrong, change the policy, not the test: a vague charter, a loose `expect`, a missing out-of-scope line.
 
 ## 9. Write tests

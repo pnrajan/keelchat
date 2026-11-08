@@ -133,7 +133,7 @@ Metric names:
 
 ## People rating conversations
 
-The console's **Review** tab is where people judge the agent. Pick the test chat or a simulated conversation, then mark
+The console's **Rate** tab (Inspector → Test) is where people judge the agent. Pick the test chat or a simulated conversation, then mark
 each reply in scope or not, and each rule that matched on it followed or not, with an optional reason. Give the
 conversation an overall score (1 bad, 5 great) and a note. Ratings are kept per agent (Postgres when configured).
 
@@ -151,6 +151,10 @@ Use them three ways:
    can, and starts the YAML with one `# change:` line per edit naming the feedback it answers. The build checks the
    revision and the model repairs its errors, like a drafted policy. **Open in editor** replaces the editor text;
    nothing is saved until you build it, run the tests and save a version.
+
+**Judge** (the tab after Rate) does the rating for you with a stronger model (`YACHAT_MODEL_CRITIC`): problems by turn,
+policy fixes applied in the editor, and code fixes kept for Claude Code (see FEATURES.md, *Judge a trial
+conversation*). Use it to find problems quickly; keep rating by hand to calibrate judges you trust in CI.
 
 A conversation rated again after it grew (more chat) counts once in the downloads: its newest rating. Eval folders use
 the agent name with `_` for `-` (`support-assistant` → `evals/support_assistant/`).

@@ -21,6 +21,7 @@ from yachat.state.models import (
     AuditEvent,
     AuditKind,
     Embed,
+    FixTask,
     Handoff,
     HandoffLine,
     HandoffStatus,
@@ -39,6 +40,7 @@ from yachat.state.store import (
     AuditStore,
     BudgetStore,
     EmbedStore,
+    FixTaskStore,
     HandoffStore,
     InsightJob,
     JobStore,
@@ -237,6 +239,16 @@ CREATE TABLE IF NOT EXISTS agent_tests (
     PRIMARY KEY (tenant, id)
 );
 CREATE INDEX IF NOT EXISTS agent_tests_tenant_agent ON agent_tests (tenant, agent, created_at);
+CREATE TABLE IF NOT EXISTS fix_tasks (
+    tenant TEXT NOT NULL,
+    id TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    task JSONB NOT NULL,
+    PRIMARY KEY (tenant, id)
+);
+CREATE INDEX IF NOT EXISTS fix_tasks_tenant ON fix_tasks (tenant, created_at DESC);
 -- tables created before tenancy keyed rows without the tenant, so two tenants overwrote each other: re-key them.
 -- The old key was unique on (user_id, agent, item), so the wider key cannot conflict.
 DO $$
@@ -1010,3 +1022,38 @@ class PostgresAgentTestStore(_Pooled, AgentTestStore):
         async with (await self.pool).acquire() as con:
             res = await con.execute("DELETE FROM agent_tests WHERE tenant=$1 AND id=$2", tenant, test_id)
         return str(res).endswith(" 1")
+
+
+class PostgresFixTaskStore(_Pooled, FixTaskStore):
+    """Code changes the critic found, in Postgres, one JSON row each."""
+
+    async def save(self, task: FixTask) -> FixTask:
+        async with (await self.pool).acquire() as con:
+            await con.execute(
+                "INSERT INTO fix_tasks (tenant, id, agent, status, created_at, task) VALUES ($1,$2,$3,$4,$5,$6::jsonb) "
+                "ON CONFLICT (tenant, id) DO UPDATE SET status=EXCLUDED.status, task=EXCLUDED.task WHERE fix_tasks.agent = EXCLUDED.agent",
+                task.tenant,
+                task.id,
+                task.agent,
+                task.status,
+                task.created_at,
+                task.model_dump_json(),
+            )
+        return task
+
+    async def get(self, tenant: str, task_id: str) -> FixTask | None:
+        async with (await self.pool).acquire() as con:
+            row = await con.fetchrow("SELECT task FROM fix_tasks WHERE tenant=$1 AND id=$2", tenant, task_id)
+        return FixTask.model_validate_json(row["task"]) if row else None
+
+    async def list(self, tenant: str, agent: str | None = None, status: str | None = None, limit: int = 200) -> list[FixTask]:
+        async with (await self.pool).acquire() as con:
+            rows = await con.fetch(
+                "SELECT task FROM fix_tasks WHERE tenant=$1 AND ($2::text IS NULL OR agent=$2) AND ($3::text IS NULL OR status=$3) "
+                "ORDER BY created_at DESC LIMIT $4",
+                tenant,
+                agent,
+                status,
+                limit,
+            )
+        return [FixTask.model_validate_json(r["task"]) for r in rows]

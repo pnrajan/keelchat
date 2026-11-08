@@ -78,6 +78,17 @@ def test_litellm_settings(monkeypatch):
     assert litellm_settings("openrouter/openai/gpt-4o-mini")["model_name"].startswith("openrouter/")
 
 
+def test_the_litellm_client_routes_each_model_to_its_own_provider(monkeypatch):
+    from yachat.runtime.litellm_client import LiteLLMClient
+
+    monkeypatch.setenv("YACHAT_LLM", "litellm")
+    monkeypatch.setenv("YACHAT_MODEL_GENERATE", "siliconflow/Qwen/Qwen3.5-27B")
+    monkeypatch.setenv("SILICONFLOW_API_KEY", "k")
+    client = llm_from_env()
+    # not pinned to the generate model's provider: a critic on OpenRouter must not be sent to SiliconFlow
+    assert isinstance(client, LiteLLMClient) and client.api_key is None and client.api_base is None
+
+
 def test_fake_tools_only_replace_tools_without_a_backend(monkeypatch):
     for var in ("YACHAT_TOOLS", "KNOWLEDGE_URL", "JOB_SEARCH_URL", "CAREER_URL", "ANALYTICS_URL", "HANDOFF_URL"):
         monkeypatch.delenv(var, raising=False)

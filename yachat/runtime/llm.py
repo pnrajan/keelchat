@@ -27,6 +27,8 @@ class ModelConfig:
     effort_rewrite: str = "low"
     #: checks reasoning before it is shown (yachat/reasoning); empty: the generate model
     verify: str = ""
+    #: a stronger model that judges trial conversations and suggests fixes (yachat/evals/critic); empty: off
+    critic: str = ""
 
     @property
     def verifier(self) -> str:
@@ -38,6 +40,7 @@ class ModelConfig:
             generate=os.getenv("YACHAT_MODEL_GENERATE", cls.generate),
             classify=os.getenv("YACHAT_MODEL_CLASSIFY", cls.classify),
             verify=os.getenv("YACHAT_MODEL_VERIFY", ""),
+            critic=os.getenv("YACHAT_MODEL_CRITIC", ""),
             effort_generate=os.getenv("YACHAT_EFFORT_GENERATE") or cls.effort_generate,
             effort_classify=os.getenv("YACHAT_EFFORT_CLASSIFY") or cls.effort_classify,
             effort_rewrite=os.getenv("YACHAT_EFFORT_REWRITE") or cls.effort_rewrite,
@@ -46,7 +49,7 @@ class ModelConfig:
 
 def small_only(m: ModelConfig) -> ModelConfig:
     """Every job on the small (classify) model: replies, checks and drafting included."""
-    return replace(m, generate=m.classify, verify=m.classify)
+    return replace(m, generate=m.classify, verify=m.classify, critic=m.classify if m.critic else "")
 
 
 @dataclass
@@ -59,6 +62,8 @@ class LLMRequest:
     effort: str = "low"
     #: stop generating at any of these (code agents stop before a made-up observation)
     stop: list[str] = dc_field(default_factory=list)
+    #: seconds before the call gives up; the client's default when unset (long judgements need more)
+    timeout_s: float | None = None
     #: fakes read this; real clients ignore it
     metadata: dict[str, Any] = dc_field(default_factory=dict)
 
@@ -126,6 +131,7 @@ class AnthropicLLMClient(LLMClient):
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
                 **({"stop_sequences": req.stop} if req.stop else {}),
+                **({"timeout": req.timeout_s} if req.timeout_s else {}),
                 **extra,
             )
         except RateLimitError as e:

@@ -39,5 +39,5 @@ uv run yachat evals run   # when a policy, prompt or example agent changed
 
 ## Reporting problems
 
-Bugs and feature requests: GitHub issues (templates provided). Security issues: see `SECURITY.md`, do not open a
+Questions and ideas: GitHub Discussions. Bugs and feature requests: GitHub issues (templates provided). Security issues: see `SECURITY.md`, do not open a
 public issue.

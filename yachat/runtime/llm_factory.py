@@ -61,7 +61,7 @@ def llm_from_env() -> LLMClient:
         settings = litellm_settings(ModelConfig.from_env().generate)
         if not settings["api_key"] and not os.getenv("OPENAI_API_KEY"):
             raise RuntimeError("YACHAT_LLM=litellm needs the provider key for YACHAT_MODEL_GENERATE (or LITELLM_PROXY_URL)")
-        return LiteLLMClient(api_key=settings["api_key"], api_base=settings["api_base"])
+        return LiteLLMClient()  # key and base per request (litellm_settings): each model may use another provider
     raise RuntimeError("no LLM configured: set YACHAT_LLM=anthropic|litellm and the provider key (see .env / README)")
 
 

@@ -21,17 +21,18 @@ The features behind a policy, with the YAML that turns each one on. Start with t
 |---|---|
 | **Compose** | Make a bot in two steps, without YAML: say what it should do (or pick an example or a ready-made bot), then read what it will do in plain words and ask for any change ("also ask for their email"); each change is listed before you apply it. **Try it** opens the test chat. **Fine-tune** (folded) has cards for steps and questions, safety, rules, handoff, memory, small talk and how carefully each step replies; **Show YAML** (folded) has the file. |
 | **Editor · test chat** | Edit the YAML with completion for keys, step names, tools and guardrails, docs on hover, and build errors marked on their lines as you type. **Build & try** compiles it and the chat pane talks to it. |
-| **Inspector** | Four groups. **Setup**: the form editor and launch checklist. **This reply**: why it was chosen (the plan, when the step thinks first, and each stage's timing), the session state, the raw response. **Test**: tests, simulations, rating. **More**: versions, handoffs, the audit log, metrics. |
+| **Inspector** | Four groups. **Setup**: the form editor and launch checklist. **This reply**: why it was chosen (the plan, when the step thinks first, and each stage's timing), the session state, the raw response. **Test**: tests, simulations, rating, the judge. **More**: versions, handoffs, the audit log, metrics. |
 | **Simulate** | Model-played personas and scripted replays against the policy, on fake tools. |
 | **Test** | Tests kept with the agent: save a conversation as one, draft them from the policy, run them all on the current build, download them as a replay set. |
-| **Review** | Rate the test chat or a simulated conversation: each reply in scope or not, each matched rule followed or not, an overall score from 1 to 5. Download the ratings as judge labels and the failed conversations as replay cases, or let the model suggest policy changes that answer them. |
+| **Rate** | Rate the test chat or a simulated conversation: each reply in scope or not, each matched rule followed or not, an overall score from 1 to 5. Download the ratings as judge labels and the failed conversations as replay cases, or let the model suggest policy changes that answer them. |
+| **Judge** | A stronger model (`YACHAT_MODEL_CRITIC`) reviews the test chat or a simulation: what went wrong on which turn, policy fixes you apply in the editor, and code fixes sent to Claude Code. See [below](#judge-a-trial-conversation-with-a-stronger-model). |
 | **Versions** | Save a build as a version, compare versions line by line, roll back, copy an agent. |
 | **Channels** | What to paste or configure for the website widget, a link, WordPress, WhatsApp, SMS, Slack and phone. |
 | **Publish · results** | Publish an agent as a widget and app. For surveys: scores over time, splits and themes. |
 | **Outcomes · Handoffs** | How conversations ended, the decision audit log, and the inbox of chats passed to a person. |
 | **Settings** | API keys, models, token usage and cost by model, purpose and day. |
 
-<p align="center"><img src="assets/console-trace.jpg" alt="The Trace tab: each Understand, Decide and Respond stage of a turn with its time in milliseconds" width="900"></p>
+<p align="center"><img src="assets/console-trace.jpg" alt="The Inspector's Why tab: how the reply was planned (what it needs, the damaged_item rule, three steps), with the stage timings folded below" width="900"></p>
 
 ## Channels
 
@@ -156,6 +157,48 @@ Then ask in plain words:
 Claude uses the same tools the console does (`whoami`, `get_schema`, `list_bot_types`, `draft_policy`,
 `create_agent`, `get_policy`, `check_readiness`, `try_conversation`, `save_version`, `activate_version`). It acts only
 in the key's tenant, and only builds that pass are saved.
+
+The **fix-findings** skill works through what the judge found (below): `/yachat:fix-findings` lists the open fix
+tasks (`list_fix_tasks`, `get_fix_task`), files each as a GitHub issue with `gh` once you say yes, and hands each to a
+subagent in its own worktree that writes the failing test, makes the fix and runs the checks. It closes each task
+with `update_fix_task` and a note. Nothing is pushed without your yes.
+
+### Judge a trial conversation with a stronger model
+
+Set `YACHAT_MODEL_CRITIC` to a stronger model than the agent runs on. In the console, **Test → Judge** sends a test
+chat or a simulation, with the policy in the editor, to that model. It returns what went wrong on which turn, and
+fixes of two kinds:
+
+- **Fix in the policy** (a rule, the charter, a field's wording, a setting): tick them and **Apply to the policy**.
+  The drafter makes the change in the editor, the build checks it, and nothing is saved.
+- **Fix in code** (something the policy can't express, or a runtime bug): **Send to Claude Code** keeps it as a fix
+  task with the conversation, the change, likely files and the test that should fail first. The fix-findings skill
+  picks it up.
+
+Code checks what the model names: a problem or fix pointing at a turn that isn't in the conversation is dropped, and
+counts are capped.
+
+<p align="center"><img src="assets/console-judge.jpg" alt="The Judge tab: a summary of the test chat and its problems by turn, marked high or medium, each with the user's message and the agent's reply" width="900"></p>
+
+```bash
+YACHAT_MODEL_CRITIC=claude-opus-5-5     # or any litellm id, e.g. openrouter/anthropic/claude-opus-5.5
+```
+
+Step by step:
+
+1. Have a trial chat (or run a simulation) and open **Test → Judge**.
+2. **Judge this conversation.** You get a short summary and the problems by turn, worst first: an off-topic question
+   answered as if it were in scope, a rule that matched but wasn't followed, a promise the bot can't keep.
+3. Tick the policy fixes and **Apply to the policy**. Try the change, then save a version.
+4. **Send to Claude Code** for each code fix.
+5. In your yachat checkout, run `/yachat:fix-findings` (the [plugin](../plugins/yachat)). Claude files each task as a
+   GitHub issue when you say yes, and gives each to its own subagent on its own branch: failing test, fix, checks.
+6. Save the chat as a test (**Test → Tests**) so every later build replays it.
+
+Why it is built this way: the bot runs on a model fast and cheap enough for every message, and a review can afford a
+stronger one. That model can still be wrong, so every fix goes through a step you approve: the build and your save
+for policy fixes, a failing test and your review for code fixes. The server never edits code; Claude Code does, in
+your checkout, on a branch.
 
 ### Any MCP client
 

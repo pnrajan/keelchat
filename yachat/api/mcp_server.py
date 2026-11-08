@@ -18,7 +18,9 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 INSTRUCTIONS = """Build goal-oriented chat agents on this yachat server, for the tenant your key belongs to.
 Workflow: whoami → list_bot_types (or draft_policy from a description) → create_agent → get_policy / update_policy
 → check_readiness until nothing blocks → try_conversation → save_version → activate_version to roll back.
-Policies are YAML; get_schema lists every key, step and tool. Only valid builds are saved."""
+Policies are YAML; get_schema lists every key, step and tool. Only valid builds are saved.
+Code fixes found by judging trial conversations: list_fix_tasks → get_fix_task → change the code (a failing test
+first) → update_fix_task with status done and a note; link a GitHub issue with `issue`."""
 
 
 class _Api:
@@ -131,6 +133,31 @@ def build_mcp(app: FastAPI) -> MCPServer:
             r = await api(ctx, "POST", f"/v1/sessions/{s['id']}/turns", {"text": m})
             turns.append({"user": m, "agent": r["outbound"]["text"], "step": r.get("route"), "errors": r.get("errors")})
         return {"session": s["id"], "policy_hash": s["policy_hash"], "turns": turns}
+
+    @mcp.tool()
+    async def list_fix_tasks(ctx: Context[Any, Any], agent: str = "", status: str = "open") -> list[dict[str, Any]]:
+        """Code fixes a stronger model proposed after judging trial conversations, newest first (status: open, done,
+        dismissed, or "" for all). Each names the problem, the change, likely files and a test that should fail first."""
+        t = await tenant(ctx)
+        q = "&".join(f"{k}={v}" for k, v in (("agent", agent), ("status", status)) if v)
+        out: list[dict[str, Any]] = await api(ctx, "GET", f"/v1/tenants/{t}/fixes" + (f"?{q}" if q else ""))
+        return out
+
+    @mcp.tool()
+    async def get_fix_task(fix_id: str, ctx: Context[Any, Any]) -> dict[str, Any]:
+        """One fix task with the conversation that showed it, and `issue_markdown`: its text as a GitHub issue body."""
+        out: dict[str, Any] = await api(ctx, "GET", f"/v1/tenants/{await tenant(ctx)}/fixes/{fix_id}")
+        return out
+
+    @mcp.tool()
+    async def update_fix_task(fix_id: str, ctx: Context[Any, Any], status: str = "", note: str = "", issue: str = "") -> dict[str, Any]:
+        """Mark a fix task done or dismissed (or open again), say what was done (`note`, e.g. the PR link), or link
+        the GitHub issue it was filed as (`issue`, a URL)."""
+        body = {k: v for k, v in (("status", status), ("note", note), ("issue", issue)) if v}
+        if not body:
+            raise ToolError("give status, note or issue")
+        out: dict[str, Any] = await api(ctx, "PATCH", f"/v1/tenants/{await tenant(ctx)}/fixes/{fix_id}", body)
+        return out
 
     return mcp
 
