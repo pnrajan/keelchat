@@ -5,4 +5,4 @@ minimums:
   rule_followed: 0.8                           # replies on turns where a rule matched do what it says
   ragas.Faithfulness: 0.8                      # answers from documents claim only what the passages say
   ragas.ContextPrecisionWithoutReference: 0.7  # the passages retrieved were the useful ones
-calibration: {}
+calibration: {in_scope: 1.0, rule_followed: 0.9}   # yachat evals calibrate, labels.yaml, Qwen3.5-27B judge; lowest of two runs

@@ -7,6 +7,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
+- `--trials k` / `trials:` on evals: each case runs k times and passes only when every run does; flaky cases listed.
+- `yachat evals calibrate`: the judge's agreement with replies a person labeled (`labels.yaml`).
 - `yachat evals check` and checks every conversation must pass (no errors, loops or broken limits; in scope; rules followed).
 - Handoffs resume: per-ticket `callback_url`, **Resolve and resume**, `handoff.timeout`.
 - `rules:` on agents and flow steps.
