@@ -32,6 +32,7 @@ Interactive docs at `/docs`. The main routes:
 | `POST /v1/tenants/{t}/agents`, `GET .../agents/{agent}/versions`, `POST .../versions/{n}/activate` | save versions, list them, roll back |
 | `POST /v1/sessions`, `POST /v1/sessions/{id}/turns`, `GET /v1/sessions/{id}/state` | talk to an agent |
 | `POST /v1/tenants/{t}/agents/{agent}/simulate` | simulated users on fake tools |
+| `POST`, `GET /v1/tenants/{t}/agents/{agent}/reviews`, `GET .../reviews/labels.yaml`, `.../reviews/replay.yaml` | people's ratings of conversations; as judge labels and replay cases |
 | `POST /v1/tenants/{t}/tools`, `PUT /v1/tenants/{t}/datasets/{name}` | register HTTP tools and datasets |
 | `POST /v1/tenants/{t}/agents/{agent}/embeds` | publish as a widget, link and app |
 | `GET /v1/tenants/{t}/handoffs`, `.../audit`, `.../dashboard`, `.../usage` | inbox, decision log, outcomes, cost |

@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 
 def new_id(prefix: str) -> str:
@@ -290,3 +290,61 @@ class Handoff(BaseModel):
 
     def public(self) -> dict[str, Any]:
         return self.model_dump(mode="json", exclude={"callback_hash"})
+
+
+class ReviewTurn(BaseModel):
+    """One exchange of the conversation under review, with the policy rules that matched on it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user: str = Field(max_length=8_000)
+    agent: str = Field(max_length=8_000)
+    rules: list[str] = Field(default_factory=list, max_length=20)
+
+
+class ReplyRating(BaseModel):
+    """A person's verdict on one reply: does it pass `check` (`in_scope` or `rule_followed:<rule>`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: the reply's turn, from 1
+    turn: int = Field(ge=1)
+    check: str = Field(pattern=r"^(in_scope|rule_followed:[A-Za-z0-9_.-]+)$")
+    ok: StrictBool
+    note: str = Field(default="", max_length=500)
+
+
+class Review(BaseModel):
+    """A person's rating of one conversation from the test chat or a simulation: per-reply verdicts that become
+    judge-calibration labels and replay cases, and an overall score."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=lambda: new_id("rev"))
+    tenant: str
+    agent: str
+    policy_hash: str = ""
+    source: Literal["chat", "simulate"]
+    #: the session id or the simulated user's name
+    conversation: str = Field(min_length=1, max_length=120)
+    turns: list[ReviewTurn] = Field(min_length=1, max_length=50)
+    replies: list[ReplyRating] = Field(default_factory=list, max_length=200)
+    #: overall, 1 (bad) to 5 (great)
+    score: int | None = Field(default=None, ge=1, le=5)
+    note: str = Field(default="", max_length=2000)
+    rater: str = Field(default="", max_length=80)
+    created_at: datetime = Field(default_factory=now)
+
+    @model_validator(mode="after")
+    def _replies_name_turns(self) -> Review:
+        seen: set[tuple[int, str]] = set()
+        for i, x in enumerate(self.replies):
+            if x.turn > len(self.turns):
+                raise ValueError(f"replies[{i}].turn: {x.turn}, but the conversation has {len(self.turns)} turns")
+            if (x.turn, x.check) in seen:
+                raise ValueError(f"replies[{i}]: turn {x.turn} {x.check} is rated twice")
+            seen.add((x.turn, x.check))
+            rule = x.check.partition(":")[2]
+            if rule and rule not in self.turns[x.turn - 1].rules:
+                raise ValueError(f"replies[{i}].check: rule {rule!r} did not match on turn {x.turn}")
+        return self

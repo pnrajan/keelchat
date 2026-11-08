@@ -57,7 +57,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     if (Array.isArray(detail)) {
       const issues = detail.map((d: ValidationError & { loc?: unknown[]; msg?: string }) =>
         d.path !== undefined ? { path: d.path, message: d.message } : { path: (d.loc ?? []).join("."), message: d.msg ?? "" });
-      throw new ApiError(issues.map((i) => `${i.path}: ${i.message}`).join("\n"), issues, r.status);
+      throw new ApiError(issues.map((i) => (i.path ? `${i.path}: ${i.message}` : i.message)).join("\n"), issues, r.status);
     }
     throw new ApiError(String(detail ?? r.statusText), [], r.status);
   }
@@ -156,9 +156,21 @@ export type SimResult = {
   conversations: {
     name: string; turns: number; exit_reason: string | null; completed: boolean; reasks: number; max_digressions: number; nudges: number;
     llm_calls: number; tool_calls: number; persona: string; transcript: { user: string; agent: string }[];
+    /** each turn with the policy rules that matched on it */
+    turn_log: { user: string; agent: string; rules: string[] }[];
+    session_id: string;
     decisions: { kind: string; decision: string; reason: string; step: string | null; field: string | null; ok: boolean | null; ref: string | null }[];
   }[];
 };
+
+export type ReviewTurn = { user: string; agent: string; rules: string[] };
+/** a person's verdict on one reply: `in_scope` or `rule_followed:<rule>` */
+export type ReplyRating = { turn: number; check: string; ok: boolean; note?: string };
+export type Review = {
+  id: string; agent: string; policy_hash: string; source: "chat" | "simulate"; conversation: string;
+  turns: ReviewTurn[]; replies: ReplyRating[]; score: number | null; note: string; rater: string; created_at: string;
+};
+export type ReviewIn = Omit<Review, "id" | "agent" | "created_at"> & { id?: string };
 
 const query = (q: Record<string, string | undefined>) => {
   const p = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]));
@@ -201,6 +213,14 @@ export const api = {
   updateHandoff: (id: string, change: { status?: HandoffStatus; assignee?: string; note?: string; resume?: boolean }) =>
     req<Handoff>("POST", `/v1/tenants/${T}/handoffs/${encodeURIComponent(id)}`, change),
   audit: (q: { agent?: string; session_id?: string; kind?: string }) => req<AuditEvent[]>("GET", `/v1/tenants/${T}/audit${query(q)}`),
+  reviews: (agent: string) => req<Review[]>("GET", `${agentPath(agent)}/reviews`),
+  saveReview: (agent: string, review: ReviewIn) => req<Review>("POST", `${agentPath(agent)}/reviews`, review),
+  /** the rated replies as labels.yaml, or the failed conversations as replay cases */
+  reviewFile: async (agent: string, kind: "labels" | "replay") => {
+    const r = await send("GET", `${agentPath(agent)}/reviews/${kind}.yaml`);
+    if (!r.ok) throw new Error(`export failed (${r.status})`);
+    return r.text();
+  },
   simulate: (agent: string, conversations: SimConversation[]) =>
     req<SimResult>("POST", `${agentPath(agent)}/simulate`, { conversations }),
   embeds: () => req<EmbedRec[]>("GET", `/v1/tenants/${T}/embeds`),

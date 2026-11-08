@@ -1,6 +1,6 @@
 import { Component, lazy, ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Analysis, { AnalysisResult, latestAnalysis, latestVerification, plural } from "./Analysis";
-import { AgentSummary, api, ApiError, BotType, Built, Dataset, TurnResponse, ValidationError } from "./api";
+import { AgentSummary, api, ApiError, BotType, Built, Dataset, SimResult, TurnResponse, ValidationError } from "./api";
 import { ANALYST_POLICY, EXAMPLE_POLICY } from "./example";
 import { appendStep, flowSteps, stepSnippet, type Root } from "./policySchema";
 import Audit from "./Audit";
@@ -9,6 +9,7 @@ import Usage from "./Usage";
 import Handoffs from "./Handoffs";
 import Setup from "./Setup";
 import Simulate from "./Simulate";
+import Review, { Conversation } from "./Review";
 import Rain from "./Rain";
 import Reach from "./Reach";
 import Install from "./Install";
@@ -16,9 +17,9 @@ import Versions from "./Versions";
 
 const PolicyEditor = lazy(() => import("./PolicyEditor"));  // CodeMirror is most of the bundle: load it on its own
 
-type Msg = { role: "user" | "agent"; text: string; meta?: string[]; analysis?: AnalysisResult | null; error?: boolean; handoff?: string };
-type Tab = "setup" | "analysis" | "trace" | "state" | "rendered" | "metrics" | "versions" | "simulate" | "handoffs" | "audit";
-const TABS: Tab[] = ["setup", "analysis", "trace", "state", "rendered", "metrics", "versions", "simulate", "handoffs", "audit"];
+type Msg = { role: "user" | "agent"; text: string; meta?: string[]; analysis?: AnalysisResult | null; error?: boolean; handoff?: string; rules?: string[] };
+type Tab = "setup" | "analysis" | "trace" | "state" | "rendered" | "metrics" | "versions" | "simulate" | "review" | "handoffs" | "audit";
+const TABS: Tab[] = ["setup", "analysis", "trace", "state", "rendered", "metrics", "versions", "simulate", "review", "handoffs", "audit"];
 
 const TEMPLATES = [
   { id: "hiring", label: "Hiring assistant", yaml: EXAMPLE_POLICY },
@@ -76,6 +77,7 @@ export default function App() {
   const [last, setLast] = useState<TurnResponse | null>(null);
   const [state, setState] = useState<Record<string, unknown> | null>(null);
   const [tab, setTab] = useState<Tab>("setup");
+  const [simRun, setSimRun] = useState<{ agent: string; result: SimResult } | null>(null);
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
   const [openHandoffs, setOpenHandoffs] = useState(0);
@@ -214,7 +216,7 @@ export default function App() {
       const meta = [r.route ?? "-", `${r.llm_calls} model`, `${r.tool_calls} tool`, r.outbound.exit_reason ? `exit: ${r.outbound.exit_reason}` : "", r.rules?.length ? `rules: ${r.rules.join(", ")}` : "", r.errors.length ? `${r.errors.length} errors` : ""].filter(Boolean);
       const analysis = latestAnalysis(r.outbound.items);
       const handoff = r.outbound.items.find((x) => x.type === "handoff")?.ticket_id as string | undefined;
-      setMsgs((m) => [...m, { role: "agent", text: r.outbound.text, meta, analysis, handoff }]);
+      setMsgs((m) => [...m, { role: "agent", text: r.outbound.text, meta, analysis, handoff, rules: r.rules ?? [] }]);
       if (handoff) countHandoffs();
       setLast(r);
       if (analysis || latestVerification(r.outbound.items)) setTab("analysis");
@@ -239,6 +241,20 @@ export default function App() {
   const analysis = latestAnalysis(last?.outbound.items);
   const verification = latestVerification(last?.outbound.items);
   const totalMs = last ? Math.max(1, ...last.trace.filter((t) => !t.skipped).map((t) => t.ms)) : 1;
+  // conversations the Review tab can rate: this test chat (each user message with the reply to it) and the last simulation
+  const chatTurns = msgs.flatMap((m, i) => {
+    const r = msgs[i + 1];
+    return m.role === "user" && r?.role === "agent" && !r.error ? [{ user: m.text, agent: r.text, rules: r.rules ?? [] }] : [];
+  });
+  const reviewable: Conversation[] = [
+    ...(session && chatTurns.length ? [{ source: "chat" as const, id: session.id, label: "Test chat", policy_hash: session.policy_hash, turns: chatTurns }] : []),
+    ...(simRun && simRun.agent === built?.agent
+      ? simRun.result.conversations.filter((c) => c.turn_log.length).map((c) => ({
+        source: "simulate" as const, id: `${c.name.slice(0, 100)}-${c.session_id.slice(-6)}`, label: `Simulated: ${c.name}`, policy_hash: simRun.result.policy_hash,
+        turns: c.turn_log.map((t) => ({ user: t.user, agent: t.agent, rules: t.rules })),
+      }))
+      : []),
+  ];
 
   return (
     <>
@@ -447,7 +463,8 @@ export default function App() {
             {tab === "state" && (state ? <pre className="code">{JSON.stringify(state, null, 2)}</pre> : <div className="empty">No session state yet.</div>)}
             {tab === "rendered" && (last ? <pre className="code">{JSON.stringify({ outbound: last.outbound, rendered: last.rendered }, null, 2)}</pre> : <div className="empty">Nothing rendered yet.</div>)}
             {tab === "metrics" && (metrics ? <pre className="code">{JSON.stringify(metrics, null, 2)}</pre> : <div className="empty">Loading…</div>)}
-            {tab === "simulate" && <Panel><Simulate agent={built?.agent ?? null} /></Panel>}
+            {tab === "simulate" && <Panel><Simulate agent={built?.agent ?? null} onResult={(result) => built && setSimRun({ agent: built.agent, result })} /></Panel>}
+            {tab === "review" && <Panel><Review agent={built?.agent ?? null} conversations={reviewable} /></Panel>}
             {tab === "handoffs" && <Panel><Handoffs focus={focusHandoff} onChange={countHandoffs} /></Panel>}
             {tab === "audit" && <Panel><Audit key={session?.id ?? "none"} agent={built?.agent ?? live.agent} session={session?.id ?? null} /></Panel>}
             {tab === "versions" && (

@@ -278,3 +278,27 @@ async def test_postgres_usage_starts_again_each_month(monkeypatch):
     await budgets.charge(tenant, 0.01, turns=1)
     await budgets.charge(tenant, 0.01, turns=1)
     assert (await budgets.get(tenant)).turns == 2
+
+
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
+async def test_postgres_review_store() -> None:
+    import asyncpg
+
+    from yachat.state.models import Review, ReviewTurn
+    from yachat.state.postgres_store import PostgresReviewStore, ensure_schema
+
+    try:
+        pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
+    except Exception as e:  # database down or missing: environment, not code
+        pytest.skip(f"postgres unreachable: {e.__class__.__name__}")
+    await ensure_schema(pool)
+    store = PostgresReviewStore(pool)
+    r = Review(tenant="pg-t", agent="pg-a", source="chat", conversation="c", turns=[ReviewTurn(user="hi", agent="hello")], score=3)
+    await store.save(r)
+    await store.save(r.model_copy(update={"score": 4}))
+    (got,) = await store.list("pg-t", "pg-a")
+    assert got.id == r.id and got.score == 4 and await store.list("pg-t", "other") == []
+    assert (await store.get("pg-t", r.id)) == got and await store.get("pg-t", "rev_missing") is None
+    await store.save(r.model_copy(update={"agent": "pg-b", "score": 1}))  # an id of another agent's rating changes nothing
+    assert (await store.get("pg-t", r.id)).agent == "pg-a" and await store.list("pg-t", "pg-b") == []
+    await pool.close()

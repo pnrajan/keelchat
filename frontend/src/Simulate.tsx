@@ -12,7 +12,7 @@ const OUTCOME: Record<string, string> = { completed: "ok", handed_off: "info", m
 
 // Run simulated users against the agent you just built: scripted messages, or a persona the model plays. Fake tools,
 // separate stores: nothing is submitted, sent to a helpdesk or written to the real audit log.
-export default function Simulate({ agent }: { agent: string | null }) {
+export default function Simulate({ agent, onResult }: { agent: string | null; onResult?: (r: SimResult) => void }) {
   const [rows, setRows] = useState<Row[]>(STARTERS);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<SimResult | null>(null);
@@ -28,7 +28,7 @@ export default function Simulate({ agent }: { agent: string | null }) {
     const conversations: SimConversation[] = rows.filter((r) => r.text.trim()).map((r) => r.kind === "persona"
       ? { name: r.name, persona: r.text.trim(), max_turns: r.maxTurns }
       : { name: r.name, messages: r.text.split("\n").map((m) => m.trim()).filter(Boolean) });
-    try { setResult(await api.simulate(agent, conversations)); } catch (e) { setErr((e as Error).message); } finally { setRunning(false); }
+    try { const r = await api.simulate(agent, conversations); setResult(r); onResult?.(r); } catch (e) { setErr((e as Error).message); } finally { setRunning(false); }
   }
 
   if (!agent) return <div className="empty">Build a policy first: the simulation runs against the agent you built.</div>;

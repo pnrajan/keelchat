@@ -483,3 +483,17 @@ code.snippet { display: block; font-size: 11.5px; padding: 8px 10px; background:
 .order-snippet { margin: 0; font-size: 11.5px; padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow-x: auto; max-height: 160px; }
 .order-email label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .order-email label button { width: auto; }
+
+/* Review tab: rate each reply and the conversation */
+.review { display: flex; flex-direction: column; gap: 10px; }
+.review-turns { display: flex; flex-direction: column; gap: 8px; }
+.review-turn { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.review-turn .line { font-size: 13px; } .review-turn .line.agent { color: var(--muted); }
+.rate-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.rate-row input.compact { flex: 1; min-width: 140px; }
+.rate { display: inline-flex; align-items: center; gap: 4px; }
+.chip { font-size: 12px; padding: 1px 9px; border-radius: 999px; }
+.chip.on-ok { color: var(--ok); background: var(--ok-soft); border-color: var(--ok); }
+.chip.on-bad { color: var(--err); background: var(--err-soft); border-color: var(--err); }
+.review-h { margin: 8px 0 0; font-size: 13px; }
+

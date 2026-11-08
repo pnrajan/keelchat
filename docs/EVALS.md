@@ -131,6 +131,30 @@ Metric names:
 - **Simulate first**: the console's **Simulate** tab and `yachat simulate` run the same kinds of conversations
   without expectations or scores, to explore an agent before you write its set.
 
+## People rating conversations
+
+The console's **Review** tab is where people judge the agent. Pick the test chat or a simulated conversation, then mark
+each reply in scope or not, and each rule that matched on it followed or not, with an optional reason. Give the
+conversation an overall score (1 bad, 5 great) and a note. Ratings are kept per agent (Postgres when configured).
+
+Use them three ways:
+
+1. **Measure the judge.** **Download labels.yaml** writes every rated reply as a label. Save it as
+   `evals/<agent>/labels.yaml` and run `yachat evals calibrate` (below).
+2. **Keep fixed problems fixed.** **Download failed conversations as replay cases** writes each conversation with a
+   failed reply, or a score of 2 or less, as a script up to the last failed reply. The checks it failed are in its
+   `note`. Add the cases to `replay.yaml`; `yachat evals check` judges them on every change.
+3. **Fix the policy.** The tab counts failures per check. A rule that fails often needs its `then` reworded or split;
+   out-of-scope replies need the charter's scope tightened; a low score with no failed check means a check is missing,
+   so turn the note into a rule or a rubric.
+
+A conversation rated again after it grew (more chat) counts once in the downloads: its newest rating. Eval folders use
+the agent name with `_` for `-` (`support-assistant` → `evals/support_assistant/`).
+
+API: `POST` and `GET /v1/tenants/{t}/agents/{agent}/reviews` (send a saved rating's `id` to change it; the list shows
+the newest 500), and `GET .../reviews/labels.yaml` or `.../replay.yaml`. Saving needs a key that may build; reading,
+one that may read.
+
 ## Calibration
 
 A judge can be wrong. `in_scope` and `rule_followed` failures fail `evals check` either way; calibration tells you how

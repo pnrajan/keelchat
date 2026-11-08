@@ -53,6 +53,13 @@ def test_labels_load_and_name_a_check_the_policy_has() -> None:
             Label.model_validate({"check": "in_scope", "turns": [{"user": "a", "agent": "b"}], "pass": True} | wrong)
 
 
+async def test_a_label_for_a_rule_the_policy_lost_is_reported_not_fatal() -> None:
+    """A label made before a rule was renamed: reported under errors, never judged, and the run is not ok."""
+    stale = Label.model_validate({"check": "rule_followed:gone", "turns": [{"user": "a", "agent": "b"}], "pass": True})
+    report = await calibrate(build(SUPPORT.read_text()), LabelSet(labels=[stale]), "unused/model")
+    assert report.checks == {} and not report.ok and "rule_followed:gone" in report.errors[0]
+
+
 async def test_trials_run_each_case_that_many_times(tmp_path: Path) -> None:
     """Real model, no judge: two runs of one short script."""
     (tmp_path / "thresholds.yaml").write_text(yaml.safe_dump({"policy": os.path.relpath(SUPPORT, tmp_path), "minimums": {}, "trials": 2}))

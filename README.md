@@ -131,6 +131,8 @@ uv run yachat evals run --trials 3                             # metric threshol
 uv run yachat evals calibrate                                  # how often the judge agrees with evals/<agent>/labels.yaml
 ```
 
+Rate conversations by hand in the console's **Review** tab; the ratings become `labels.yaml` and replay cases.
+
 Targets come from the policy (finish the flow, give up, a bad answer per field, each rule and a near miss, out of
 scope, asking for a person, each language); the model only plays the user. In CI, run both `evals run` and
 `evals check`. The judge quotes the reply for every verdict, and code decides pass or fail.

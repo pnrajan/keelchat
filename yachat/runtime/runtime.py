@@ -44,6 +44,7 @@ from yachat.state.store import (
     InMemoryPolicyStore,
     InMemoryRateLimiter,
     InMemoryResponseStore,
+    InMemoryReviewStore,
     InMemorySessionStore,
     InMemoryTemplateStore,
     InMemoryTurnLocks,
@@ -52,6 +53,7 @@ from yachat.state.store import (
     PolicyStore,
     RateLimiter,
     ResponseStore,
+    ReviewStore,
     SessionStore,
     TemplateStore,
     TurnLocks,
@@ -120,6 +122,7 @@ class Runtime:
         templates: TemplateStore | None = None,
         audit: AuditStore | None = None,
         handoffs: HandoffStore | None = None,
+        reviews: ReviewStore | None = None,
         responses: ResponseStore | None = None,
         budgets: BudgetStore | None = None,
         limits: RateLimiter | None = None,
@@ -139,6 +142,7 @@ class Runtime:
         self.templates = templates or InMemoryTemplateStore()
         self.audit = audit or InMemoryAuditStore()
         self.handoffs = handoffs or InMemoryHandoffStore()
+        self.reviews = reviews or InMemoryReviewStore()
         self.responses = responses or InMemoryResponseStore()
         self.budgets = budgets or InMemoryBudgetStore()
         self.limits = limits or InMemoryRateLimiter()  # public-traffic rate limits, shared by servers on Postgres
