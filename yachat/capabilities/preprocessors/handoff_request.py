@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from yachat.capabilities.nodes.handoff import HANDED_OFF
+from yachat.capabilities.nodes.handoff import HANDED_OFF, take_back, timed_out
 from yachat.logging import get_logger
 from yachat.registry.core import PreProcessor, preprocessor
 from yachat.runtime.context import TurnContext
@@ -32,6 +32,12 @@ class HandoffRequest(PreProcessor):
         h, st = ctx.policy.handoff, ctx.state
         if h is None:
             return ctx
+        timeout = h.timeout.total_seconds() if h.timeout else None
+        if timed_out(st, timeout):  # nobody reported back in time: the assistant takes the conversation back
+            ticket = st.data["handoff"]["ticket_id"]
+            take_back(st, ctx.policy.fields)
+            ctx.decide("handoff", "timed_out", ref=ticket)
+            log.info("handoff timed out; resuming", handoff=ticket)
         if st.exit_reason == HANDED_OFF:
             ctx.handoff_reason = "follow_up"
         elif not st.finished and "user_request" in h.when and asks_for_person(ctx.text):

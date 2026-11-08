@@ -62,9 +62,18 @@ class FakeTools:
         return {"application_id": f"app_{len(self.submitted)}", "job_id": job_id}
 
     async def handoff_webhook(
-        self, reason: str, session_id: str, agent: str, fields: dict[str, str], transcript: list[dict[str, str]], ticket_id: str | None = None
+        self,
+        reason: str,
+        session_id: str,
+        agent: str,
+        fields: dict[str, str],
+        transcript: list[dict[str, str]],
+        ticket_id: str | None = None,
+        callback_url: str | None = None,
     ) -> dict[str, Any]:
         args = {"reason": reason, "session_id": session_id, "agent": agent, "fields": fields, "transcript": transcript, "ticket_id": ticket_id}
+        if callback_url:
+            args["callback_url"] = callback_url
         await self._gate("handoff_webhook", args)
         return {"ticket_id": ticket_id or f"hof_{len(self.calls['handoff_webhook'])}"}
 

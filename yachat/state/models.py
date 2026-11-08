@@ -91,8 +91,18 @@ class SessionState(BaseModel):
     def finished(self) -> bool:
         return self.completed or self.exited
 
+    @property
+    def retained_short(self) -> bool:
+        """Finished and nothing will bring it back: kept only briefly. A handed-off conversation waits for the person's
+        report back (and may resume), so it is kept as long as an open one."""
+        return self.finished and self.exit_reason != "handed_off"
+
     def recent_turns(self, n: int = 6) -> list[Turn]:
-        return self.turns[-n:]
+        """The last `n` turns since the conversation last came back from a person: what was said before was dealt with
+        there (an earlier "let me talk to a human" must not hand off again)."""
+        since = self.data.get("back_at")
+        turns = [t for t in self.turns if t.created_at.isoformat() > since] if since else self.turns
+        return turns[-n:]
 
 
 class MemoryRecord(BaseModel):
@@ -275,3 +285,8 @@ class Handoff(BaseModel):
     external_id: str | None = None
     created_at: datetime = Field(default_factory=now)
     updated_at: datetime = Field(default_factory=now)
+    #: sha256 of the callback token handed to the receiver; never shown (see `public`)
+    callback_hash: str = ""
+
+    def public(self) -> dict[str, Any]:
+        return self.model_dump(mode="json", exclude={"callback_hash"})

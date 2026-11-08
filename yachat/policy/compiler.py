@@ -93,6 +93,18 @@ class CompiledPolicy(BaseModel):
                 return s
         raise KeyError(name)
 
+    def step_fields(self, name: str) -> list[str]:
+        """Every field a step takes: its configured `fields` (a form), else the node's declared ones."""
+        if not any(s.name == name for s in self.steps):
+            return []
+        configured = [str(f["name"]) for f in self.step(name).settings.get("fields", []) or []]
+        return configured or list(REGISTRY.node(name).cls.fields)
+
+    @property
+    def fields(self) -> list[str]:
+        """Every field of the flow, in step order."""
+        return list(dict.fromkeys(f for s in self.steps for f in self.step_fields(s.name)))
+
     def producer_of(self, output: str) -> CompiledStep | None:
         for s in self.steps:
             if output in s.produces:
@@ -214,7 +226,7 @@ def compile_policy(
         "memory": [m.model_dump(mode="json") for m in memory],
         "defaults": resolved.model_dump(mode="json"),
         "manifest": used,
-        **({"handoff": policy.handoff.model_dump(mode="json")} if policy.handoff else {}),  # absent when unused: hashes stay stable
+        **({"handoff": _handoff_payload(policy.handoff)} if policy.handoff else {}),  # absent when unused: hashes stay stable
         **({"rules": [r.model_dump(mode="json") for r in policy.rules]} if policy.rules else {}),
     }
     return CompiledPolicy(
@@ -238,6 +250,13 @@ def compile_policy(
 
 #: step fields added after policies were first pinned: in the hash only when set, so existing hashes stay stable
 _LATER_STEP_FIELDS: dict[str, Any] = {"rules": [], "model": None, "high_stakes": False}
+
+
+def _handoff_payload(h: HandoffSpec) -> dict[str, Any]:
+    out = h.model_dump(mode="json")
+    if out.get("timeout") is None:  # added later: in the hash only when set
+        out.pop("timeout", None)
+    return out
 
 
 def _step_payload(s: CompiledStep) -> dict[str, Any]:

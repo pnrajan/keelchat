@@ -29,6 +29,8 @@ OUT_OF_SCOPE = {
     "en": "That's outside what I can help with here. What would you like to do within that?",
     "es": "Eso está fuera de lo que puedo hacer aquí. ¿En qué te ayudo dentro de ese alcance?",
 }
+#: the first reply after a person hands the conversation back
+BACK = {"en": "Thanks for waiting. You're back with the assistant.", "es": "Gracias por esperar. Vuelves a hablar con el asistente."}
 #: what a reply does when it answers a side question in the middle of a step
 RETURN_GOAL = "Then return to the open question and ask it."
 
@@ -57,8 +59,9 @@ class Orchestrator:
         spec = REGISTRY.node(name)
         settings = ctx.policy.step(name).settings if any(s.name == name for s in ctx.policy.steps) else {}
         cfg = spec.config_model.model_validate(settings)
-        services = ctx.services
-        ctx.services = replace(services, models=rules.models_for(ctx, name))  # the step's tier, while it acts
+        services, models = ctx.services, rules.models_for(ctx, name)
+        if models is not services.models:  # the step's tier, while it acts
+            ctx.services = replace(services, models=models)
         try:
             return await asyncio.wait_for(spec.cls().act(ctx, cfg), timeout=spec.cls.timeout_s)
         except Exception as e:  # isolation: a failing node yields a graceful reply
@@ -128,6 +131,15 @@ class Orchestrator:
         return owner
 
     async def run(self, ctx: TurnContext) -> TurnContext:
+        resumed = ctx.state.data.pop("resumed", False)  # the first turn back from a person
+        ctx = await self._route(ctx)
+        r = ctx.node_result
+        if resumed and r is not None and not ctx.handoff_reason:
+            r.text = f"{BACK.get(ctx.language, BACK['en'])}\n{r.text}"
+            r.goal = "Say they are back with the assistant. Then " + (r.goal or "say the plain version.")
+        return ctx
+
+    async def _route(self, ctx: TurnContext) -> TurnContext:
         ctx.system_prompt = system_prompt(ctx)
         st, graph, q = ctx.state, StepGraph(ctx.policy), ctx.state.open_question
 

@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from yachat.policy.durations import parse_duration
+from yachat.policy.durations import Duration, parse_duration
 
 Mode = Literal["flow", "planner", "adaptive"]
 #: which model tier a step's work runs on: small (the classify model) or large (the generate model)
@@ -147,6 +147,8 @@ class HandoffSpec(PolicyModel):
 
     notify: str | None = None
     when: list[HandoffTrigger] = Field(default_factory=lambda: list[HandoffTrigger](["user_request"]), min_length=1)
+    #: with no callback by then, the assistant takes the conversation back at the user's next message; None: it waits
+    timeout: Duration | None = None
 
 
 class AgentPolicy(PolicyModel):

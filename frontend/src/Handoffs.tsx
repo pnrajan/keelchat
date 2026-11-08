@@ -27,7 +27,10 @@ export default function Handoffs({ focus, onChange }: { focus?: string | null; o
   useEffect(() => { load(); const t = window.setInterval(load, 10000); return () => window.clearInterval(t); }, [load]);
   useEffect(() => { if (focus) { setOpen(focus); setStatus(""); } }, [focus]);
 
-  async function act(h: Handoff, change: { status?: HandoffStatus; assignee?: string; note?: string }) {
+  const resolve = (h: Handoff, resume: boolean) =>
+    act(h, { status: "resolved", resume, ...(me.trim() ? { assignee: me.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) });
+
+  async function act(h: Handoff, change: { status?: HandoffStatus; assignee?: string; note?: string; resume?: boolean }) {
     try {
       await api.updateHandoff(h.id, change);
       try { if (change.assignee) localStorage.setItem("yachat.assignee", change.assignee); } catch { /* per-browser convenience only */ }
@@ -70,10 +73,13 @@ export default function Handoffs({ focus, onChange }: { focus?: string | null; o
                   onClick={() => void act(h, { status: "claimed", assignee: me.trim() })}>Claim</button>}
                 <input id={`note-${h.id}`} className="grow compact" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (what you did)" aria-label="Note" />
                 {h.status !== "resolved"
-                  ? <button className="compact" onClick={() => void act(h, { status: "resolved", ...(me.trim() ? { assignee: me.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) })}>Resolve</button>
+                  ? <>
+                    <button className="compact" title="Hand the conversation back to the assistant" onClick={() => void resolve(h, true)}>Resolve and resume</button>
+                    <button className="compact" title="Close the conversation" onClick={() => void resolve(h, false)}>Resolve and end</button>
+                  </>
                   : <button className="compact" disabled={!note.trim()} onClick={() => void act(h, { note: note.trim() })}>Add note</button>}
               </div>
-              <p className="muted small">The user's later messages are added here. Replying in the user's channel is not built yet: contact them through your helpdesk.</p>
+              <p className="muted small">The user's later messages are added here. Resolve and resume hands the conversation back to the assistant at their next message; a helpdesk does the same through the callback URL it was sent.</p>
             </div>
           )}
         </div>

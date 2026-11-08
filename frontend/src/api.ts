@@ -198,7 +198,7 @@ export const api = {
   deleteMemory: (userId: string) => req<{ deleted: number }>("DELETE", `/v1/users/${userId}/memory`),
   metrics: () => req<Record<string, unknown>>("GET", "/v1/metrics"),
   handoffs: (status?: HandoffStatus) => req<Handoff[]>("GET", `/v1/tenants/${T}/handoffs${query({ status })}`),
-  updateHandoff: (id: string, change: { status?: HandoffStatus; assignee?: string; note?: string }) =>
+  updateHandoff: (id: string, change: { status?: HandoffStatus; assignee?: string; note?: string; resume?: boolean }) =>
     req<Handoff>("POST", `/v1/tenants/${T}/handoffs/${encodeURIComponent(id)}`, change),
   audit: (q: { agent?: string; session_id?: string; kind?: string }) => req<AuditEvent[]>("GET", `/v1/tenants/${T}/audit${query(q)}`),
   simulate: (agent: string, conversations: SimConversation[]) =>

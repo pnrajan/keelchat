@@ -488,7 +488,7 @@ class PostgresSessionStore(_Pooled, SessionStore):
 
     async def save(self, state: SessionState) -> SessionState:
         nxt = state.model_copy(deep=True, update={"version": state.version + 1})
-        ttl = self.ttl if nxt.finished else self.session_ttl_s
+        ttl = self.ttl if nxt.retained_short else self.session_ttl_s
         args = (nxt.id, nxt.tenant, nxt.agent, nxt.user_id, nxt.version, nxt.finished, ttl, nxt.model_dump_json())
         async with (await self.pool).acquire() as con:
             if state.version == 0:

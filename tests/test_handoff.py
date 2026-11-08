@@ -153,3 +153,92 @@ async def test_an_unlisted_dead_end_still_exits(policy_yaml):
     await say(rt, s.id, "my address is downtown")
     r = await say(rt, s.id, "my address is near the park")
     assert not await rt.handoffs.list("default") and r.outbound.exit_reason == "max_reasks"
+
+
+async def _handed_off(policy_yaml: str, **spec: object):  # type: ignore[no-untyped-def]
+    from httpx import ASGITransport, AsyncClient
+
+    from yachat.api.app import create_app
+    from yachat.state.store import InMemoryTenantToolStore
+
+    rt, tools = await make_runtime(with_handoff(policy_yaml, **spec))
+    s = await rt.start_session("hiring-agent", "u1")
+    await reach_form(rt, s.id)
+    r = await say(rt, s.id, "Can I talk to a human please?")
+    assert r.state.exit_reason == "handed_off"
+    (h,) = await rt.handoffs.list("default", status="open")
+    client = AsyncClient(transport=ASGITransport(app=create_app(rt, tool_store=InMemoryTenantToolStore())), base_url="http://t")
+    return rt, tools, s, h, client
+
+
+async def test_the_receiver_reports_back_on_its_callback_and_the_conversation_resumes(policy_yaml):
+    from urllib.parse import parse_qs, urlparse
+
+    rt, tools, s, h, c = await _handed_off(policy_yaml, notify="handoff_webhook", when=["user_request", "max_reasks"])
+    (sent,) = tools.calls["handoff_webhook"]
+    url = urlparse(sent["callback_url"])
+    assert url.path == f"/v1/public/handoffs/default/{h.id}/callback"
+    token = parse_qs(url.query)["token"][0]
+    async with c:
+        assert (await c.post(url.path, params={"token": "wrong"}, json={"status": "resolved"})).status_code == 404
+        assert (await c.post(url.path, params={"token": token}, json={"status": "claimed"})).status_code == 422  # who claims it
+        bad = await c.post(url.path, params={"token": token}, json={"status": "resolved", "fields": {"shoe_size": "9"}})
+        assert bad.status_code == 422 and (await rt.session_state(s.id)).exit_reason == "handed_off"  # nothing changed
+        got = await c.post(url.path, params={"token": token}, json={"status": "resolved", "fields": {"full_name": "Jane Doe"}, "note": "called her"})
+        assert got.json() == {"id": h.id, "status": "resolved", "conversation": "resumed"}
+        again = await c.post(url.path, params={"token": token}, json={"status": "resolved"})
+        assert again.json()["conversation"] == "unchanged"  # reported twice: the second changes nothing
+        late = await c.post(url.path, params={"token": token}, json={"status": "claimed", "assignee": "bot-retry"})
+        assert late.json()["status"] == "resolved"  # resolved is final
+        listed = (await c.get("/v1/tenants/default/handoffs")).json()
+        assert "callback_hash" not in listed[0] and listed[0]["note"] == "called her"
+    st = await rt.session_state(s.id)
+    assert not st.exited and st.exit_reason is None and "handoff" not in st.data
+    assert st.prefilled["full_name"] == "Jane Doe" and "full_name" not in st.fields  # offered back, not trusted unchecked
+    assert [t.text for t in st.recent_turns()] == []  # the talk before the handoff was the person's to handle
+    r = await say(rt, s.id, "ok thanks")
+    assert r.route != "handoff" and r.state.open_question is not None and r.state.open_question.field.startswith("full_name")
+    assert "Jane Doe" in r.outbound.text  # confirms the person's answer instead of asking from scratch
+    events = await rt.audit.query("default", session_id=s.id, kinds=["handoff"])
+    assert {"resumed", "resolved"} <= {e.decision for e in events}
+
+
+async def test_resolving_in_the_inbox_resumes_by_default_or_ends_the_conversation(policy_yaml):
+    rt, _, s, h, c = await _handed_off(policy_yaml)
+    async with c:
+        r = await c.post(f"/v1/tenants/default/handoffs/{h.id}", json={"status": "resolved", "resume": False, "assignee": "ana@team"})
+        assert r.status_code == 200 and "callback_hash" not in r.json()
+    assert (await rt.session_state(s.id)).exit_reason == "resolved_by_person"
+    ended = await say(rt, s.id, "hello?")
+    assert ended.outbound.text.startswith("This conversation has ended")
+
+    rt, _, s, h, c = await _handed_off(policy_yaml)
+    async with c:
+        await c.post(f"/v1/tenants/default/handoffs/{h.id}", json={"status": "resolved", "assignee": "ana@team"})
+    assert not (await rt.session_state(s.id)).exited
+
+
+async def test_a_ticket_still_closes_when_its_conversation_has_expired(policy_yaml):
+    rt, _, s, h, c = await _handed_off(policy_yaml)
+    rt.sessions._s.pop(s.id)  # type: ignore[attr-defined]  # the in-memory store; Redis/Postgres expire it
+    async with c:
+        r = await c.post(f"/v1/tenants/default/handoffs/{h.id}", json={"status": "resolved", "assignee": "ana@team"})
+    assert r.status_code == 200 and r.json()["status"] == "resolved"
+
+
+async def test_with_no_report_back_the_assistant_takes_over_after_the_timeout(policy_yaml):
+    from datetime import timedelta
+
+    from yachat.state.models import now
+
+    rt, _, s, h, c = await _handed_off(policy_yaml, timeout="1h")
+    await c.aclose()
+    held = await say(rt, s.id, "still there?")
+    assert held.route == "handoff"  # within the hour: still with the team
+    st = await rt.session_state(s.id)
+    st.data["handoff"]["opened_at"] = (now() - timedelta(hours=2)).isoformat()
+    await rt.sessions.save(st)
+    r = await say(rt, s.id, "Jane Doe")
+    assert r.route != "handoff" and not r.state.exited
+    assert "timed_out" in {e.decision for e in await rt.audit.query("default", session_id=s.id, kinds=["handoff"])}
+    assert (await rt.handoffs.get("default", h.id)).status == "open"  # the ticket stays for the team to see

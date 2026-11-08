@@ -5,6 +5,8 @@ All notable changes are recorded here. Format: [Keep a Changelog](https://keepac
 ## [Unreleased]
 
 ### Added
+- Handoffs come back: the receiver reports on a per-ticket `callback_url` (or the inbox's **Resolve and resume**), and
+  the conversation resumes by default with the person's answers; `handoff.timeout` resumes it when nobody reports.
 - `rules:` on an agent or a flow step: plain-language `when` / `then` rules matched per turn (with quoted evidence
   checked in code), `overrides` for conflicts, audit records and console display.
 - `model: small | large` and `high_stakes` per step: run a step on one model tier, or write and always check its reply

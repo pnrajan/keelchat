@@ -70,7 +70,10 @@ SCHEMA: dict[str, Any] = {
 }
 
 #: asked only when the policy hands off on user_request, so other agents' prompts and schema stay as they are
-WANTS_HUMAN = {"type": "boolean", "description": "the user asks to talk to a person (a human agent, a representative)"}
+WANTS_HUMAN = {
+    "type": "boolean",
+    "description": "the user's latest message asks to talk to a person (a human agent, a representative); an earlier ask does not count",
+}
 
 #: a quieter opt-out than the STOP words ("please don't message me again"): asked of every agent, confirmed before ending
 WANTS_TO_STOP = {"type": "boolean", "description": "the user wants this conversation or these messages to stop for good"}
@@ -116,21 +119,11 @@ def few_shot(language: str) -> str:
 
 
 def step_fields(ctx: TurnContext, step: str) -> list[str]:
-    """Every field a step can take: a FormFill's configured fields, or the node's declared `fields`."""
-    if not any(s.name == step for s in ctx.policy.steps):
-        return []
-    settings = ctx.policy.step(step).settings
-    configured = [f["name"] for f in settings.get("fields", []) or []]
-    return configured or list(REGISTRY.node(step).cls.fields)
+    return ctx.policy.step_fields(step)
 
 
 def known_fields(ctx: TurnContext) -> list[str]:
-    out: list[str] = []
-    for s in ctx.policy.steps:
-        for f in step_fields(ctx, s.name):
-            if f not in out:
-                out.append(f)
-    return out
+    return ctx.policy.fields
 
 
 def open_fields(ctx: TurnContext) -> list[str]:

@@ -44,8 +44,8 @@ class RedisSessionStore(SessionStore):
                     raise VersionConflict(f"session {state.id}: expected v{state.version}, stored v{stored}")
                 nxt = state.model_copy(deep=True, update={"version": state.version + 1})
                 pipe.multi()
-                if nxt.finished:  # completed or exited sessions close: no resume, short retention
-                    await pipe.set(key, nxt.model_dump_json(), ex=self.ttl)
+                if nxt.finished:  # completed or exited sessions close: no resume; short retention unless a person may hand it back
+                    await pipe.set(key, nxt.model_dump_json(), ex=self.ttl if nxt.retained_short else self.session_ttl_s)
                     await pipe.delete(self._open_key(nxt.user_id, nxt.agent, nxt.tenant))
                 else:  # unfinished sessions resume within the TTL from the last turn
                     await pipe.set(key, nxt.model_dump_json(), ex=self.session_ttl_s)

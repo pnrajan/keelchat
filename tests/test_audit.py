@@ -109,7 +109,7 @@ async def test_people_work_the_inbox_and_see_outcomes_over_the_api(policy_yaml):
         assert (await c.get("/v1/tenants/default/handoffs", params={"status": "open"})).json() == []
         assert (await c.get("/v1/tenants/default/handoffs/hof_nope")).status_code == 404
         log = (await c.get("/v1/tenants/default/audit", params={"session_id": sid, "kind": "handoff"})).json()
-        assert [(e["decision"], e["actor"]) for e in log] == [("resolved", "admin"), ("claimed", "ana@team"), ("opened", "runtime")]
+        assert [(e["decision"], e["actor"]) for e in log] == [("resumed", "runtime"), ("resolved", "admin"), ("claimed", "ana@team"), ("opened", "runtime")]
         s = (await c.get("/v1/tenants/default/audit/summary", params={"agent": "hiring-agent"})).json()
         assert s["sessions"] == 1 and s["outcomes"] == {"handed_off": 1} and s["handoff_rate"] == 1.0
         assert s["handoff_reasons"] == {"user_request": 1} and s["handoff_actions"] == {"claimed": 1, "resolved": 1}
