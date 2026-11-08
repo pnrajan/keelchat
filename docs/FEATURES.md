@@ -17,6 +17,13 @@ The features behind a policy, with the YAML that turns each one on. Start with t
 
 `frontend/` is a React console for building and testing bots, served at `/console/` once built.
 
+<p align="center"><img src="assets/compose.jpg" alt="Compose: a dental clinic's booking bot written from two sentences, read back in plain words (what it asks, when it hands an emergency to a person), with Try it, Save, and a box to ask for changes" width="900"></p>
+
+Drafting a bot from a description is the job where a stronger model shows most: set `YACHAT_MODEL_GENERATE` to one for
+cleaner YAML on the first try. The README lists [where else it helps](../README.md#where-a-stronger-model-helps).
+
+<p align="center"><img src="assets/console.jpg" alt="The console after Try it: the drafted YAML, a test chat where a knocked-out tooth is handed to a person by the emergency rule, and the launch checklist" width="900"></p>
+
 | Tab | What you do there |
 |---|---|
 | **Compose** | Make a bot in two steps, without YAML: say what it should do (or pick an example or a ready-made bot), then read what it will do in plain words and ask for any change ("also ask for their email"); each change is listed before you apply it. **Try it** opens the test chat. **Fine-tune** (folded) has cards for steps and questions, safety, rules, handoff, memory, small talk and how carefully each step replies; **Show YAML** (folded) has the file. |

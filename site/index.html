@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>yachat: chatbots you write in YAML</title>
+<title>yachat: customer-facing chatbots that follow your rules</title>
 <meta name="description" content="Open-source chatbots you write in YAML and extend in Python. One short file per bot; limits, guardrails and handoff enforced in code.">
 <meta property="og:title" content="yachat: chatbots you write in YAML">
 <meta property="og:description" content="One short YAML file per bot. Describe yours and get the file, then run it yourself.">
-<meta property="og:image" content="assets/console.jpg">
+<meta property="og:image" content="assets/compose.jpg">
 <style>
   :root { --bg: #ffffff; --fg: #1f1f1d; --muted: #6e6e69; --line: #e6e5e0; --soft: #f4f4f1; --accent: #2f6f4f; color-scheme: light }
   @media (prefers-color-scheme: dark) {
@@ -61,9 +61,9 @@
   </nav>
 
   <section class="hero">
-    <h1>Chatbots you write in YAML and extend in Python.</h1>
-    <p class="lead">One short file per bot: what it's for, what it asks, its rules and when it hands over to a person. One
-      open-source runtime runs them all and enforces limits, guardrails and tool access in code, not in a prompt.</p>
+    <h1>Customer-facing chatbots that follow your rules.</h1>
+    <p class="lead">Describe a bot in plain English, or write its YAML yourself: what it's for, what it asks, its rules and when
+      it hands over to a person. One open-source runtime enforces all of it in code, not in a prompt.</p>
     <div class="ctas">
       <a class="btn solid" href="https://yachat-demo.fly.dev">Make a bot from a description</a>
       <a class="btn" href="https://github.com/pnrajan/yachat/fork">Fork on GitHub</a>
@@ -81,7 +81,7 @@
         - {name: issue, ask: "What went wrong?", expect: "A short description", optional: true}
 <span class="k">guardrails:</span> {input: [prompt_injection], output: [pii, no_legal_advice]}
 <span class="k">handoff:</span> {when: [user_request, max_reasks]}</pre>
-  <img class="shot" src="assets/console.jpg" alt="The yachat console: the policy, a test chat, and why each reply was chosen" width="1440" height="900" loading="lazy">
+  <img class="shot" src="assets/make-a-bot.gif" alt="A dental booking bot described in two sentences, read back in plain words, then a test chat where an emergency is handed to a person" width="960" height="600" loading="lazy">
 
   <section class="points">
     <div><h2>Code decides, the model phrases</h2><p>Re-asks, digressions, exits and handoff are counted by the runtime, never left to the model.</p></div>

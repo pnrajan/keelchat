@@ -198,3 +198,17 @@ def test_the_plain_summary_lists_rules_and_small_talk() -> None:
     lines = plain_summary(build((ROOT / "examples" / "support_assistant.yaml").read_text()))
     assert "When the customer says an item arrived damaged or broken: say a free replacement can be sent" in " ".join(lines)
     assert any("small talk" in x for x in lines) and any(x.startswith("Passes the chat to you when") for x in lines)
+
+
+def test_a_rule_reads_as_one_sentence_in_the_summary() -> None:
+    """A drafted `when` often starts with a capital ("The user ..."); mid-sentence it is lowered. Acronyms stay."""
+    from yachat.policy.compiler import build
+    from yachat.policy.summary import plain_summary
+
+    rules = [
+        {"name": "urgent", "when": "The user describes an emergency.", "then": "Hand over to a person."},
+        {"name": "vip", "when": "VIP customers ask for a refund", "then": "Offer a person"},
+    ]
+    lines = plain_summary(build(edited(SUPPORT, rules=rules)))
+    assert "When the user describes an emergency: Hand over to a person." in lines
+    assert "When VIP customers ask for a refund: Offer a person." in lines

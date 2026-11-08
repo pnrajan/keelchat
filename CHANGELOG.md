@@ -44,6 +44,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `yachat.evals`.
 
 ### Fixed
+
+- The plain-words summary reads each rule as one sentence: "When the user describes ...", not "When The user ...".
 - A session is resumed only on the build it was asked for: a different `policy_hash` starts a new conversation instead of picking up an old one on another build.
 - When the documents don't answer a question and the policy hands off on request, the reply says the user can ask for a person.
 - A handoff trigger listed twice is rejected with its path (`handoff.when`).
