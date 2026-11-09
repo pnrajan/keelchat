@@ -183,6 +183,7 @@ An objective:
 | `then` | text | required | What the reply must do ("say a person will review it today"). |
 | `overrides` | list of rule names | none | When both match, this one wins. |
 | `high_stakes` | `true`/`false` | `false` | A turn this rule matches is written with the large model and always checked. |
+| `handoff` | `true`/`false` | `false` | When it matches, the conversation passes to a person, in code: the reply says so and asks nothing more. Needs the top-level `handoff`; the handoff's reason is `rule:<name>`. |
 
 ## `guardrails`
 

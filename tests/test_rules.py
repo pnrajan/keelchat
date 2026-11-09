@@ -170,3 +170,33 @@ async def test_a_high_stakes_rule_writes_with_the_large_model_and_always_checks(
     render = [c for c in llm.calls if c.purpose == "render"]
     assert render and all(c.model == "tier-large" for c in render)
     assert [c for c in llm.calls if c.purpose == "reply_verify"], "a high-stakes reply is always checked"
+
+
+URGENT = {
+    "name": "urgent",
+    "when": "the customer says someone was hurt or there is a safety risk",
+    "then": "say it sounds urgent and a person will take over now",
+    "handoff": True,
+}
+
+
+def test_a_handoff_rule_needs_a_handoff_block() -> None:
+    with pytest.raises(PolicyValidationError) as e:
+        build(with_rules(lambda d: (d.update(rules=[URGENT]), d.pop("handoff", None))))
+    assert any(err.path == "rules[0].handoff" and "handoff:" in err.message for err in e.value.errors), e.value.errors
+    assert build(with_rules(lambda d: d.update(rules=[URGENT]))).rules[0].handoff  # with the block it builds
+
+
+async def test_a_handoff_rule_passes_the_conversation_to_a_person_in_code() -> None:
+    """A matched `handoff: true` rule hands off like a request for a person: no next question, the rule as the reason."""
+    rt, _ = await runtime(with_rules(lambda d: d.update(rules=[URGENT])))
+    s = await rt.start_session("support-assistant", "u1")
+    await say(rt, s.id, "hi")
+    await say(rt, s.id, "yes")
+    r = await say(rt, s.id, "the heater I ordered caught fire and my son burned his hand")
+    assert r.rules == ["urgent"], r.trace
+    st = await rt.sessions.load(s.id)
+    assert st is not None and st.exit_reason == "handed_off" and st.open_question is None
+    assert st.data["handoff"]["reason"] == "rule:urgent"
+    tickets = await rt.handoffs.list("default")
+    assert [t.reason for t in tickets] == ["rule:urgent"]

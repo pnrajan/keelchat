@@ -39,7 +39,10 @@ Keys (no others): agent, charter, languages, tools, flow, guardrails, limits, me
 - rules: only for situations the description names: `- {name: snake_case, when: the situation in the user's words,
   then: what the reply must do}`.
 - handoff: when the description wants a person reachable: `handoff: {when: [user_request]}` (also max_reasks).
-  Never list `handoff` or `exit` as flow steps: the runtime runs them.
+  When it says to hand over in a situation ("emergencies go to a person", "refunds over $100 to a manager"), add a
+  rule with `handoff: true` (the runtime passes the chat on; `then` only says what to tell them, e.g. "say it sounds
+  urgent and a person will take over now"), plus the top-level `handoff`. Never write "I'll connect you" into a `then`
+  without `handoff: true`. Never list `handoff` or `exit` as flow steps: the runtime runs them.
 - small_talk: brief when the description asks for a friendly or chatty bot; omit otherwise.
 - A step may take `think: true` (plan replies first; for nuanced or sensitive steps) and a form step `curious: true`
   (one follow-up on a vague answer, e.g. a problem description); add them only when the description asks for care.
@@ -57,6 +60,12 @@ flow:
           expect: An order number such as ORD-12345
 guardrails: {input: [prompt_injection], output: [pii]}
 limits: {reasks: 3, digressions: 3}
+rules:
+  - name: injury
+    when: the customer says someone was hurt by a product
+    then: say you're sorry and that a person will take over now
+    handoff: true
+handoff: {when: [user_request]}
 memory:
   - field: preferred_contact
     extract: How they prefer to be contacted
@@ -119,11 +128,13 @@ EDIT = """You change an agent policy (YAML) as the owner asks. Reply with the wh
   same `agent` unless asked to rename it.
 - Use only steps, tools, guardrails and datasets in the catalog; settings follow each step's `format`.
 - Keys you may use: agent, charter, languages, tools, flow, guardrails, limits, memory, mode, rules, handoff, small_talk.
-  A rule is `{name: snake_case, when: the situation in the user's words, then: what the reply must do}`; a step may
+  A rule is `{name: snake_case, when: the situation in the user's words, then: what the reply must do}` (plus
+  `handoff: true` to pass the chat to a person when it matches); a step may
   take `think`, `model` (small|large), `high_stakes` and `rules`; a form step `curious`.
 - To let people reach a person, set the top-level `handoff: {when: [user_request]}` (add max_reasks or disengaged
-  when asked); to hand off in a situation ("refunds over $100"), add a rule whose `then` offers a person and include
-  user_request. Never add `handoff` or `exit` as flow steps: the runtime runs them.
+  when asked); to hand off in a situation ("refunds over $100"), add a rule with `handoff: true` whose `then` says
+  what to tell them, and keep the top-level `handoff`. Never add `handoff` or `exit` as flow steps: the runtime runs
+  them.
 - Begin the YAML with one comment line per change, in plain words for a non-technical owner (no key names):
   `# change: <what changed>`."""
 
@@ -213,6 +224,13 @@ async def _until_it_builds(
         hint = ""
         if any("valid string" in x.message for x in errors):  # YAML reads bare yes/no/on/off as true/false
             hint = 'A value that should be text was read as true/false/null: quote it ("yes", "no").\n'
+        if any("mapping values are not allowed" in x.message for x in errors):  # "Out of scope: ..." on one bare line
+            hint += "Text with a colon in it must be quoted or written as a folded block (`charter: >` and the text on the next lines).\n"
+        if any(x.path.startswith("handoff.when") for x in errors):  # a situation written as a trigger
+            hint += (
+                "handoff.when lists only user_request, max_reasks, disengaged, tool_unavailable. To hand off in a situation, "
+                "add a rule with `handoff: true` instead.\n"
+            )
         fix = f"The build rejected it:\n{problems}\n{hint}Reply with the corrected YAML only."
         messages = [*messages, {"role": "assistant", "content": text}, {"role": "user", "content": fix}]
     return Draft(text, errors, DRAFT_ATTEMPTS)

@@ -29,6 +29,9 @@ class Rule(PolicyModel):
     overrides: list[str] = Field(default_factory=list)
     #: a turn this rule matches is written with the large model and always checked before it is sent
     high_stakes: bool = False
+    #: when it matches, the conversation passes to a person (needs the top-level `handoff`); decided in code, so the
+    #: reply never just says a person will help
+    handoff: bool = False
 
 
 class FlowStep(PolicyModel):

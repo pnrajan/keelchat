@@ -72,7 +72,7 @@ def plain_summary(policy: CompiledPolicy) -> list[str]:
         when = r.when.rstrip(".")
         if when[:1].isupper() and when[1:2].islower():  # "The user ..." mid-sentence; "VIP ..." and "I ..." stay
             when = when[0].lower() + when[1:]
-        out.append(f"When {when}: {r.then.rstrip('.')}.")
+        out.append(f"When {when}: {r.then.rstrip('.')}" + (", and passes the chat to a person." if r.handoff else "."))
     if policy.small_talk != "off":
         out.append("Chats briefly when the customer makes small talk, then gets back to the task.")
     return out
