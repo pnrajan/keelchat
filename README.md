@@ -11,8 +11,8 @@ code, not in a prompt.
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
 
-**[Try the demo](https://yachat-demo.fly.dev)** · [Quickstart](#quickstart) · [Docs](#docs) · [Examples](examples) ·
-[How it compares](#how-yachat-compares)
+**[Make a bot in your browser](https://yachat-demo.fly.dev)** · [Website](https://pnrajan.github.io/yachat/) ·
+[Quickstart](#quickstart) · [Docs](#docs) · [Examples](examples) · [How it compares](#how-yachat-compares)
 
 <img src="docs/assets/make-a-bot.gif" alt="In the yachat console: a dental clinic's booking bot is described in two sentences, yachat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" width="900">
 
@@ -37,10 +37,14 @@ the model, decides what happens next.
 
 ## Make a bot from plain English
 
-**In the [demo](https://yachat-demo.fly.dev)**, no install: describe a bot and get its YAML, checked by the build.
-Under it, what the bot needs connecting before real people use it, with options for each: the services its YAML
-uses, and the outside systems your description implies (a booking calendar, a CRM, an SMS gateway). Then fork the
-repo and run it.
+**In the [demo](https://yachat-demo.fly.dev)**, no install and no sign-in: describe a bot and get its YAML, checked by
+the build. Press **Try this bot** to chat with it right there (its tools answer with sample data), and ask for changes
+in plain words. Under the YAML, what the bot needs connecting before real people use it, with options for each: the
+services its YAML uses, and the outside systems your description implies (a booking calendar, a CRM, an SMS gateway).
+Then fork the repo and run it.
+
+A link can start a draft, which is handy in an issue or a post:
+[`yachat-demo.fly.dev/?describe=Book haircuts and ask for a phone number`](https://yachat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
 
 **In the console** (after the [Quickstart](#quickstart)), open **Compose**, describe the bot, and press **Create my
 bot**. It reads the bot back in plain words; ask for changes the same way ("also ask for their email", "add Spanish"),
@@ -188,7 +192,9 @@ detail and sources.
 
 Questions and bots to show go to [Discussions](https://github.com/pnrajan/yachat/discussions), bugs to
 [issues](https://github.com/pnrajan/yachat/issues/new/choose), vulnerabilities to [SECURITY.md](SECURITY.md).
-Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
+Contributions are welcome: start with a
+[good first issue](https://github.com/pnrajan/yachat/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), and
+see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 If yachat is useful to you, a star helps others find it.
 
 ## Status
