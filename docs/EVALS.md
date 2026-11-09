@@ -165,17 +165,17 @@ policy to revise; the active version when omitted). Saving needs a key that may 
 
 ## Tests kept with the agent
 
-The console's **Test** tab keeps test conversations with the agent, in the store (Postgres when configured), so a bot
+The console's **Tests** tab (Inspector → Test) keeps test conversations with the agent, in the store (Postgres when configured), so a bot
 built in the console has tests without a folder on disk.
 
 - **Save as test**: pick the test chat or a simulated conversation. The test replays what the user said; with **Expect
   the same ending** it also expects the conversation to finish (or not) and exit the same way.
-- **Draft tests from the policy**: `yachat evals generate` on the server, for targets that have no drafted test yet.
+- **+ Draft from policy**: `yachat evals generate` on the server, for targets that have no drafted test yet.
   Each drafted case shows whether it passes now; **Keep** the ones you want.
-- **Run**: every test (or one) on the agent's current build, on sample tools, like a simulation. A test passes when its
+- **Run tests** (or **Run this one**): every test (or one) on the agent's current build, on sample tools, like a simulation. A test passes when its
   `expect` holds and the checks every conversation must pass do; the judged checks run when the server sets
   `EVALS_JUDGE_MODEL`.
-- **Download replay.yaml**: the tests as a replay set, for `evals/<agent>/` and CI.
+- **Download YAML**: the tests as a replay set, for `evals/<agent>/` and CI.
 
 The launch checklist counts these tests as well as an eval set under `evals/`. API: `POST`, `GET .../agents/{agent}/tests`,
 `DELETE .../tests/{id}`, `POST .../tests/run` (`{ids}` optional, up to 50), `POST .../tests/draft` (`{redo}`),

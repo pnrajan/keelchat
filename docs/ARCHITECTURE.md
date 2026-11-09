@@ -34,7 +34,7 @@ components and contracts.
 
 | Component | Package | Responsibility |
 |---|---|---|
-| Policy (AgentBuild) | `yachat/policy/` | YAML → `CompiledPolicy`: eight fields, resolved defaults, step graph, allow list, typed memory, content hash |
+| Policy (AgentBuild) | `yachat/policy/` | YAML → `CompiledPolicy`: the policy's keys, resolved defaults, step graph, allow list, typed memory, content hash |
 | Registry | `yachat/registry/` | one registry of capabilities (`@tool`, `@action`, `@node`, `@guardrail`, `@preprocessor`), auto-discovery (`capabilities/` + entry points), manifest, contract suite |
 | Runtime | `yachat/runtime/` | the three stages, `TurnContext`, pipeline timing and short-circuit, LLM clients, Tool Gateway, composition (`runtime.py`) |
 | Capabilities | `yachat/capabilities/` | the shipped tools, nodes, guardrails, pre-processors and the `submit_application` action |
@@ -48,8 +48,9 @@ components and contracts.
 
 ## 2. The policy is the only product surface
 
-Behaviour comes from `CompiledPolicy`; the runtime never branches on an agent name. The YAML has eight fields:
-`agent`, `charter`, `languages`, `tools`, `flow`, `guardrails`, `limits`, `memory` (plus `mode`). The compiler merges
+Behaviour comes from `CompiledPolicy`; the runtime never branches on an agent name. The YAML's keys are
+`agent`, `charter`, `languages`, `tools`, `flow`, `rules`, `guardrails`, `limits`, `memory`, `handoff`, `small_talk` and
+`mode` ([`POLICY_LANGUAGE.md`](POLICY_LANGUAGE.md)). The compiler merges
 `Defaults` (re-asks, digressions, nudges, session TTL, base guardrails, tool-failure cap, intent timeout...) into the
 policy so a session pinned to a hash sees the same behaviour for its whole life. Scope and tone live only in the
 charter text, which every prompt receives.
@@ -75,7 +76,8 @@ charter text, which every prompt receives.
      `StepGraph`, runs the node, chains completed steps in the same turn, answers an enquiry alongside an answer, and
      runs the planner for `needs_multi_step` enquiries in adaptive mode. Completed sessions turn edits into follow-up
      records.
-   - **Nodes** (`greet_consent`, `job_search`, `form_fill`, `knowledge`, `exit`) ask one question at a time, validate
+   - **Nodes** (`greet_consent`, `job_search`, `form_fill`, `knowledge`, `analytics`, `survey`, `conversation_survey`,
+     `handoff`, `exit`) ask one question at a time, validate
      answers with the model, confirm prefilled or remembered values, and reach tools only through the **Tool Gateway**
      (allow list, timeouts, retries, circuit breaker, sensitive-value scrub). Actions (`submit_application`) run only
      through `ActionRunner` with the candidate's own explicit submit.

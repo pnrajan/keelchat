@@ -69,7 +69,10 @@ def plain_summary(policy: CompiledPolicy) -> list[str]:
         items = [_words(m.name) + (" (only with permission)" if m.sensitive else "") for m in policy.memory]
         out.append("Remembers between chats: " + ", ".join(items) + ".")
     for r in [*policy.rules, *(r for s in policy.steps for r in s.rules)]:
-        out.append(f"When {r.when.rstrip('.')}: {r.then.rstrip('.')}.")
+        when = r.when.rstrip(".")
+        if when[:1].isupper() and when[1:2].islower():  # "The user ..." mid-sentence; "VIP ..." and "I ..." stay
+            when = when[0].lower() + when[1:]
+        out.append(f"When {when}: {r.then.rstrip('.')}.")
     if policy.small_talk != "off":
         out.append("Chats briefly when the customer makes small talk, then gets back to the task.")
     return out

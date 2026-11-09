@@ -10,7 +10,7 @@ rules, handoff, memory, small talk, how carefully each step replies) and **Show 
 
 Every key, its values and defaults are defined in [The policy language](POLICY_LANGUAGE.md).
 
-Or start from a bot type with **New agent…** (Blank, Support, Hiring, Analyst, Coach, or one your team saved), or
+Or start from a bot type with **New agent…** (Blank, Support, Hiring, Analyst, the two surveys, Coach, or one your team saved), or
 **Duplicate** an existing agent from its Versions tab. Write it in the console's policy editor: it completes keys and names from the registry, shows docs on hover and
 marks build errors on their lines as you type. **+ Add step** inserts a step with its settings; **Describe a bot…**
 drafts a first version from a plain description. **Save version** keeps each valid build as a numbered version; the
@@ -46,8 +46,8 @@ flow:
 ```
 
 - One question per turn. Each step asks for exactly what it needs and nothing speculative.
-- `ask` is shown to the user word for word: write the question itself ("What is your home address?"), not an
-  instruction to the bot. `expect` is the instruction the validator reads.
+- `ask` is the sample wording the model phrases from: write the question itself ("What is your home address?"), not
+  an instruction to the bot. `expect` is the instruction the validator reads.
 - `expect` is read by the validation model: write it as a human would explain a valid answer ("a US address with
   street, city, state and ZIP"), not as a regex.
 - Steps declare `requires` only when the order is not linear. Reopening a step (an edit) keeps later answers.
@@ -222,7 +222,7 @@ flow:
 - `curious: true` (form steps) checks each valid answer for the detail a person handling it would need. When one is
   missing ("it's broken": broken how?), the answer is kept and one short follow-up asks for it; what they add is
   appended. Code allows one follow-up per field and never asks about ids, numbers, names, dates or yes/no answers.
-  Drafted tests (`yachat evals generate`, the console's Test tab) cover each such field.
+  Drafted tests (`yachat evals generate`, the console's Tests tab) cover each such field.
 
 ### Small talk
 

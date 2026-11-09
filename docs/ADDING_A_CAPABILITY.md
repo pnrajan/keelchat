@@ -164,7 +164,9 @@ candidate's own action proves it (`InboundMessage.action` from the channel, or a
 from yachat import PreProcessor, preprocessor
 
 
-@preprocessor("spam_filter", order=45)  # built-ins: receiver 10, opt_out 15, language 20, shorthand 30, entity_normalization 40, input_guardrails 50
+# built-ins: receiver 10, opt_out 15, handoff_request 16, language 20, shorthand 30, entity_normalization 40,
+# input_guardrails 50, confirm_stop 55
+@preprocessor("spam_filter", order=45)
 class SpamFilter(PreProcessor):
     async def run(self, ctx):
         if looks_like_spam(ctx.text):

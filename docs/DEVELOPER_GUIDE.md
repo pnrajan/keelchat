@@ -26,14 +26,18 @@ Full component walkthrough: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Set up
 
-Needs Python 3.12, [uv](https://docs.astral.sh/uv/), Node 20+, and a model provider key. Docker is optional: it
-runs Redis/Postgres (`scripts/db.sh up`) and the local code sandbox.
+Needs macOS, Linux or WSL 2, and a model provider key. `./setup.sh` checks for git, curl,
+[uv](https://docs.astral.sh/uv/) and Node 20+ (and Docker with `--docker`), offers to install what's missing with
+Homebrew, apt, dnf or pacman, writes `.env` with your key, and installs the Python and console dependencies.
 
 ```bash
-cp .env.example .env              # set YACHAT_LLM and the matching *_API_KEY
-uv sync --all-extras
+./setup.sh                        # asks before each install; --yes to skip asking, --check to only report
 ./run.sh                          # console, API, Knowledge and Analytics Services
 ```
+
+To set up by hand: `cp .env.example .env` (set `YACHAT_LLM` and the matching `*_API_KEY`), then
+`uv sync --all-extras`. Docker is optional: it runs the whole stack (`scripts/local.sh up`), Redis/Postgres on their
+own (`scripts/db.sh up`), and the local code sandbox.
 
 There is no fake model. Tests, simulations and evals call the provider in `.env`, so a key is needed even for
 `pytest`.
@@ -44,9 +48,10 @@ There is no fake model. Tests, simulations and evals call the provider in `.env`
 |---|---|---|
 | `./run.sh` | console (Vite, hot reload), API, Knowledge (indexes `examples/knowledge`), Analytics (registers `examples/data` as `sales`) | everyday development |
 | `./run.sh --sandbox` | the same, plus statistics code in a local Docker sandbox (builds `yachat-sandbox:latest` on first use) | analytics questions that need Python |
-| `./run.sh --build` | console built into `frontend/dist` and served by the API on :8000 | checking the production bundle |
+| `./run.sh --build` | the same services, with the console built into `frontend/dist` and served by the API at `http://127.0.0.1:8000/console/` (no Vite) | checking the production bundle |
 | `./run.sh --fake-tools` | API and console only; every tool uses its in-memory fake | runtime work that does not touch the services |
 | `scripts/try.sh` | built console and API, all in memory (ignores `DATABASE_URL` and `REDIS_URL`), with `support-assistant` saved and three tests; the next free port from 8000; `--judge` adds the judged checks | trying the Tests, Rate and Judge tabs |
+| `scripts/local.sh up` | the API with the built console, Redis and Postgres, all in Docker (`docker compose --profile app`); data kept in volumes; the next free ports from 8000, 6379 and 5432; `logs`, `down`, `reset` | trying it the way it deploys, with saved data |
 | `scripts/dev.sh --knowledge` / `--analytics` | one data service; fakes for the other tools | working on one service |
 | `scripts/knowledge.sh`, `scripts/analytics.sh` | one service on its own | service-only work, with `curl` |
 
@@ -137,8 +142,8 @@ curl -s -X DELETE localhost:8000/v1/users/dev/memory      # forget everything re
 
 ## Debugging
 
-**Start with the console's Inspector.** *Trace* lists every step of the last turn with its time and notes (skipped
-steps, the routing reason). *State* is the session as stored: step progress, collected fields, step outputs, counters. *Rendered*
+**Start with the console's Inspector** (the **This reply** group). *Why* lists every step of the last turn with its time and notes (skipped
+steps, the routing reason). *State* is the session as stored: step progress, collected fields, step outputs, counters. *Raw*
 shows the channel-specific payload. *Analysis* shows the full analysis behind an analytics reply, including the SQL
 and any Python, and the verification of analytics and knowledge answers: the plan, each check with pass or fail, and
 the problems the verifier found.

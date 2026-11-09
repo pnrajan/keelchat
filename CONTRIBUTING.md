@@ -19,8 +19,8 @@ uv run pre-commit install       # ruff + mypy on commit
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run pytest                   # calls the model in .env; 3 workers; one automatic rerun per flaky test
 uv run pytest --offline         # no key: only the tests that don't call the model (CI runs this on forks)
-cd frontend && npm run build    # when the console changed
-uv run yachat evals run   # when a policy, prompt or example agent changed
+(cd frontend && npm run build)  # when the console changed
+uv run yachat evals run        # when a policy, prompt or example agent changed
 ```
 
 - Tests call the real model. Keep new tests behavioural (what the runtime asked, what the state became), not tied to
