@@ -89,6 +89,94 @@ def test_the_litellm_client_routes_each_model_to_its_own_provider(monkeypatch):
     assert isinstance(client, LiteLLMClient) and client.api_key is None and client.api_base is None
 
 
+async def test_reasoning_is_off_for_models_whose_provider_turns_it_on(monkeypatch):
+    """OpenRouter turns reasoning on for some models (Claude Haiku 5.5): hidden reasoning used the whole max_tokens and the
+    intent detector got no answer. Like Qwen's thinking on SiliconFlow, it is switched off; a gateway's config owns it."""
+    from yachat.runtime.litellm_client import LiteLLMClient
+    from yachat.runtime.llm import LLMRequest
+
+    for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
+        monkeypatch.delenv(var, raising=False)
+    sent: list[dict[str, Any]] = []
+
+    class Capture(LiteLLMClient):
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            sent.append(kwargs)
+
+    for model in ("openrouter/anthropic/claude-haiku-5.5", "siliconflow/Qwen/Qwen3.5-35B-A3B", "anthropic/claude-haiku-5-5"):
+        await Capture()._call_untraced(LLMRequest("t", model, "s", [{"role": "user", "content": "hi"}]))
+    assert sent[0]["extra_body"] == {"reasoning": {"enabled": False}}
+    assert sent[1]["extra_body"] == {"enable_thinking": False}
+    assert sent[2]["extra_body"] == {}
+    monkeypatch.setenv("LITELLM_PROXY_URL", "http://gateway:4000")
+    await Capture()._call_untraced(LLMRequest("t", "openrouter/anthropic/claude-haiku-5.5", "s", []))
+    assert sent[3]["extra_body"] == {}
+
+
+async def test_claude_without_reasoning_is_made_to_answer_with_the_tool(monkeypatch):
+    """With reasoning on, Claude refuses a forced tool and may answer in prose; with it off (OpenRouter here) the tool
+    is forced, so a structured call does not fail on a prose reply."""
+    from types import SimpleNamespace
+
+    from yachat.runtime.litellm_client import LiteLLMClient
+    from yachat.runtime.llm import LLMRequest
+
+    for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
+        monkeypatch.delenv(var, raising=False)
+    choices: list[Any] = []
+
+    class Capture(LiteLLMClient):
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            choices.append(kwargs.get("tool_choice"))
+            call = SimpleNamespace(function=SimpleNamespace(arguments='{"ok": true}'))
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[call], content=""))])
+
+    for model in ("openrouter/anthropic/claude-haiku-5.5", "anthropic/claude-haiku-5-5", "siliconflow/Qwen/Qwen3.5-35B-A3B"):
+        assert await Capture().structured(LLMRequest("t", model, "s", []), {"type": "object"}) == {"ok": True}
+    assert [c if c == "auto" else "forced" for c in choices] == ["forced", "auto", "forced"]
+
+
+async def test_a_model_that_must_reason_is_sent_again_with_the_providers_default(monkeypatch):
+    """OpenRouter refuses `reasoning: off` for Claude Sonnet 5.5 and Opus 5.5. The refusal is remembered per model: that
+    call is sent again with the provider's default (Claude then picks the tool itself), and later calls go straight there."""
+    from types import SimpleNamespace
+
+    from yachat.runtime import litellm_client
+    from yachat.runtime.litellm_client import LiteLLMClient
+    from yachat.runtime.llm import LLMError, LLMRequest
+
+    for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(litellm_client, "MUST_REASON", set())
+    sent: list[dict[str, Any]] = []
+
+    class Provider(LiteLLMClient):
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            sent.append(kwargs)
+            if kwargs["extra_body"].get("reasoning") == {"enabled": False}:
+                raise LLMError("BadRequestError") from Exception('{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled."}}')
+            call = SimpleNamespace(function=SimpleNamespace(arguments='{"ok": true}'))
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[call], content=""))])
+
+    model = "openrouter/anthropic/claude-sonnet-5.5"
+    assert await Provider().structured(LLMRequest("t", model, "s", []), {"type": "object"}) == {"ok": True}
+    assert [k["extra_body"] for k in sent] == [{"reasoning": {"enabled": False}}, {}]
+    assert sent[1]["tool_choice"] == "auto"
+    sent.clear()
+    assert await Provider().structured(LLMRequest("t", model, "s", []), {"type": "object"}) == {"ok": True}
+    assert [k["extra_body"] for k in sent] == [{}] and sent[0]["tool_choice"] == "auto"  # remembered: one call
+
+    class Down(LiteLLMClient):
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            sent.append(kwargs)
+            raise LLMError("ServiceUnavailableError") from Exception("upstream down")
+
+    sent.clear()
+    with pytest.raises(LLMError):  # any other error is still an error, sent once
+        await Down()._call_untraced(LLMRequest("t", "openrouter/anthropic/claude-haiku-5.5", "s", []))
+    assert len(sent) == 1 and litellm_client.MUST_REASON == {model}
+
+
 def test_fake_tools_only_replace_tools_without_a_backend(monkeypatch):
     for var in ("YACHAT_TOOLS", "KNOWLEDGE_URL", "JOB_SEARCH_URL", "CAREER_URL", "ANALYTICS_URL", "HANDOFF_URL"):
         monkeypatch.delenv(var, raising=False)

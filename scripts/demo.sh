@@ -2,19 +2,20 @@
 # Deploy the public demo (examples/demo/app.py) to Fly.io with the current checkout. deploy/demo/fly.toml has the setup.
 #
 #   scripts/demo.sh             # build and deploy, then check the live site
-#   scripts/demo.sh --secrets   # first copy the model settings and DEMO_KEYS from .env to Fly (values never printed)
+#   scripts/demo.sh --secrets   # first copy DEMO_KEYS from .env to Fly (values never printed)
 #   DEMO_KEYS="ANTHROPIC_API_KEY" scripts/demo.sh --secrets   # the provider keys the demo's models need
+# The models themselves are in deploy/demo/fly.toml ([env]).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CONFIG=deploy/demo/fly.toml
-KEYS=${DEMO_KEYS:-SILICONFLOW_API_KEY}  # only these provider keys go to Fly, not every key in .env
+KEYS=${DEMO_KEYS:-OPENROUTER_API_KEY}  # only these provider keys go to Fly, not every key in .env
 URL=https://yachat-demo.fly.dev
 
 command -v fly >/dev/null || { echo "missing: fly (https://fly.io/docs/flyctl/install/)" >&2; exit 1; }
 if [ "${1:-}" = "--secrets" ]; then
   [ -f .env ] || { echo "no .env" >&2; exit 1; }
   # shellcheck disable=SC2046
-  fly secrets set -c "$CONFIG" --stage $(grep -E "^(YACHAT_LLM|YACHAT_MODEL_GENERATE|YACHAT_MODEL_CLASSIFY|${KEYS// /|})=" .env | xargs) >/dev/null
+  fly secrets set -c "$CONFIG" --stage $(grep -E "^(${KEYS// /|})=" .env | xargs) >/dev/null
   fly secrets list -c "$CONFIG" --json | python3 -c 'import json,sys; print("secrets:", ", ".join(s["Name"] for s in json.load(sys.stdin)))'
 fi
 # the console and API stay locked: set a random key once, never print it

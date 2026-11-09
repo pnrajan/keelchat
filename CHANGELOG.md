@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Demo: `YACHAT_DEMO_DRAFT_MODEL`, a stronger model for writing bots than for chatting. The demo's models are now in
+  `deploy/demo/fly.toml` (Claude Haiku 5.5 to chat, Sonnet 5.5 to draft, via OpenRouter); `scripts/demo.sh --secrets`
+  copies only the provider key.
 - `handoff: true` on a rule: when it matches, the conversation passes to a person in code (reason `rule:<name>`), instead
   of a reply that only says someone will help. Drafts and edits use it for "hand over when ..."; needs the top-level
   `handoff`.
@@ -57,6 +60,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Claude Haiku 5.5 through OpenRouter: hidden reasoning used the whole token budget, so the intent detector got no
+  answer and every message was asked again. Reasoning is off for OpenRouter models, and models that require it
+  (Sonnet 5.5, Opus 5.5) are sent the provider's default instead.
+- The intent detector has room for wordier models (800 tokens, was 400), so matched rules, the last part of its answer,
+  aren't cut off.
 - A drafted bot told to hand emergencies to a person now does: before, it promised a person and asked the next question.
 - Drafts that fail on a colon in bare text, or on a situation listed under `handoff.when`, are told how to fix it.
 - The Docker image sets `HOME` for the unprivileged user, so connecting to Postgres no longer fails on

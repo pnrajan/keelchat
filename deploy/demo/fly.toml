@@ -21,6 +21,12 @@ swap_size_mb = 512  # the app uses about 220 MB of the 256; swap absorbs bursts 
   YACHAT_TOOLS = "fake"
   YACHAT_CLIENT_IP_HEADER = "Fly-Client-IP"
   YACHAT_DEMO_DAILY = "300"
+  # models, through OpenRouter (the key is a Fly secret: scripts/demo.sh --secrets). Chat on a small fast model; writing
+  # bots on a stronger one, at a few cents a draft (YACHAT_DEMO_DRAFTS_DAILY caps the day)
+  YACHAT_LLM = "litellm"
+  YACHAT_MODEL_GENERATE = "openrouter/anthropic/claude-haiku-5.5"
+  YACHAT_MODEL_CLASSIFY = "openrouter/anthropic/claude-haiku-5.5"
+  YACHAT_DEMO_DRAFT_MODEL = "openrouter/anthropic/claude-sonnet-5.5"
 
 [processes]
   app = "uvicorn examples.demo.app:create_app --factory --host 0.0.0.0 --port 8080"
