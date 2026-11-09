@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `handoff: true` on a rule: when it matches, the conversation passes to a person in code (reason `rule:<name>`), instead
+  of a reply that only says someone will help. Drafts and edits use it for "hand over when ..."; needs the top-level
+  `handoff`.
 - `./setup.sh`: checks for git, curl, uv, Node 20+ (and Docker with `--docker`) on macOS, Debian/Ubuntu, Fedora, Arch
   and WSL, offers to install what's missing, writes `.env` with your model key and installs the dependencies.
 - `scripts/local.sh up|logs|down|reset`: the whole stack in Docker (API with the console, Redis, Postgres), on the next
@@ -52,6 +55,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A drafted bot told to hand emergencies to a person now does: before, it promised a person and asked the next question.
+- Drafts that fail on a colon in bare text, or on a situation listed under `handoff.when`, are told how to fix it.
 - The Docker image sets `HOME` for the unprivileged user, so connecting to Postgres no longer fails on
   `/root/.postgresql` permissions.
 - The plain-words summary reads each rule as one sentence: "When the user describes ...", not "When The user ...".

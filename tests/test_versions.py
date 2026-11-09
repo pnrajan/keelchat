@@ -138,6 +138,23 @@ async def test_draft_a_policy_from_a_description():
         assert "greet_consent" in steps and "form_fill" in steps and body["attempts"] >= 1
 
 
+async def test_a_draft_hands_off_in_a_named_situation_with_a_handoff_rule():
+    """'Hand emergencies to a person' becomes a rule the runtime hands off on, not a reply that only promises a person."""
+    from yachat.policy.compiler import build
+    from yachat.policy.summary import plain_summary
+
+    async with AsyncClient(transport=ASGITransport(app=app_with(InMemoryAgentVersionStore())), base_url="http://t") as c:
+        r = await c.post(
+            "/v1/agents/draft",
+            json={"description": "Book dental appointments: ask which treatment, a preferred day and a phone number. Hand over to a person for emergencies."},
+        )
+        body = r.json()
+        assert r.status_code == 200 and body["errors"] == [], body
+        policy = build(body["yaml"])
+        assert policy.handoff is not None and [x for x in policy.rules if x.handoff], body["yaml"]
+        assert any("passes the chat to a person" in line for line in plain_summary(policy))
+
+
 async def test_sessions_follow_the_shared_active_version_and_keep_their_pinned_one(policy_yaml):
     from tests.helpers import RecordingLLM, mutate, say
     from yachat.policy.compiler import build

@@ -181,13 +181,16 @@ def validate_policy(
 
 
 def _rule_errors(policy: AgentPolicy) -> list[PolicyError]:
-    """Rule names are unique across the agent and its steps; `overrides` names known rules and forms no cycle."""
+    """Rule names are unique across the agent and its steps; `overrides` names known rules and forms no cycle; a rule that
+    hands off has a `handoff` to hand off to."""
     located = [(f"rules[{i}]", r) for i, r in enumerate(policy.rules)] + [
         (f"flow[{i}].{s.name}.rules[{j}]", r) for i, s in enumerate(policy.flow or []) for j, r in enumerate(s.rules)
     ]
     errors: list[PolicyError] = []
     seen: set[str] = set()
     for path, r in located:
+        if r.handoff and policy.handoff is None:
+            errors.append(PolicyError(f"{path}.handoff", "a rule that hands off needs a top-level `handoff:` (e.g. `handoff: {when: [user_request]}`)"))
         if r.name in seen:
             errors.append(PolicyError(f"{path}.name", f"duplicate rule {r.name!r}"))
         seen.add(r.name)

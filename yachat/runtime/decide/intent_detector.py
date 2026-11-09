@@ -291,6 +291,9 @@ class IntentDetector:
         ctx.rules = rules.resolve(rules.grounded(reported, ctx.text), rules.active_rules(ctx))
         for r in ctx.rules:
             ctx.decide("rule", r.name, reason=r.when[:120])
+        if (hands := next((r for r in ctx.rules if r.handoff), None)) and not ctx.state.finished:
+            ctx.handoff_reason = f"rule:{hands.name}"  # code passes it on; the reply only says so
+            log.info("routing", decision="handoff", reason=ctx.handoff_reason)
         return v
 
     async def run(self, ctx: TurnContext) -> TurnContext:
@@ -311,7 +314,7 @@ class IntentDetector:
                 log.error("scope check failed; treating as in scope", error=f"{e.__class__.__name__}: {e}")
                 ctx.errors.append(f"intent_detector: {e.__class__.__name__}")
                 ctx.verdict = AnswerVerdict("digressed", intent="enquiry", reason="detector error", items=[IntentItem("enquiry", text=ctx.text)], in_scope=True)
-            if self._wants_human(ctx) or self._wants_to_stop(ctx):  # a quiet "please stop" is confirmed for every agent
+            if ctx.handoff_reason or self._wants_human(ctx) or self._wants_to_stop(ctx):  # a quiet "please stop" is confirmed for every agent
                 return ctx
             if self._small_talk(ctx, talk):
                 return ctx
