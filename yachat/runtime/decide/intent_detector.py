@@ -80,6 +80,9 @@ SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+#: room for the verdict: every intent, fields and matched rules. 400 cut off wordier models (Claude Haiku 5.5) before
+#: `rules`, the last key, so a matched rule (and its handoff) was lost
+DETECT_MAX_TOKENS = 800
 #: asked only when the policy hands off on user_request, so other agents' prompts and schema stay as they are
 WANTS_HUMAN = {
     "type": "boolean",
@@ -249,7 +252,7 @@ class IntentDetector:
             models.classify,
             self._system(ctx),
             msgs,
-            max_tokens=400,
+            max_tokens=DETECT_MAX_TOKENS,
             effort=models.effort_classify,
             metadata={
                 "open_field": q.field if q else None,

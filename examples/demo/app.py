@@ -13,6 +13,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -44,6 +45,9 @@ TRIES_PER_IP = int(os.getenv("YACHAT_DEMO_TRIES_PER_IP", "10"))
 TRIES_PER_DAY = int(os.getenv("YACHAT_DEMO_TRIES_DAILY", "300"))
 #: conversations per tried bot per day
 TRY_CHATS = 30
+#: a stronger model for writing bots than for chatting (YAML that builds, handoffs in the right place); unset: the
+#: chat's own YACHAT_MODEL_GENERATE
+DRAFT_MODEL = os.getenv("YACHAT_DEMO_DRAFT_MODEL", "")
 log = get_logger("demo")
 
 
@@ -65,6 +69,7 @@ def create_app() -> FastAPI:
     embeds = InMemoryEmbedStore()
     app = create_api(embeds=embeds)
     rt: Runtime = app.state.runtime
+    drafting = replace(rt.models, generate=DRAFT_MODEL) if DRAFT_MODEL else rt.models
     inner = app.router.lifespan_context
 
     @asynccontextmanager
@@ -94,10 +99,10 @@ def create_app() -> FastAPI:
         if not await rt.limits.take("draft-day", DRAFTS_PER_DAY, 86_400):
             raise HTTPException(429, "The demo has made all the bots it can today. Clone the repo to keep going.")
         if body.yaml.strip():
-            d, _ = await edit_policy(rt.llm, rt.models, body.yaml, body.text, "default", {})
+            d, _ = await edit_policy(rt.llm, drafting, body.yaml, body.text, "default", {})
             extra: list[Need] | None = None  # the page keeps the suggestions from the first draft
         else:
-            d, extra = await asyncio.gather(draft_policy(rt.llm, rt.models, body.text, "default", {}), suggest(body.text))
+            d, extra = await asyncio.gather(draft_policy(rt.llm, drafting, body.text, "default", {}), suggest(body.text))
         return {
             "yaml": d.yaml,
             "errors": [{"path": e.path, "message": e.message} for e in d.errors],
@@ -123,7 +128,7 @@ def create_app() -> FastAPI:
 
     async def suggest(description: str) -> list[Need]:
         try:
-            return await suggested(rt.llm, rt.models, description, "")
+            return await suggested(rt.llm, drafting, description, "")
         except LLMError as e:  # the draft still arrives; the page says suggestions are unavailable
             log.error("needs suggestion failed", error=str(e)[:300])
             return []
