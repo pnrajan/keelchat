@@ -3,200 +3,395 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>yachat: customer-facing chatbots that follow your rules</title>
-<meta name="description" content="Open-source runtime for customer-facing chatbots that must finish a job: support triage, bookings, intake, surveys. One reviewable file per bot; steps, limits, guardrails and handoff enforced in code, not in a prompt.">
-<meta property="og:title" content="yachat: chatbots you write in YAML">
-<meta property="og:description" content="One short YAML file per bot. Describe yours and get the file, then run it yourself.">
-<meta property="og:image" content="assets/compose.jpg">
+<title>yachat: open-source LLM chatbot framework in YAML and Python</title>
+<meta name="description" content="Open-source Python framework for customer-facing LLM chatbots: support, bookings, intake, surveys. Describe a bot in plain English, get one YAML file; steps, limits, guardrails and handoff are enforced in code.">
+<link rel="canonical" href="https://pnrajan.github.io/yachat/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6f4f'/%3E%3Ctext x='16' y='22' font-family='system-ui,sans-serif' font-size='18' font-weight='700' text-anchor='middle' fill='%23fff'%3Ey%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#2f6f4f">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="yachat">
+<meta property="og:url" content="https://pnrajan.github.io/yachat/">
+<meta property="og:title" content="yachat: chatbots that follow your rules">
+<meta property="og:description" content="Describe a bot in plain English, get one YAML file, run it yourself. Steps, limits, guardrails and handoff enforced in code. Open source, any model.">
+<meta property="og:image" content="https://pnrajan.github.io/yachat/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="yachat: a dental booking bot as one short YAML file">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="yachat: chatbots that follow your rules">
+<meta name="twitter:description" content="Open-source Python framework: one YAML file per bot, rules enforced in code, any model.">
+<meta name="twitter:image" content="https://pnrajan.github.io/yachat/assets/og.jpg">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "SoftwareSourceCode", "name": "yachat",
+ "description": "Open-source Python framework for customer-facing LLM chatbots defined in YAML, with steps, limits, guardrails and handoff enforced in code.",
+ "url": "https://pnrajan.github.io/yachat/", "codeRepository": "https://github.com/pnrajan/yachat", "programmingLanguage": "Python",
+ "license": "https://www.apache.org/licenses/LICENSE-2.0", "keywords": "chatbot framework, LLM, YAML, conversational AI, customer support bot, guardrails, MCP, self-hosted"}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-  :root { --bg: #ffffff; --fg: #1f1f1d; --muted: #6e6e69; --line: #e6e5e0; --soft: #f4f4f1; --accent: #2f6f4f; color-scheme: light }
+  :root {
+    --bg: #fbfbf8; --bg2: #f3f2ec; --card: #ffffff; --fg: #191a17; --muted: #63655e; --line: #e4e3dc;
+    --accent: #2f6f4f; --accent-2: #3f8f66; --tint: #e7f1ea; --code: #12140f; --code-fg: #e8e9e2; --code-k: #8fd3ad; --code-c: #7d8177;
+    --glow: rgb(63 143 102 / .18); --shadow: 0 1px 2px rgb(20 24 18 / .05), 0 12px 32px -12px rgb(20 24 18 / .16);
+    color-scheme: light;
+  }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #181817; --fg: #ecebe6; --muted: #9b9a94; --line: #2e2e2b; --soft: #21211f; --accent: #7cc39c; color-scheme: dark }
+    :root {
+      --bg: #10110f; --bg2: #161814; --card: #1a1c18; --fg: #ecede6; --muted: #9a9d93; --line: #2a2d27;
+      --accent: #8fd3ad; --accent-2: #6cbf93; --tint: #1c2a21; --code: #0b0c0a; --code-fg: #e8e9e2; --code-k: #8fd3ad; --code-c: #6f7369;
+      --glow: rgb(108 191 147 / .14); --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 16px 40px -16px rgb(0 0 0 / .6);
+      color-scheme: dark;
+    }
   }
   * { box-sizing: border-box }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif }
+  html { scroll-behavior: smooth }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+         -webkit-font-smoothing: antialiased }
   a { color: var(--accent) }
-  .wrap { max-width: 880px; margin: 0 auto; padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right)) }
-  nav { display: flex; align-items: center; gap: 18px; padding-block: 18px; font-size: 15px }
-  nav b { margin-right: auto; font-size: 17px }
-  nav a { color: var(--fg); text-decoration: none }
-  nav a:hover { color: var(--accent) }
+  code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)) }
 
-  .hero { padding-block: 56px 36px }
-  h1 { font-size: clamp(32px, 6vw, 48px); line-height: 1.1; letter-spacing: -0.025em; margin: 0 0 16px; text-wrap: balance }
-  .lead { font-size: 18px; color: var(--muted); max-width: 56ch; margin: 0 0 28px }
-  .ctas { display: flex; flex-wrap: wrap; gap: 10px }
-  .btn { display: inline-block; border-radius: 10px; padding: 10px 18px; text-decoration: none; font-weight: 600; border: 1px solid var(--line); color: var(--fg) }
+  /* nav */
+  header { position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px);
+           background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent) }
+  nav { display: flex; align-items: center; gap: 22px; padding-block: 14px; font-size: 15px }
+  .logo { display: flex; align-items: center; gap: 9px; margin-right: auto; font-weight: 800; font-size: 18px; letter-spacing: -.02em; color: var(--fg); text-decoration: none }
+  .logo i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-2), var(--accent)); display: grid; place-items: center;
+            color: var(--bg); font-style: normal; font-size: 15px }
+  nav a:not(.logo):not(.btn) { color: var(--muted); text-decoration: none; font-weight: 500 }
+  nav a:not(.logo):not(.btn):hover { color: var(--fg) }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 10px 18px; text-decoration: none; font-weight: 600; font-size: 15px;
+         border: 1px solid var(--line); color: var(--fg); background: var(--card); transition: transform .15s, box-shadow .15s, border-color .15s }
+  .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)) }
   .btn.solid { background: var(--fg); color: var(--bg); border-color: var(--fg) }
-  .btn:hover { opacity: .88 }
-  .make { display: flex; gap: 8px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 14px; padding: 6px; background: var(--bg) }
-  .make:focus-within { border-color: var(--muted) }
-  .make input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font: inherit; padding: 6px 10px }
-  .make button { flex: none; border: 0; border-radius: 10px; padding: 8px 16px; font: inherit; font-weight: 600; background: var(--fg); color: var(--bg); cursor: pointer }
-  .eg { color: var(--muted); font-size: 14px; margin: 0 0 20px }
-  .eg a { white-space: nowrap }
+  .btn.sm { padding: 6px 12px; font-size: 14px }
 
-  pre { margin: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-x: auto;
-        font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace }
-  .k { color: var(--accent) }
-  .shot { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 28px }
+  /* hero */
+  .hero { position: relative; padding-block: 72px 104px; overflow: hidden }
+  .hero::before { content: ""; position: absolute; inset: -30% -10% auto; height: 520px; pointer-events: none;
+                  background: radial-gradient(50% 60% at 70% 30%, var(--glow), transparent 70%), radial-gradient(40% 50% at 15% 10%, var(--glow), transparent 70%) }
+  .hero .wrap { position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 56px; align-items: center }
+  .pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+          padding: 4px 12px 4px 6px; font-size: 13px; color: var(--muted); text-decoration: none; margin-bottom: 22px }
+  .pill b { background: var(--tint); color: var(--accent); border-radius: 999px; padding: 1px 8px; font-weight: 600 }
+  h1 { font-size: clamp(38px, 5.6vw, 64px); line-height: 1.02; letter-spacing: -.035em; margin: 0 0 20px; font-weight: 800; text-wrap: balance }
+  h1 em { font-style: normal; background: linear-gradient(120deg, var(--accent-2), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent }
+  .lead { font-size: 19px; color: var(--muted); max-width: 52ch; margin: 0 0 28px }
+  .make { display: flex; gap: 8px; border: 1px solid var(--line); border-radius: 14px; padding: 7px; background: var(--card); box-shadow: var(--shadow);
+          transition: border-color .15s, box-shadow .15s }
+  .make:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--glow), var(--shadow) }
+  .make input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font: inherit; padding: 8px 10px }
+  .make button { flex: none; border: 0; border-radius: 10px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+                 background: linear-gradient(135deg, var(--accent-2), var(--accent)); color: #fff }
+  @media (prefers-color-scheme: dark) { .make button { color: #0b1a12 } }
+  .eg { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 28px; font-size: 14px; color: var(--muted) }
+  .eg a { border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; text-decoration: none; color: var(--fg); background: var(--card) }
+  .eg a:hover { border-color: var(--accent) }
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px }
 
-  .points { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; padding-block: 48px }
-  .points h2 { font-size: 16px; margin: 0 0 6px }
-  .points p { margin: 0; color: var(--muted); font-size: 15px }
+  /* hero visual: the file and the chat it runs */
+  .stage { position: relative; min-width: 0 }
+  .file { background: var(--code); color: var(--code-fg); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid color-mix(in srgb, var(--code-fg) 10%, transparent) }
+  .file .bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid rgb(255 255 255 / .07); font-size: 12.5px; color: var(--code-c) }
+  .file .bar span { width: 10px; height: 10px; border-radius: 50%; background: rgb(255 255 255 / .14) }
+  .file .bar b { margin-left: 8px; font-weight: 500; color: var(--code-fg) }
+  .file pre { margin: 0; padding: 16px 18px 20px; font-size: 13px; line-height: 1.65; overflow-x: auto; background: transparent; border: 0; border-radius: 0 }
+  .k { color: var(--code-k) }
+  .c { color: var(--code-c) }
+  .hero-yaml { padding-bottom: 104px !important }
+  section.block, .final { scroll-margin-top: 64px }
+  .chat { position: absolute; right: -28px; bottom: -84px; width: min(330px, 78%); background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+          box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.45 }
+  .chat .t { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; display: flex; justify-content: space-between }
+  .chat .t i { font-style: normal; color: var(--accent) }
+  .u { align-self: flex-end; background: var(--bg2); border-radius: 14px 14px 4px 14px; padding: 7px 11px; max-width: 85% }
+  .b { align-self: flex-start; background: var(--tint); border-radius: 14px 14px 14px 4px; padding: 7px 11px; max-width: 90% }
+  .ev { align-self: center; font-size: 11.5px; color: var(--accent); border: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent); border-radius: 999px; padding: 2px 10px }
 
-  .sec { padding-block: 40px 8px }
-  .sec h2 { font-size: 24px; letter-spacing: -0.015em; margin: 0 0 8px; text-wrap: balance }
-  .sec > p { color: var(--muted); max-width: 64ch; margin: 0 0 22px }
-  .why { width: 100%; border-collapse: collapse; font-size: 15px }
-  .why th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 0 12px 8px 0 }
-  .why td { vertical-align: top; padding: 12px 12px 12px 0; border-top: 1px solid var(--line) }
-  .why td:first-child { width: 42%; color: var(--muted) }
-  .why b { color: var(--fg) }
-  .uses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
-  .use { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0 }
-  .use h3 { font-size: 15px; margin: 0 0 4px }
-  .use p { margin: 0 0 8px; color: var(--muted); font-size: 14px }
-  .use a { font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere }
-  .who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px }
-  .who h3 { font-size: 15px; margin: 0 0 4px }
+  /* sections */
+  section.block { padding-block: 88px 0 }
+  .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px }
+  h2 { font-size: clamp(28px, 3.6vw, 40px); line-height: 1.12; letter-spacing: -.025em; margin: 0 0 14px; font-weight: 750; text-wrap: balance; max-width: 22ch }
+  .intro { color: var(--muted); font-size: 17.5px; max-width: 62ch; margin: 0 0 36px }
+
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; min-width: 0; counter-increment: s }
+  .step::before { content: counter(s); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--tint); color: var(--accent);
+                  font-weight: 700; font-size: 14px; margin-bottom: 14px }
+  .step h3 { margin: 0 0 6px; font-size: 17px }
+  .step p { margin: 0; color: var(--muted); font-size: 15px }
+  .shot { display: block; width: 100%; height: auto; margin-top: 28px; border-radius: 16px; border: 1px solid var(--line); box-shadow: var(--shadow) }
+
+  .vs { display: grid; gap: 10px }
+  .row { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden }
+  .row > div { padding: 16px 20px; min-width: 0; font-size: 15px }
+  .row .bad { color: var(--muted); background: var(--bg2); display: flex; gap: 10px; align-items: flex-start }
+  .row .bad::before { content: "✕"; color: #b4553c; font-weight: 700; flex: none }
+  .row .good { display: flex; gap: 10px; align-items: flex-start }
+  .row .good::before { content: "✓"; color: var(--accent); font-weight: 700; flex: none }
+  .row b { display: block }
+  .row .good span { color: var(--muted) }
+  .vs .head { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+  .vs .head div { padding: 0 20px }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px }
+  .use { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; min-width: 0;
+         text-decoration: none; color: var(--fg); transition: transform .15s, box-shadow .15s, border-color .15s }
+  .use:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)) }
+  .use .ic { width: 38px; height: 38px; border-radius: 11px; background: var(--tint); display: grid; place-items: center; font-size: 19px; margin-bottom: 14px }
+  .use h3 { margin: 0 0 6px; font-size: 17px }
+  .use p { margin: 0 0 16px; color: var(--muted); font-size: 15px }
+  .use code { margin-top: auto; font-size: 12.5px; color: var(--accent); overflow-wrap: anywhere }
+
+  .dev { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start }
+  .dev .file pre { font-size: 12.5px }
+  .dev p { color: var(--muted); font-size: 15px; margin: 12px 4px 0 }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px }
+  .chips span { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 13px; font-size: 14px; color: var(--muted) }
+
+  .who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px }
+  .who h3 { margin: 0 0 6px; font-size: 17px }
   .who p { margin: 0; color: var(--muted); font-size: 15px }
-  .fit { color: var(--muted); font-size: 15px; margin: 22px 0 0; max-width: 70ch }
-  .start { padding-block: 8px 48px }
-  .start h2 { font-size: 22px; margin: 0 0 12px; letter-spacing: -0.01em }
-  .start p { color: var(--muted); margin: 12px 0 0 }
-  .copy { position: relative }
-  .copy button { position: absolute; top: 10px; right: 10px; font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--bg);
-                 color: var(--fg); border-radius: 8px; padding: 3px 10px; cursor: pointer }
+  .fit { margin: 36px 0 0; padding: 16px 20px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 15px }
 
-  footer { border-top: 1px solid var(--line); padding-block: 22px 32px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 20px }
-  footer a { color: var(--muted) }
-  @media (max-width: 680px) { .copy pre { padding-top: 46px } .points, .uses, .who { grid-template-columns: 1fr; gap: 16px } .why td:first-child { width: 45% } .hero { padding-top: 32px } nav .wide { display: none } }
+  .final { margin-top: 96px; padding-block: 64px; background: var(--bg2); border-block: 1px solid var(--line) }
+  .final .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: center }
+  .final p { color: var(--muted) }
+  .copy { position: relative }
+  .copy button { position: absolute; top: 9px; right: 10px; font: inherit; font-size: 12.5px; border: 1px solid rgb(255 255 255 / .16); background: transparent;
+                 color: var(--code-fg); border-radius: 7px; padding: 3px 10px; cursor: pointer }
+
+  footer { padding-block: 28px 40px; color: var(--muted); font-size: 14px }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center }
+  footer a { color: var(--muted); text-decoration: none }
+  footer a:hover { color: var(--fg) }
+  footer .logo { font-size: 15px; margin-right: auto }
+  footer .logo i { width: 20px; height: 20px; font-size: 12px; border-radius: 6px }
+
+  @media (max-width: 900px) {
+    .hero .wrap, .final .wrap, .dev { grid-template-columns: minmax(0, 1fr); gap: 40px }
+    .chat { position: relative; right: auto; bottom: auto; width: auto; margin: -28px 12px 0 auto; max-width: 340px }
+    .hero-yaml { padding-bottom: 44px !important }
+    .steps, .grid3, .who { grid-template-columns: minmax(0, 1fr) }
+    nav .wide { display: none }
+  }
+  @media (max-width: 620px) {
+    .hero { padding-top: 40px }
+    .row, .vs .head { grid-template-columns: minmax(0, 1fr) }
+    .vs .head { display: none }
+    section.block { padding-top: 64px }
+    .make { flex-direction: column }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <nav>
-    <b>yachat</b>
-    <a class="wide" href="#why">Why</a>
-    <a class="wide" href="#uses">Use cases</a>
-    <a class="wide" href="https://github.com/pnrajan/yachat/tree/main/docs">Docs</a>
-    <a class="wide" href="https://github.com/pnrajan/yachat/discussions">Discussions</a>
-    <a href="https://github.com/pnrajan/yachat">GitHub</a>
-  </nav>
+<header>
+  <div class="wrap">
+    <nav>
+      <a class="logo" href="#"><i>y</i>yachat</a>
+      <a class="wide" href="#how">How it works</a>
+      <a class="wide" href="#why">Why</a>
+      <a class="wide" href="#uses">Use cases</a>
+      <a class="wide" href="#developers">Developers</a>
+      <a class="wide" href="https://github.com/pnrajan/yachat/tree/main/docs">Docs</a>
+      <a class="btn sm" href="https://github.com/pnrajan/yachat">★ Star on GitHub</a>
+    </nav>
+  </div>
+</header>
 
-  <section class="hero">
-    <h1>Customer-facing chatbots that follow your rules.</h1>
-    <p class="lead">Describe a bot in plain English, or write its YAML yourself: what it's for, what it asks, its rules and when
-      it hands over to a person. One open-source runtime enforces all of it in code, not in a prompt.</p>
-    <form class="make" action="https://yachat-demo.fly.dev/" method="get">
-      <input name="describe" required minlength="3" maxlength="1000" aria-label="Describe your bot"
-             placeholder="Describe your bot, e.g. book haircuts and ask for a phone number">
-      <button type="submit">Make it</button>
-    </form>
-    <p class="eg">You get the YAML, a list of what to connect, and a chat with your bot, in about a minute. Or start from:
-      <a href="https://yachat-demo.fly.dev/?describe=Book+dental+appointments%3A+ask+which+treatment%2C+a+preferred+day+and+a+phone+number.+Hand+over+to+a+person+for+emergencies.">dental bookings</a> ·
-      <a href="https://yachat-demo.fly.dev/?describe=A+short+survey+after+delivery%3A+how+likely+they+are+to+recommend+us+from+0+to+10%2C+and+what+we+could+do+better.">delivery survey</a> ·
-      <a href="https://yachat-demo.fly.dev/?describe=Screen+job+applicants%3A+the+role+they+want%2C+years+of+experience%2C+notice+period+and+an+email+address.+Friendly+and+brief.">applicant screening</a></p>
-    <div class="ctas">
-      <a class="btn" href="https://github.com/pnrajan/yachat/fork">Fork on GitHub</a>
-      <a class="btn" href="https://yachat-demo.fly.dev/#try">Chat with a sample bot</a>
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <a class="pill" href="https://github.com/pnrajan/yachat"><b>Open source</b> Python · Apache-2.0 · any LLM</a>
+      <h1>Chatbots that <em>follow your rules.</em></h1>
+      <p class="lead">Describe a customer-facing bot in plain English and get one short YAML file. yachat runs it with the
+        steps, limits, guardrails and handoff enforced in code, not left to a prompt.</p>
+      <form class="make" action="https://yachat-demo.fly.dev/" method="get">
+        <input name="describe" required minlength="3" maxlength="1000" aria-label="Describe your bot"
+               placeholder="e.g. Book haircuts and ask for a phone number">
+        <button type="submit">Make my bot →</button>
+      </form>
+      <div class="eg">Try:
+        <a href="https://yachat-demo.fly.dev/?describe=Book+dental+appointments%3A+ask+which+treatment%2C+a+preferred+day+and+a+phone+number.+Hand+over+to+a+person+for+emergencies.">Dental bookings</a>
+        <a href="https://yachat-demo.fly.dev/?describe=A+short+survey+after+delivery%3A+how+likely+they+are+to+recommend+us+from+0+to+10%2C+and+what+we+could+do+better.">Delivery survey</a>
+        <a href="https://yachat-demo.fly.dev/?describe=Screen+job+applicants%3A+the+role+they+want%2C+years+of+experience%2C+notice+period+and+an+email+address.+Friendly+and+brief.">Applicant screening</a>
+      </div>
+      <div class="ctas">
+        <a class="btn solid" href="https://github.com/pnrajan/yachat">Get started on GitHub</a>
+        <a class="btn" href="https://yachat-demo.fly.dev/#try">Chat with a sample bot</a>
+      </div>
     </div>
-  </section>
 
-  <pre><span class="k">agent:</span> support-assistant
-<span class="k">charter:</span> "Help customers with orders and returns. Out of scope: legal advice."
+    <div class="stage">
+      <div class="file">
+        <div class="bar"><span></span><span></span><span></span><b>support_assistant.yaml</b></div>
+<pre class="hero-yaml"><span class="k">agent:</span> support-assistant
+<span class="k">charter:</span> &gt;
+  Help customers with orders and returns.
+  Out of scope: legal advice.
 <span class="k">tools:</span> [knowledge_search]
 <span class="k">flow:</span>
   - greet_consent
   - <span class="k">form_fill:</span>
       <span class="k">fields:</span>
-        - {name: order_number, ask: "What is your order number?", expect: "An order number"}
-        - {name: issue, ask: "What went wrong?", expect: "A short description", optional: true}
-<span class="k">guardrails:</span> {input: [prompt_injection], output: [pii, no_legal_advice]}
+        - <span class="k">name:</span> order_number
+          <span class="k">ask:</span> What is your order number?
+          <span class="k">expect:</span> An order number
+<span class="k">guardrails:</span> {output: [pii, no_legal_advice]}
 <span class="k">handoff:</span> {when: [user_request, max_reasks]}</pre>
-  <img class="shot" src="assets/make-a-bot.gif" alt="A dental booking bot described in two sentences, read back in plain words, then a test chat where an emergency is handed to a person" width="960" height="600" loading="lazy">
+      </div>
+      <div class="chat" aria-label="An example conversation">
+        <div class="t">Live chat <i>● running</i></div>
+        <div class="u">My parcel arrived broken</div>
+        <div class="b">Sorry about that. What is your order number?</div>
+        <div class="u">no idea, sorry</div>
+        <div class="b">It's on your confirmation email, e.g. ORD-12345.</div>
+        <div class="ev">re-ask 2 of 2 · counted in code</div>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <section class="sec" id="why">
-    <h2>Why it's needed</h2>
-    <p>A bot that is only a prompt works in a demo and drifts in production. When it has a job to finish (take an order
-      number, book a slot, collect an application), the model is asked to remember the steps, count its own attempts,
-      stay in scope and know when to stop. It does that most of the time. yachat moves those decisions into code and
-      leaves the model to read and phrase.</p>
-    <table class="why">
-      <thead><tr><th>A prompt-only bot</th><th>With yachat</th></tr></thead>
-      <tbody>
-        <tr><td>Skips a question, or moves on with an answer it couldn't use</td>
-            <td><b>Steps are code.</b> A form isn't done until every field passes its check; the next step is decided by the runtime.</td></tr>
-        <tr><td>Asks the same thing forever, or gives up at random</td>
-            <td><b>Counting lives in code.</b> Re-asks, digressions and budgets have limits; at the limit it hands over to a person, with the conversation so far.</td></tr>
-        <tr><td>Promises a refund, gives legal advice, leaks a phone number</td>
-            <td><b>Rules and guardrails.</b> Plain-language rules apply on the turns they fit; input and output checks run on every reply.</td></tr>
-        <tr><td>Calls any tool with anything the model makes up</td>
-            <td><b>One tool gateway.</b> An allow list per bot, timeouts, a circuit breaker; tool output is treated as untrusted.</td></tr>
-        <tr><td>A prompt edit changes every live chat, and nobody reviewed it</td>
-            <td><b>A file you can review.</b> Each bot is one YAML policy, versioned with rollback; a conversation stays on the version it started on.</td></tr>
-        <tr><td>"It seemed fine when I tried it"</td>
-            <td><b>Tested from the policy.</b> Test sets are generated from the YAML; a stronger model reviews trial chats and proposes fixes.</td></tr>
-      </tbody>
-    </table>
+<div class="wrap">
+  <section class="block" id="how">
+    <p class="eyebrow">How it works</p>
+    <h2>From a sentence to a running bot in minutes.</h2>
+    <p class="intro">No prompt engineering. You say what the bot is for; yachat writes a file you can read, and the runtime
+      does exactly what the file says.</p>
+    <div class="steps">
+      <div class="step"><h3>Describe it</h3><p>"Book dental appointments; hand emergencies to a person." A model writes the YAML and the build checks it.</p></div>
+      <div class="step"><h3>Try it, change it</h3><p>Chat with your bot in the browser. Ask for changes in plain words: "also ask for an email".</p></div>
+      <div class="step"><h3>Run it yourself</h3><p>Clone the repo, run <code>./setup.sh</code>, and serve it on your site, WhatsApp, SMS, Slack or the phone.</p></div>
+    </div>
+    <img class="shot" src="assets/make-a-bot.gif" alt="A dental booking bot described in two sentences, read back in plain words, then a test chat where an emergency is handed to a person" width="960" height="600" loading="lazy">
   </section>
 
-  <section class="sec" id="uses">
-    <h2>What you can build</h2>
-    <p>Bots with a job to finish. Each of these ships as an example policy you can run and change.</p>
-    <div class="uses">
-      <div class="use"><h3>Support triage</h3><p>Consent, the order number and what went wrong, answers from your help docs, a person when needed.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/support_assistant.yaml">support_assistant.yaml</a></div>
-      <div class="use"><h3>Bookings</h3><p>Service, day and contact details, open slots from your calendar through a Python tool.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/booking_assistant.yaml">booking_assistant.yaml</a></div>
-      <div class="use"><h3>Applications and intake</h3><p>Search, pick, a validated form, and a submit that runs only when the user confirms.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/hiring_agent.yaml">hiring_agent.yaml</a></div>
-      <div class="use"><h3>Surveys</h3><p>A 0-10 score and open questions asked as a conversation; scores computed in code, results over time.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/customer_feedback.yaml">customer_feedback.yaml</a></div>
-      <div class="use"><h3>Questions about data</h3><p>Answers from your tables with SQL and checked statistics, not guesses.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/sales_analyst.yaml">sales_analyst.yaml</a></div>
-      <div class="use"><h3>A concierge</h3><p>No fixed steps: it picks read-only tools each turn, within a budget counted in code.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/concierge.yaml">concierge.yaml</a></div>
+  <section class="block" id="why">
+    <p class="eyebrow">Why yachat</p>
+    <h2>A prompt works in a demo. Production needs rules.</h2>
+    <p class="intro">When a bot has a job to finish, a prompt-only bot is asked to remember the steps, count its own attempts
+      and know when to stop. It does, most of the time. yachat moves those decisions into code and leaves the model to
+      read and phrase.</p>
+    <div class="vs">
+      <div class="head"><div>A prompt-only bot</div><div>With yachat</div></div>
+      <div class="row"><div class="bad">Skips a question, or moves on with an answer it couldn't use</div>
+        <div class="good"><div><b>Steps are code.</b><span>A form isn't done until every field passes its check.</span></div></div></div>
+      <div class="row"><div class="bad">Asks the same thing forever, or gives up at random</div>
+        <div class="good"><div><b>Counting lives in code.</b><span>Re-asks and budgets have limits; at the limit, a person takes over with the context.</span></div></div></div>
+      <div class="row"><div class="bad">Promises a refund, gives legal advice, leaks a phone number</div>
+        <div class="good"><div><b>Rules and guardrails.</b><span>Plain-language rules where they fit; input and output checks on every reply.</span></div></div></div>
+      <div class="row"><div class="bad">Calls any tool with anything the model makes up</div>
+        <div class="good"><div><b>One tool gateway.</b><span>An allow list per bot, timeouts, a circuit breaker; tool output is untrusted.</span></div></div></div>
+      <div class="row"><div class="bad">A prompt edit changes every live chat, unreviewed</div>
+        <div class="good"><div><b>A file you can review.</b><span>Versioned with rollback; each conversation stays on its version.</span></div></div></div>
+      <div class="row"><div class="bad">"It seemed fine when I tried it"</div>
+        <div class="good"><div><b>Tested from the policy.</b><span>Test sets generated from the YAML; a stronger model reviews trial chats and proposes fixes.</span></div></div></div>
     </div>
   </section>
 
-  <section class="sec" id="who">
-    <h2>Who uses what</h2>
+  <section class="block" id="uses">
+    <p class="eyebrow">Use cases</p>
+    <h2>Built for bots with a job to finish.</h2>
+    <p class="intro">Each ships as an example you can run, read and change.</p>
+    <div class="grid3">
+      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/support_assistant.yaml"><div class="ic">🛟</div><h3>Support triage</h3><p>Consent, the order number and what went wrong, answers from your help docs, a person when needed.</p><code>support_assistant.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/booking_assistant.yaml"><div class="ic">📅</div><h3>Bookings</h3><p>Service, day and contact details, with open slots from your calendar through a Python tool.</p><code>booking_assistant.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/hiring_agent.yaml"><div class="ic">📝</div><h3>Applications and intake</h3><p>Search, pick, a validated form, and a submit that runs only when the user confirms.</p><code>hiring_agent.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/customer_feedback.yaml"><div class="ic">📊</div><h3>Surveys</h3><p>A 0-10 score and open questions as a conversation; scores computed in code, results over time.</p><code>customer_feedback.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/sales_analyst.yaml"><div class="ic">🔎</div><h3>Questions about data</h3><p>Answers from your tables with SQL and checked statistics, not guesses.</p><code>sales_analyst.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/concierge.yaml"><div class="ic">🧭</div><h3>Concierge</h3><p>No fixed steps: it picks read-only tools each turn, within a budget counted in code.</p><code>concierge.yaml</code></a>
+    </div>
+  </section>
+
+  <section class="block" id="developers">
+    <p class="eyebrow">For developers</p>
+    <h2>YAML says what it does. Python adds what it can reach.</h2>
+    <p class="intro">Tools, steps, guardrails and channels plug into one registry, so a new tool shows up in the schema, the
+      console and the tests without wiring.</p>
+    <div class="dev">
+      <div>
+        <div class="file"><div class="bar"><span></span><span></span><span></span><b>my_caps/tools.py</b></div>
+<pre><span class="k">from</span> yachat <span class="k">import</span> tool
+
+<span class="k">@tool</span>("slot_search", timeout_s=3.0, retries=1)
+<span class="k">async def</span> slot_search(service: str, day: str = "") -> dict[str, list[str]]:
+    <span class="c">"""Open appointment slots for a service, optionally on one day."""</span>
+    <span class="k">return</span> {"slots": <span class="k">await</span> my_booking_api.free_slots(service, day)}</pre></div>
+        <p>Type hints become the schema; the docstring is what the model reads. Allow it with <code>tools: [slot_search]</code>.</p>
+      </div>
+      <div>
+        <div class="file"><div class="bar"><span></span><span></span><span></span><b>terminal</b></div>
+<pre>uv run yachat new package my_caps  <span class="c"># tool, step, guardrail, test</span>
+uv run yachat build my_bot.yaml    <span class="c"># validate and compile</span>
+uv run yachat evals generate my_bot.yaml
+uv run yachat serve --port 8000    <span class="c"># API + console</span></pre></div>
+        <p><a href="https://github.com/pnrajan/yachat/blob/main/docs/ADDING_A_CAPABILITY.md">Adding a capability</a> ·
+          <a href="https://github.com/pnrajan/yachat/blob/main/docs/ARCHITECTURE.md">Architecture</a> ·
+          <a href="https://github.com/pnrajan/yachat/blob/main/docs/POLICY_LANGUAGE.md">Every YAML key</a></p>
+      </div>
+    </div>
+    <div class="chips"><span>Anthropic · OpenAI · Gemini · Bedrock · Ollama</span><span>MCP tools in and out</span><span>FastAPI HTTP API</span>
+      <span>Web widget · WhatsApp · SMS · Slack · voice</span><span>Redis · Postgres · in-memory</span><span>Evals and an LLM judge</span></div>
+  </section>
+
+  <section class="block" id="who">
+    <p class="eyebrow">Who it's for</p>
+    <h2>One file the whole team can read.</h2>
     <div class="who">
       <div><h3>Support and ops teams</h3><p>Describe the bot in plain English, read back what it will do, ask for changes the same way. No YAML needed.</p></div>
       <div><h3>Developers</h3><p>Add a tool, step, guardrail or channel as one decorated Python function, or connect an MCP server. Run many bots on one runtime.</p></div>
       <div><h3>Reviewers</h3><p>Read one file per bot, see why each reply was chosen, and check the audit log, outcomes and model cost.</p></div>
     </div>
     <p class="fit"><b>Not the right tool</b> for a free-form assistant, multi-agent research workflows, or if you need stable
-      APIs today: yachat is alpha. <a href="https://github.com/pnrajan/yachat/blob/main/docs/COMPARISON.md">How it compares</a> with Parlant, Rasa, LangGraph and Botpress.</p>
+      APIs today: yachat is alpha. <a href="https://github.com/pnrajan/yachat/blob/main/docs/COMPARISON.md">How it compares</a>
+      with Parlant, Rasa, LangGraph and Botpress.</p>
   </section>
+</div>
 
-  <section class="points">
-    <div><h2>Any model</h2><p>Anthropic or anything litellm reaches; small models for routine turns, a stronger one where it pays off.</p></div>
-    <div><h2>Any channel</h2><p>A website widget, WhatsApp, SMS, Slack and phone; each channel keeps its own limits and opt-out rules.</p></div>
-    <div><h2>Self-hosted</h2><p>Runs on a laptop with only a model key, or in Docker with Redis and Postgres. Apache-2.0.</p></div>
-  </section>
-
-  <section class="start">
-    <h2>Run it yourself</h2>
-    <div class="copy">
-      <pre id="steps">git clone https://github.com/pnrajan/yachat &amp;&amp; cd yachat
-./setup.sh                # installs what's missing, asks for your model key
-scripts/try.sh            # the console, with a sample bot</pre>
+<section class="final" id="start">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Get started</p>
+      <h2>Run it on your machine in three commands.</h2>
+      <p>Needs macOS, Linux or WSL and one model key; <code>setup.sh</code> installs the rest. Or run it all in Docker with
+        <code>scripts/local.sh up</code>.</p>
+      <div class="ctas">
+        <a class="btn solid" href="https://github.com/pnrajan/yachat">★ Star on GitHub</a>
+        <a class="btn" href="https://github.com/pnrajan/yachat/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">Good first issues</a>
+        <a class="btn" href="https://github.com/pnrajan/yachat/discussions">Discussions</a>
+      </div>
+    </div>
+    <div class="file copy">
+      <div class="bar"><span></span><span></span><span></span><b>terminal</b></div>
+<pre id="steps">git clone https://github.com/pnrajan/yachat &amp;&amp; cd yachat
+./setup.sh      <span class="c"># installs what's missing, asks for your key</span>
+scripts/try.sh  <span class="c"># the console, with a sample bot</span></pre>
       <button type="button" id="copy">Copy</button>
     </div>
-    <p>Needs macOS, Linux or WSL and a model key; <code>setup.sh</code> installs the rest. Or run it all in Docker with
-      <code>scripts/local.sh up</code>.
-      <a href="https://github.com/pnrajan/yachat#quickstart">Quickstart</a> ·
-      <a href="https://github.com/pnrajan/yachat/blob/main/docs/POLICY_LANGUAGE.md">Every YAML key</a></p>
-  </section>
+  </div>
+</section>
+</main>
 
-  <footer>
-    <span>Apache-2.0</span>
+<footer>
+  <div class="wrap">
+    <a class="logo" href="#"><i>y</i>yachat</a>
     <a href="https://github.com/pnrajan/yachat">GitHub</a>
     <a href="https://yachat-demo.fly.dev">Demo</a>
+    <a href="https://github.com/pnrajan/yachat/tree/main/docs">Docs</a>
     <a href="https://github.com/pnrajan/yachat/blob/main/CONTRIBUTING.md">Contributing</a>
-  </footer>
-</div>
+    <a href="https://github.com/pnrajan/yachat/blob/main/CHANGELOG.md">Changelog</a>
+    <span>Apache-2.0</span>
+  </div>
+</footer>
 <script>
   document.getElementById("copy").onclick = async (e) => {
-    const b = e.currentTarget;
-    try { await navigator.clipboard.writeText(document.getElementById("steps").textContent); b.textContent = "Copied"; }
+    const b = e.currentTarget, text = document.getElementById("steps").textContent.replace(/ +#.*$/gm, "");
+    try { await navigator.clipboard.writeText(text); b.textContent = "Copied"; }
     catch { b.textContent = "Select and copy"; }
     setTimeout(() => (b.textContent = "Copy"), 1500);
   };

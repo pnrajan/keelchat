@@ -13,6 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and WSL, offers to install what's missing, writes `.env` with your model key and installs the dependencies.
 - `scripts/local.sh up|logs|down|reset`: the whole stack in Docker (API with the console, Redis, Postgres), on the next
   free ports, with data kept in volumes.
+- Website (GitHub Pages): redesigned, with a describe-your-bot box, how it works in three steps, a developer section, and
+  search and share metadata.
 - Demo: **Try this bot** chats with the drafted bot right away (tools on sample data; its own tenant, rate-limited);
   `?describe=` links start a draft, and the landing page has a box to describe a bot.
 - `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
