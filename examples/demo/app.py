@@ -1,5 +1,5 @@
-"""The public demo: a landing page where visitors describe a bot and get its YAML, then clone the repo to run it, and a
-ready-made support assistant to chat with.
+"""The public demo: a landing page where visitors describe a bot, get its YAML and chat with it right away (tools on
+sample data), then clone the repo to run it; and a ready-made support assistant to chat with.
 
 Everything is in memory, so it is set up again on every start; the fixed id keeps the chat link the same.
 Run it with `uvicorn examples.demo.app:create_app --factory`. Deployed with deploy/demo/fly.toml (scripts/demo.sh).
@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import html
 import os
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -38,6 +39,11 @@ DEMO_ID = os.getenv("YACHAT_DEMO_ID", "pk_demo_support")
 #: drafts per visitor network per 10 minutes, and per day across everyone: each one is several model calls
 DRAFTS_PER_IP = int(os.getenv("YACHAT_DEMO_DRAFTS_PER_IP", "6"))
 DRAFTS_PER_DAY = int(os.getenv("YACHAT_DEMO_DRAFTS_DAILY", "200"))
+#: drafted bots put up to chat with, the same way; each is kept in memory until the machine restarts
+TRIES_PER_IP = int(os.getenv("YACHAT_DEMO_TRIES_PER_IP", "10"))
+TRIES_PER_DAY = int(os.getenv("YACHAT_DEMO_TRIES_DAILY", "300"))
+#: conversations per tried bot per day
+TRY_CHATS = 30
 log = get_logger("demo")
 
 
@@ -47,6 +53,12 @@ class DraftIn(BaseModel):
     text: str = Field(min_length=3, max_length=1_000)
     #: the visitor's current draft, when asking for a change
     yaml: str = Field(default="", max_length=20_000)
+
+
+class TryIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    #: the visitor's draft
+    yaml: str = Field(min_length=10, max_length=20_000)
 
 
 def create_app() -> FastAPI:
@@ -93,6 +105,22 @@ def create_app() -> FastAPI:
             "suggested": None if extra is None else [n.model_dump() for n in extra],
         }
 
+    async def try_it(body: TryIn, request: Request) -> dict[str, object]:
+        """Put the visitor's draft up to chat with: its own tenant (nobody else's bot), a new embed id, few chats."""
+        try:
+            policy = build(body.yaml, tenant="try-" + secrets.token_hex(8))
+        except PolicyValidationError as e:
+            raise HTTPException(422, "The YAML doesn't build yet: " + "; ".join(f"{x.path}: {x.message}" for x in e.errors[:3])) from e
+        if not await rt.limits.take(f"try-ip:{client_ip(request)}", TRIES_PER_IP, 600):
+            raise HTTPException(429, "That's a lot of bots. Wait a few minutes and try again.")
+        if not await rt.limits.take("try-day", TRIES_PER_DAY, 86_400):
+            raise HTTPException(429, "The demo has run all the bots it can today. Clone the repo to keep going.")
+        await rt.save_version(policy, body.yaml, note="demo try")
+        embed = Embed(tenant=policy.tenant, agent=policy.agent, name="yachat demo: your bot", daily_limit=TRY_CHATS)
+        await embeds.put(embed)
+        log.info("demo bot up", agent=policy.agent, policy_hash=policy.hash)
+        return {"embed": embed.id, "agent": policy.agent}
+
     async def suggest(description: str) -> list[Need]:
         try:
             return await suggested(rt.llm, rt.models, description, "")
@@ -113,5 +141,6 @@ def create_app() -> FastAPI:
         APIRoute("/", lambda: HTMLResponse(page), include_in_schema=False),
         APIRoute("/demo/app.js", lambda: Response(script, media_type="text/javascript"), include_in_schema=False),
         APIRoute("/demo/draft", draft, methods=["POST"], include_in_schema=False),
+        APIRoute("/demo/try", try_it, methods=["POST"], include_in_schema=False),
     ]
     return app

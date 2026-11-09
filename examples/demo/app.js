@@ -1,14 +1,16 @@
-// The demo landing page: "Make a bot" drafts YAML from a description (POST /demo/draft); "Try a bot" chats with the
-// published support assistant through the public chat API.
-const EMBED = document.body.dataset.embed;
+// The demo landing page: "Make a bot" drafts YAML from a description (POST /demo/draft); "Try this bot" puts the draft
+// up to chat with (POST /demo/try); "Try a bot" chats through the public chat API, with the support assistant until then.
+// ?describe=... (from the GitHub Pages site) sends that description straight away.
+let EMBED = document.body.dataset.embed;
 const $ = (id) => document.getElementById(id);
 const text = $("text"), send = $("send");
 const PLACEHOLDER = {
   make: "Describe the bot you want",
   change: "Ask for a change, e.g. \"also ask for an email\"",
   try: "Message the support assistant",
+  mine: "Message your bot",
 };
-let mode = "make", busy = false, yaml = "", session = null, suggested = [];
+let mode = "make", busy = false, yaml = "", session = null, suggested = [], mine = false;
 
 function add(where, kind, body) {
   $(`${where}-empty`).hidden = true;
@@ -62,6 +64,9 @@ function result(into, draft) {
     w.textContent = "The build still reports: " + draft.errors.map((e) => `${e.path}: ${e.message}`).join("; ") + ". Ask for a fix below.";
   }
   needs(into.querySelector(".needs ul"), [...suggested, ...draft.needs]);
+  const t = into.querySelector("[data-try]");
+  t.disabled = draft.errors.length > 0;
+  t.onclick = () => tryIt(draft.yaml, t);
   into.querySelector("[data-copy-yaml]").onclick = (e) => copy(draft.yaml, e.currentTarget);
   into.querySelector("[data-copy-steps]").onclick = (e) => copy(e.currentTarget.closest(".file").querySelector("pre").textContent, e.currentTarget);
   into.querySelector("[data-download]").onclick = () => {
@@ -103,6 +108,21 @@ async function make(message) {
   }
 }
 
+async function tryIt(source, button) {
+  if (busy) return;
+  busy = true; button.disabled = true; button.textContent = "Starting…";
+  try {
+    const r = await post("/demo/try", { yaml: source });
+    EMBED = r.embed; session = null; mine = true;
+    $("try-msgs").replaceChildren();
+    show("try");
+    add("try", "note", `Now chatting with your bot (${r.agent}). Its tools answer with sample data. Say hello.`);
+  } catch (e) {
+    add("make", "note", e.message);
+  }
+  busy = false; button.disabled = false; button.textContent = "Try this bot"; update();
+}
+
 async function chat(message) {
   add("try", "you", message);
   const out = typing("try");
@@ -135,7 +155,7 @@ function show(next) {
   $("try").hidden = next !== "try";
   $("tab-make").setAttribute("aria-selected", String(next === "make"));
   $("tab-try").setAttribute("aria-selected", String(next === "try"));
-  text.placeholder = next === "try" ? PLACEHOLDER.try : yaml ? PLACEHOLDER.change : PLACEHOLDER.make;
+  text.placeholder = next === "try" ? (mine ? PLACEHOLDER.mine : PLACEHOLDER.try) : yaml ? PLACEHOLDER.change : PLACEHOLDER.make;
   text.focus();
 }
 
@@ -152,3 +172,5 @@ $("show-yaml").onclick = (e) => { e.preventDefault(); $("yaml").showModal(); };
 $("close-yaml").onclick = () => $("yaml").close();
 $("yaml").addEventListener("click", (e) => { if (e.target === $("yaml")) $("yaml").close(); });
 show(location.hash === "#try" ? "try" : "make");
+const described = new URLSearchParams(location.search).get("describe");
+if (described) { history.replaceState(null, "", location.pathname); show("make"); say(described.slice(0, 1000)); }

@@ -1,4 +1,4 @@
-"""The public demo's list of what a drafted bot needs connecting (examples/demo/needs.py)."""
+"""The public demo (examples/demo): what a drafted bot needs connecting, the landing page YAML, trying a draft."""
 
 from __future__ import annotations
 
@@ -30,3 +30,21 @@ def test_the_landing_page_yaml_builds() -> None:
     shown = re.search(r'<pre><span class="k">agent:.*?</pre>', page, re.S)
     assert shown is not None
     assert build(html.unescape(re.sub(r"<[^>]+>", "", shown.group(0)))).agent == "support-assistant"
+
+
+def test_a_draft_can_be_put_up_to_chat_with_and_a_broken_one_is_refused() -> None:
+    from fastapi.testclient import TestClient
+
+    from examples.demo.app import create_app
+
+    yaml = (ROOT / "examples" / "support_assistant.yaml").read_text()
+    with TestClient(create_app()) as c:
+        first, second = c.post("/demo/try", json={"yaml": yaml}), c.post("/demo/try", json={"yaml": yaml})
+        assert first.status_code == second.status_code == 200
+        assert first.json()["agent"] == "support-assistant"
+        assert first.json()["embed"] != second.json()["embed"]  # each visitor gets their own bot
+        session = c.post(f"/v1/public/embeds/{first.json()['embed']}/sessions", json={})
+        assert session.status_code == 201 and session.json()["token"]
+
+        broken = c.post("/demo/try", json={"yaml": "agent: x\nflow: [no_such_step]\n"})
+        assert broken.status_code == 422 and "doesn't build" in broken.json()["detail"]

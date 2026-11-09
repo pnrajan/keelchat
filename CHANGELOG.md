@@ -10,6 +10,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and WSL, offers to install what's missing, writes `.env` with your model key and installs the dependencies.
 - `scripts/local.sh up|logs|down|reset`: the whole stack in Docker (API with the console, Redis, Postgres), on the next
   free ports, with data kept in volumes.
+- Demo: **Try this bot** chats with the drafted bot right away (tools on sample data; its own tenant, rate-limited);
+  `?describe=` links start a draft, and the landing page has a box to describe a bot.
 - `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
 - `resume` on `POST /v1/sessions` (default true). The console's **New session** always starts afresh.
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.

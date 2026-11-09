@@ -29,6 +29,12 @@
   .btn { display: inline-block; border-radius: 10px; padding: 10px 18px; text-decoration: none; font-weight: 600; border: 1px solid var(--line); color: var(--fg) }
   .btn.solid { background: var(--fg); color: var(--bg); border-color: var(--fg) }
   .btn:hover { opacity: .88 }
+  .make { display: flex; gap: 8px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 14px; padding: 6px; background: var(--bg) }
+  .make:focus-within { border-color: var(--muted) }
+  .make input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font: inherit; padding: 6px 10px }
+  .make button { flex: none; border: 0; border-radius: 10px; padding: 8px 16px; font: inherit; font-weight: 600; background: var(--fg); color: var(--bg); cursor: pointer }
+  .eg { color: var(--muted); font-size: 14px; margin: 0 0 20px }
+  .eg a { white-space: nowrap }
 
   pre { margin: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-x: auto;
         font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace }
@@ -83,9 +89,18 @@
     <h1>Customer-facing chatbots that follow your rules.</h1>
     <p class="lead">Describe a bot in plain English, or write its YAML yourself: what it's for, what it asks, its rules and when
       it hands over to a person. One open-source runtime enforces all of it in code, not in a prompt.</p>
+    <form class="make" action="https://yachat-demo.fly.dev/" method="get">
+      <input name="describe" required minlength="3" maxlength="1000" aria-label="Describe your bot"
+             placeholder="Describe your bot, e.g. book haircuts and ask for a phone number">
+      <button type="submit">Make it</button>
+    </form>
+    <p class="eg">You get the YAML, a list of what to connect, and a chat with your bot, in about a minute. Or start from:
+      <a href="https://yachat-demo.fly.dev/?describe=Book+dental+appointments%3A+ask+which+treatment%2C+a+preferred+day+and+a+phone+number.+Hand+over+to+a+person+for+emergencies.">dental bookings</a> ·
+      <a href="https://yachat-demo.fly.dev/?describe=A+short+survey+after+delivery%3A+how+likely+they+are+to+recommend+us+from+0+to+10%2C+and+what+we+could+do+better.">delivery survey</a> ·
+      <a href="https://yachat-demo.fly.dev/?describe=Screen+job+applicants%3A+the+role+they+want%2C+years+of+experience%2C+notice+period+and+an+email+address.+Friendly+and+brief.">applicant screening</a></p>
     <div class="ctas">
-      <a class="btn solid" href="https://yachat-demo.fly.dev">Make a bot from a description</a>
       <a class="btn" href="https://github.com/pnrajan/yachat/fork">Fork on GitHub</a>
+      <a class="btn" href="https://yachat-demo.fly.dev/#try">Chat with a sample bot</a>
     </div>
   </section>
 

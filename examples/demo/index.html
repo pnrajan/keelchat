@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>yachat: describe a chatbot, get the YAML, run it yourself</title>
-<meta name="description" content="Describe a chatbot in plain words and get the YAML file that runs it. Open source: clone yachat and run it on your own machine.">
+<title>yachat: describe a chatbot, chat with it, run it yourself</title>
+<meta name="description" content="Describe a chatbot in plain words, get the YAML file that runs it and chat with it right away. Open source: clone yachat and run it on your own machine.">
 <style>
   :root { --bg: #ffffff; --fg: #1f1f1d; --muted: #6e6e69; --line: #e6e5e0; --soft: #f4f4f1; --you: #efeee9; --accent: #2f6f4f; --warn: #9a5b13; color-scheme: light }
   @media (prefers-color-scheme: dark) {
@@ -55,6 +55,8 @@
   .file { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; white-space: normal }
   .file .bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 14px; background: var(--soft); border-bottom: 1px solid var(--line); font-size: 13px }
   .file .bar b { font-weight: 600; margin-right: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace }
+  .file .bar .solid { padding: 4px 11px; font-size: 13px }
+  .solid:disabled { opacity: .4; cursor: default }
   .file pre { margin: 0; padding: 14px; overflow: auto; max-height: 420px; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre }
   .warn { color: var(--warn); font-size: 14px; margin: 10px 0 0 }
   .next { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; white-space: normal }
@@ -113,10 +115,11 @@
   <!-- Make a bot -->
   <section id="make">
     <div class="col empty" id="make-empty">
-      <h1>Describe a chatbot. Get the YAML. Run it yourself.</h1>
+      <h1>Describe a chatbot. Chat with it. Run it yourself.</h1>
       <p>In yachat, a bot is one short YAML file: what it is for, what it asks, its rules and limits, and when it hands over to
-        a person. Say what yours should do; a model writes the file and yachat checks that it builds.</p>
-      <p>Then clone the repo and run it on your own machine. It's open source (Apache-2.0).</p>
+        a person. Say what yours should do in a sentence or two; a model writes the file and yachat checks that it builds.</p>
+      <p>Press <b>Try this bot</b> to talk to it here, ask for changes in plain words, then clone the repo and run it on your
+        own machine. It's open source (Apache-2.0).</p>
       <div class="cards">
         <button class="card" type="button" data-say="Book dental appointments: ask which treatment, a preferred day and a phone number. Hand over to a person for emergencies.">Dental bookings<span>treatment, day, phone; emergencies go to a person</span></button>
         <button class="card" type="button" data-say="A short survey after delivery: how likely they are to recommend us from 0 to 10, and what we could do better.">Delivery survey<span>a 0-10 score and one open question</span></button>
@@ -159,7 +162,7 @@
 
 <template id="result">
   <div class="file">
-    <div class="bar"><b>my_bot.yaml</b><button class="ghost" type="button" data-copy-yaml>Copy</button><button class="ghost" type="button" data-download>Download</button></div>
+    <div class="bar"><b>my_bot.yaml</b><button class="solid" type="button" data-try>Try this bot</button><button class="ghost" type="button" data-copy-yaml>Copy</button><button class="ghost" type="button" data-download>Download</button></div>
     <pre></pre>
   </div>
   <p class="warn" hidden></p>
@@ -185,7 +188,7 @@ scripts/try.sh            # the console, with chat, tests and the judge</pre>
       <a class="ghost" href="https://github.com/pnrajan/yachat/blob/main/docs/ADDING_A_CAPABILITY.md">Add your own tools</a>
     </div>
   </div>
-  <p class="hint">Want a change? Ask below, e.g. "also ask for an email" or "answer in Spanish too".</p>
+  <p class="hint">Want a change? Ask below, e.g. "also ask for an email" or "answer in Spanish too", then try it again.</p>
 </template>
 
 <dialog id="yaml">
