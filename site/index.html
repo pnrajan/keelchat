@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>yachat: customer-facing chatbots that follow your rules</title>
-<meta name="description" content="Open-source chatbots you write in YAML and extend in Python. One short file per bot; limits, guardrails and handoff enforced in code.">
+<meta name="description" content="Open-source runtime for customer-facing chatbots that must finish a job: support triage, bookings, intake, surveys. One reviewable file per bot; steps, limits, guardrails and handoff enforced in code, not in a prompt.">
 <meta property="og:title" content="yachat: chatbots you write in YAML">
 <meta property="og:description" content="One short YAML file per bot. Describe yours and get the file, then run it yourself.">
 <meta property="og:image" content="assets/compose.jpg">
@@ -39,6 +39,23 @@
   .points h2 { font-size: 16px; margin: 0 0 6px }
   .points p { margin: 0; color: var(--muted); font-size: 15px }
 
+  .sec { padding-block: 40px 8px }
+  .sec h2 { font-size: 24px; letter-spacing: -0.015em; margin: 0 0 8px; text-wrap: balance }
+  .sec > p { color: var(--muted); max-width: 64ch; margin: 0 0 22px }
+  .why { width: 100%; border-collapse: collapse; font-size: 15px }
+  .why th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 0 12px 8px 0 }
+  .why td { vertical-align: top; padding: 12px 12px 12px 0; border-top: 1px solid var(--line) }
+  .why td:first-child { width: 42%; color: var(--muted) }
+  .why b { color: var(--fg) }
+  .uses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
+  .use { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0 }
+  .use h3 { font-size: 15px; margin: 0 0 4px }
+  .use p { margin: 0 0 8px; color: var(--muted); font-size: 14px }
+  .use a { font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere }
+  .who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px }
+  .who h3 { font-size: 15px; margin: 0 0 4px }
+  .who p { margin: 0; color: var(--muted); font-size: 15px }
+  .fit { color: var(--muted); font-size: 15px; margin: 22px 0 0; max-width: 70ch }
   .start { padding-block: 8px 48px }
   .start h2 { font-size: 22px; margin: 0 0 12px; letter-spacing: -0.01em }
   .start p { color: var(--muted); margin: 12px 0 0 }
@@ -48,13 +65,15 @@
 
   footer { border-top: 1px solid var(--line); padding-block: 22px 32px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 20px }
   footer a { color: var(--muted) }
-  @media (max-width: 680px) { .copy pre { padding-top: 46px } .points { grid-template-columns: 1fr; gap: 20px } .hero { padding-top: 32px } nav .wide { display: none } }
+  @media (max-width: 680px) { .copy pre { padding-top: 46px } .points, .uses, .who { grid-template-columns: 1fr; gap: 16px } .why td:first-child { width: 45% } .hero { padding-top: 32px } nav .wide { display: none } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <nav>
     <b>yachat</b>
+    <a class="wide" href="#why">Why</a>
+    <a class="wide" href="#uses">Use cases</a>
     <a class="wide" href="https://github.com/pnrajan/yachat/tree/main/docs">Docs</a>
     <a class="wide" href="https://github.com/pnrajan/yachat/discussions">Discussions</a>
     <a href="https://github.com/pnrajan/yachat">GitHub</a>
@@ -83,10 +102,59 @@
 <span class="k">handoff:</span> {when: [user_request, max_reasks]}</pre>
   <img class="shot" src="assets/make-a-bot.gif" alt="A dental booking bot described in two sentences, read back in plain words, then a test chat where an emergency is handed to a person" width="960" height="600" loading="lazy">
 
+  <section class="sec" id="why">
+    <h2>Why it's needed</h2>
+    <p>A bot that is only a prompt works in a demo and drifts in production. When it has a job to finish (take an order
+      number, book a slot, collect an application), the model is asked to remember the steps, count its own attempts,
+      stay in scope and know when to stop. It does that most of the time. yachat moves those decisions into code and
+      leaves the model to read and phrase.</p>
+    <table class="why">
+      <thead><tr><th>A prompt-only bot</th><th>With yachat</th></tr></thead>
+      <tbody>
+        <tr><td>Skips a question, or moves on with an answer it couldn't use</td>
+            <td><b>Steps are code.</b> A form isn't done until every field passes its check; the next step is decided by the runtime.</td></tr>
+        <tr><td>Asks the same thing forever, or gives up at random</td>
+            <td><b>Counting lives in code.</b> Re-asks, digressions and budgets have limits; at the limit it hands over to a person, with the conversation so far.</td></tr>
+        <tr><td>Promises a refund, gives legal advice, leaks a phone number</td>
+            <td><b>Rules and guardrails.</b> Plain-language rules apply on the turns they fit; input and output checks run on every reply.</td></tr>
+        <tr><td>Calls any tool with anything the model makes up</td>
+            <td><b>One tool gateway.</b> An allow list per bot, timeouts, a circuit breaker; tool output is treated as untrusted.</td></tr>
+        <tr><td>A prompt edit changes every live chat, and nobody reviewed it</td>
+            <td><b>A file you can review.</b> Each bot is one YAML policy, versioned with rollback; a conversation stays on the version it started on.</td></tr>
+        <tr><td>"It seemed fine when I tried it"</td>
+            <td><b>Tested from the policy.</b> Test sets are generated from the YAML; a stronger model reviews trial chats and proposes fixes.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="sec" id="uses">
+    <h2>What you can build</h2>
+    <p>Bots with a job to finish. Each of these ships as an example policy you can run and change.</p>
+    <div class="uses">
+      <div class="use"><h3>Support triage</h3><p>Consent, the order number and what went wrong, answers from your help docs, a person when needed.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/support_assistant.yaml">support_assistant.yaml</a></div>
+      <div class="use"><h3>Bookings</h3><p>Service, day and contact details, open slots from your calendar through a Python tool.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/booking_assistant.yaml">booking_assistant.yaml</a></div>
+      <div class="use"><h3>Applications and intake</h3><p>Search, pick, a validated form, and a submit that runs only when the user confirms.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/hiring_agent.yaml">hiring_agent.yaml</a></div>
+      <div class="use"><h3>Surveys</h3><p>A 0-10 score and open questions asked as a conversation; scores computed in code, results over time.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/customer_feedback.yaml">customer_feedback.yaml</a></div>
+      <div class="use"><h3>Questions about data</h3><p>Answers from your tables with SQL and checked statistics, not guesses.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/sales_analyst.yaml">sales_analyst.yaml</a></div>
+      <div class="use"><h3>A concierge</h3><p>No fixed steps: it picks read-only tools each turn, within a budget counted in code.</p><a href="https://github.com/pnrajan/yachat/blob/main/examples/concierge.yaml">concierge.yaml</a></div>
+    </div>
+  </section>
+
+  <section class="sec" id="who">
+    <h2>Who uses what</h2>
+    <div class="who">
+      <div><h3>Support and ops teams</h3><p>Describe the bot in plain English, read back what it will do, ask for changes the same way. No YAML needed.</p></div>
+      <div><h3>Developers</h3><p>Add a tool, step, guardrail or channel as one decorated Python function, or connect an MCP server. Run many bots on one runtime.</p></div>
+      <div><h3>Reviewers</h3><p>Read one file per bot, see why each reply was chosen, and check the audit log, outcomes and model cost.</p></div>
+    </div>
+    <p class="fit"><b>Not the right tool</b> for a free-form assistant, multi-agent research workflows, or if you need stable
+      APIs today: yachat is alpha. <a href="https://github.com/pnrajan/yachat/blob/main/docs/COMPARISON.md">How it compares</a> with Parlant, Rasa, LangGraph and Botpress.</p>
+  </section>
+
   <section class="points">
-    <div><h2>Code decides, the model phrases</h2><p>Re-asks, digressions, exits and handoff are counted by the runtime, never left to the model.</p></div>
-    <div><h2>Extend in Python</h2><p>A tool, step, guardrail or channel is one decorated function, or an MCP server. Any model, any channel.</p></div>
-    <div><h2>Tested from the policy</h2><p>Test sets are generated from the YAML, and a stronger model reviews trial chats and proposes fixes.</p></div>
+    <div><h2>Any model</h2><p>Anthropic or anything litellm reaches; small models for routine turns, a stronger one where it pays off.</p></div>
+    <div><h2>Any channel</h2><p>A website widget, WhatsApp, SMS, Slack and phone; each channel keeps its own limits and opt-out rules.</p></div>
+    <div><h2>Self-hosted</h2><p>Runs on a laptop with only a model key, or in Docker with Redis and Postgres. Apache-2.0.</p></div>
   </section>
 
   <section class="start">

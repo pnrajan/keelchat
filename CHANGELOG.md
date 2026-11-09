@@ -9,7 +9,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `./setup.sh`: checks for git, curl, uv, Node 20+ (and Docker with `--docker`) on macOS, Debian/Ubuntu, Fedora, Arch
   and WSL, offers to install what's missing, writes `.env` with your model key and installs the dependencies.
 - `scripts/local.sh up|logs|down|reset`: the whole stack in Docker (API with the console, Redis, Postgres), on the next
-  free ports, with data kept in volumes.- `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
+  free ports, with data kept in volumes.
+- `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
 - `resume` on `POST /v1/sessions` (default true). The console's **New session** always starts afresh.
 - `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
 - `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
