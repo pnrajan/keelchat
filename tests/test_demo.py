@@ -27,7 +27,7 @@ def test_the_landing_page_yaml_builds() -> None:
     import re
 
     page = (ROOT / "site" / "index.html").read_text()
-    shown = re.search(r'<pre><span class="k">agent:.*?</pre>', page, re.S)
+    shown = re.search(r"<pre[^>]*><span class=\"k\">agent:.*?</pre>", page, re.S)
     assert shown is not None
     assert build(html.unescape(re.sub(r"<[^>]+>", "", shown.group(0)))).agent == "support-assistant"
 
