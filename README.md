@@ -73,7 +73,7 @@ plain words.
 
 ### Deploy to Render
 
-Run yachat in your own Render account on the free plan, rebuilt each time CI passes on your fork.
+Run yachat in your own Render account on the free plan.
 
 1. **Fork** this repository, so the deploy follows your copy.
 2. Open `https://render.com/deploy?repo=https://github.com/<you>/yachat`. (The button below deploys this
@@ -81,8 +81,8 @@ Run yachat in your own Render account on the free plan, rebuilt each time CI pas
 
    [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pnrajan/yachat)
 
-3. Sign in to Render, enter your `ANTHROPIC_API_KEY` when asked, and confirm. The first build
-   takes a few minutes.
+3. Sign in to Render, review the service it will create, enter your `ANTHROPIC_API_KEY` when asked, and approve.
+   The first build takes a few minutes.
 4. On the service's **Environment** page, copy `YACHAT_API_KEY`. Render generated it; it locks the console and API.
 5. Open `https://<service>.onrender.com`. The console asks for the key once.
 
@@ -92,6 +92,8 @@ Good to know:
   `YACHAT_MODEL_CLASSIFY` and the provider's key (e.g. `OPENROUTER_API_KEY`), as in [`.env.example`](.env.example).
 - **Saved bots need a database.** Without `DATABASE_URL` (and `REDIS_URL`), everything is in memory and is lost when
   the service restarts or sleeps. Add a Postgres URL on the **Environment** page.
+- **Updates are not automatic.** To redeploy each time CI passes on your fork, set **Auto-Deploy** to "After CI
+  checks pass" in the service's **Settings**, or press **Manual Deploy**.
 - **The free plan sleeps** when idle, so the first request after that is slow. A paid plan stays awake.
 - Settings are in [`render.yaml`](render.yaml). For **Fly.io** and other hosts, see
   [Deploy from GitHub](docs/REFERENCE.md#deploy-from-github).

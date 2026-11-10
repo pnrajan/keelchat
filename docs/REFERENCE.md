@@ -139,14 +139,16 @@ Redis, Postgres and an optional LiteLLM gateway next to it.
 
 ### Deploy from GitHub
 
-Deploy to your own Render or Fly.io account, on its smallest plan. Fork the repository first: the deploy then follows
-your fork, rebuilding when CI passes on its `main`. State is in memory until you set `DATABASE_URL` (and
+Deploy to your own Render or Fly.io account, on its smallest plan. Fork the repository first, so the deploy follows
+your copy. State is in memory until you set `DATABASE_URL` (and
 `REDIS_URL`): without them, saved bots go when the app restarts. The console asks for `YACHAT_API_KEY` to sign in.
 
 **Render.** Open `https://render.com/deploy?repo=<your fork's URL>` and sign in to Render. It reads
 [`render.yaml`](../render.yaml), asks for `ANTHROPIC_API_KEY`, and generates `YACHAT_API_KEY` (on the service's
 **Environment** page). For another provider, set `YACHAT_LLM=litellm`, the two `YACHAT_MODEL_*` and its key there,
-as in `.env.example`. The free plan sleeps when idle.
+as in `.env.example`. The free plan sleeps when idle. The Blueprint turns auto-deploy off, as Render advises for Deploy
+buttons, so a push to this repository never redeploys your service; to redeploy when CI passes on your fork, set
+**Auto-Deploy** to "After CI checks pass" in the service's **Settings**.
 
 **Fly.io.** In your fork, with [`flyctl`](https://fly.io/docs/flyctl/install/) signed in to your account:
 

@@ -34,4 +34,5 @@ def test_render_builds_the_image_on_its_port_with_a_generated_api_key() -> None:
     assert web["runtime"] == "docker" and (ROOT / web["dockerfilePath"]).is_file()
     assert web["healthCheckPath"] == "/health" and env["PORT"]["value"] == str(PORT)
     assert env["YACHAT_API_KEY"].get("generateValue") is True
+    assert web["autoDeployTrigger"] == "off"  # a push here must not redeploy every copy made with the button
     assert all("value" not in v for k, v in env.items() if k.endswith("_API_KEY"))  # keys are never in the file
