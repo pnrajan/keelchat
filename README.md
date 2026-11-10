@@ -3,79 +3,98 @@
 # yachat
 
 **Customer-facing chatbots that follow your rules.**<br>
-Describe a bot in plain English or write it in YAML; one open-source runtime enforces its steps, limits and handoff in
-code, not in a prompt.
+Describe a bot in plain English or write it in YAML. The runtime, not the model, enforces its steps, limits and
+handover to a person.
 
 [![CI](https://github.com/pnrajan/yachat/actions/workflows/ci.yml/badge.svg)](https://github.com/pnrajan/yachat/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
 
-**[Make a bot in your browser](https://yachat-demo.fly.dev)** · [Website](https://pnrajan.github.io/yachat/) ·
-[Quickstart](#quickstart) · [Docs](#docs) · [Examples](examples) · [How it compares](#how-yachat-compares)
+**[Try it in your browser](https://yachat-demo.fly.dev)** · [Run it locally](#run-it-locally) ·
+[Deploy to Render](#deploy-to-render) · [Docs](#docs) · [Website](https://pnrajan.github.io/yachat/)
 
 <img src="docs/assets/make-a-bot.gif" alt="In the yachat console: a dental clinic's booking bot is described in two sentences, yachat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" width="900">
 
 </div>
 
-yachat is for bots that have a job to finish: support triage, bookings, intake forms, surveys. Each bot is one short
-YAML file that says what it is for, what it asks, which tools it may use and when it must hand over to a person. You
-can write that file yourself, or describe the bot in a sentence and let a model write it; either way the runtime, not
-the model, decides what happens next.
+## Why yachat
 
-- **Plain English in, a reviewable file out.** Describe the bot, read back what it will do in plain words, ask for
-  changes the same way. The YAML is there when you want it.
-- **Code decides, the model phrases.** Steps validate answers; re-asks, digressions, budgets and exits are counted by
-  the runtime. A model never decides to end a conversation.
-- **Safe by default.** Every tool call goes through one gateway (allow list, timeouts, circuit breaker); input and
-  output guardrails; memory only for listed items, with consent.
-- **Extend in Python.** A tool, step, guardrail or channel is one decorated function or class, or an MCP server.
-- **Any model, any channel.** Anthropic or anything litellm reaches (OpenAI, Gemini, Bedrock, Ollama); web widget,
-  WhatsApp, SMS, Slack and phone.
-- **Tested from the policy.** Test sets are generated from the YAML, and a stronger model reviews trial chats and
+A chatbot that books appointments or takes support requests has a job to finish. Prompt-only bots drift: they skip
+questions, loop, or promise a person and never hand over. yachat keeps the model for reading and phrasing, and puts
+every decision in code you can review.
+
+- **Plain English in, a reviewable file out.** Describe the bot, read back what it will do, change it in plain words.
+  The result is one short YAML file.
+- **Code decides, the model phrases.** Answers are validated, re-asks and budgets are counted, and handover happens
+  in code. A model never decides to end a conversation.
+- **Safe by default.** Tools are called through one gateway (allow list, timeouts, circuit breaker), with input and
+  output guardrails, and memory only for listed items, with consent.
+- **Any model, any channel.** Anthropic, or anything litellm reaches (OpenAI, Gemini, Bedrock, OpenRouter, Ollama).
+  Web widget, WhatsApp, SMS, Slack and phone.
+- **Tested from the policy.** Test sets are generated from the YAML; a stronger model reviews trial chats and
   proposes fixes.
+- **Yours to run and extend.** Apache-2.0 and one Docker image. A tool, step, guardrail or channel is one decorated
+  Python function or class, or an MCP server.
 
-## Make a bot from plain English
+**A good fit:** support triage, bookings, intake forms, surveys; many bots on one self-hosted runtime.
+**Not a fit:** a free-form assistant, multi-agent research, or anything that needs stable APIs today
+([comparison](#how-yachat-compares)).
 
-**In the [demo](https://yachat-demo.fly.dev)**, no install and no sign-in: describe a bot and get its YAML, checked by
-the build. Press **Try this bot** to chat with it right there (its tools answer with sample data), and ask for changes
-in plain words. Under the YAML, what the bot needs connecting before real people use it, with options for each: the
-services its YAML uses, and the outside systems your description implies (a booking calendar, a CRM, an SMS gateway).
-Then fork the repo and run it.
+## Get started
 
-A link can start a draft, which is handy in an issue or a post:
-[`yachat-demo.fly.dev/?describe=Book haircuts and ask for a phone number`](https://yachat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
+| | Time | You need | |
+|---|---|---|---|
+| **Try it in your browser** | 1 min | nothing | [yachat-demo.fly.dev](https://yachat-demo.fly.dev) |
+| **Run it locally** | 5 min | macOS, Linux or WSL 2, a model key | [steps](#run-it-locally) |
+| **Deploy to Render** | 10 min | GitHub and Render accounts, a model key | [steps](#deploy-to-render) |
 
-**In the console** (after the [Quickstart](#quickstart)), open **Compose**, describe the bot, and press **Create my
-bot**. It reads the bot back in plain words; ask for changes the same way ("also ask for their email", "add Spanish"),
-press **Try it** to chat, and **Save** when it's right.
+### Try it in your browser
 
-**From Claude Code**, the [yachat plugin](plugins/yachat) builds, tries and saves bots on your server when you ask in
-plain words. See [Use with Claude](docs/FEATURES.md#use-with-claude).
+In the [demo](https://yachat-demo.fly.dev), with no install or sign-in, describe a bot and get its YAML. Press
+**Try this bot** to chat with it (its tools answer with sample data), and see what it needs connecting before real
+people use it. A link can start a draft:
+[`?describe=Book haircuts and ask for a phone number`](https://yachat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
 
 <p align="center"><img src="docs/assets/demo-make.jpg" alt="The demo: a dental booking bot described in one sentence, its YAML with Copy and Download, and what it needs connecting: a booking calendar (Open Dental, Dentrix, Calendly), a model key, somewhere for handed-over chats, and where people talk to it" width="560"></p>
 
-## Quickstart
-
-Needs macOS, Linux or WSL 2, and one model key. `setup.sh` checks for git, uv and Node 20+, offers to install
-what's missing (Homebrew, apt, dnf or pacman), and asks for your key.
+### Run it locally
 
 ```bash
 git clone https://github.com/pnrajan/yachat && cd yachat
-./setup.sh                  # --docker to also set up Docker; --check to only report
-scripts/try.sh              # the console with a sample bot, everything in memory
+./setup.sh        # checks for git, uv, Node 20+; offers to install what's missing; asks for your model key
+scripts/try.sh    # opens the console with a sample bot, everything in memory
 ```
 
-Or run the whole stack in Docker (API, console, Redis and Postgres, with data that survives restarts):
-`scripts/local.sh up`.
+In the console, open **Compose**, describe a bot, press **Create my bot**, then **Try it**. The **Inspector** shows
+why each reply was chosen. For the whole stack in Docker (API, console, Redis, Postgres, data kept between restarts):
+`scripts/local.sh up`. From Claude Code, the [yachat plugin](plugins/yachat) builds and tries bots when you ask in
+plain words.
 
-To put it online in your own account, fork the repo and deploy it to Render or Fly.io; both redeploy when CI passes
-on your fork's `main` ([Deploy from GitHub](docs/REFERENCE.md#deploy-from-github)).
+### Deploy to Render
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pnrajan/yachat)
+Run yachat in your own Render account on the free plan, rebuilt each time CI passes on your fork.
 
-Open **Compose** and describe a bot, or pick **Support assistant**, press **Build & try**, then **New session**, and
-chat. The **Inspector** shows why each reply was chosen.
+1. **Fork** this repository, so the deploy follows your copy.
+2. Open `https://render.com/deploy?repo=https://github.com/<you>/yachat`. (The button below deploys this
+   repository as is, without your changes.)
+
+   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pnrajan/yachat)
+
+3. Sign in to Render, enter your `ANTHROPIC_API_KEY` when asked, and confirm. The first build
+   takes a few minutes.
+4. On the service's **Environment** page, copy `YACHAT_API_KEY`. Render generated it; it locks the console and API.
+5. Open `https://<service>.onrender.com`. The console asks for the key once.
+
+Good to know:
+
+- **Another model provider:** on the **Environment** page, set `YACHAT_LLM=litellm`, `YACHAT_MODEL_GENERATE`,
+  `YACHAT_MODEL_CLASSIFY` and the provider's key (e.g. `OPENROUTER_API_KEY`), as in [`.env.example`](.env.example).
+- **Saved bots need a database.** Without `DATABASE_URL` (and `REDIS_URL`), everything is in memory and is lost when
+  the service restarts or sleeps. Add a Postgres URL on the **Environment** page.
+- **The free plan sleeps** when idle, so the first request after that is slow. A paid plan stays awake.
+- Settings are in [`render.yaml`](render.yaml). For **Fly.io** and other hosts, see
+  [Deploy from GitHub](docs/REFERENCE.md#deploy-from-github).
 
 ## Your first bot
 
@@ -106,10 +125,9 @@ injection, removes personal details from replies, and hands over to a person whe
 uv run yachat build my_bot.yaml   # validate and compile; errors name the YAML path
 ```
 
-To chat with it, paste it into the console's editor and press **Build & try**, or send it to the API with
-`POST /v1/agents` ([walkthrough](docs/DEVELOPER_GUIDE.md#one-conversation-end-to-end)).
-[The policy language](docs/POLICY_LANGUAGE.md) lists every key; [examples](examples) has bots for bookings, surveys,
-hiring and data questions.
+Paste it into the console's editor and press **Build & try**, or send it to the API with `POST /v1/agents`
+([walkthrough](docs/DEVELOPER_GUIDE.md#one-conversation-end-to-end)). [The policy language](docs/POLICY_LANGUAGE.md)
+lists every key; [examples](examples) has bots for bookings, surveys, hiring and data questions.
 
 ## How it works
 
@@ -152,15 +170,15 @@ In the console, **Test → Judge** has a stronger model review a chat and propos
 
 ## Where a stronger model helps
 
-yachat runs well on a small, cheap model for everyday turns. A stronger model pays off in a few places, and each is
-one setting:
+yachat runs well on a small, cheap model for everyday turns. A stronger model pays off in a few places, each one
+setting:
 
 | Job | Why a stronger model helps | Setting |
 |---|---|---|
-| Writing a bot from English | Cleaner YAML on the first try, fewer build repairs, sharper suggestions for what to connect | `YACHAT_MODEL_GENERATE` |
-| Reviewing trial chats | Spots what went wrong on which turn and proposes policy and code fixes | `YACHAT_MODEL_CRITIC` |
-| Hard or risky steps | A step or rule marked `high_stakes: true` is written with the large model and always checked | the policy |
-| Checking plans before replying | Steps with `think: true` plan first; a separate model can check the plan | `YACHAT_MODEL_VERIFY` |
+| Writing a bot from English | Cleaner YAML on the first try, fewer build repairs | `YACHAT_MODEL_GENERATE` |
+| Reviewing trial chats | Spots what went wrong on which turn and proposes fixes | `YACHAT_MODEL_CRITIC` |
+| Hard or risky steps | `high_stakes: true` steps use the large model and are always checked | the policy |
+| Checking plans before replying | `think: true` steps plan first; a separate model can check the plan | `YACHAT_MODEL_VERIFY` |
 | Judging test results | Scores scope and rule-following in evals | `EVALS_JUDGE_MODEL` |
 
 Classification and routine replies stay on `YACHAT_MODEL_CLASSIFY`. [Model routing and cost](docs/REFERENCE.md) has
@@ -176,10 +194,7 @@ the detail.
 | Open source | Apache-2.0 | Apache-2.0 | Pro is commercial; open source is in maintenance | MIT | Hosted; SDK is MIT |
 | Maturity | Alpha | Active | Mature | Mature | Mature |
 
-**A good fit** when a bot has a job to finish (a form, a booking, triage, a survey), its behaviour should live in a
-file people can review, and you want many bots on one self-hosted runtime. **Not a fit** for a free-form assistant,
-multi-agent research workflows, or if you need stable APIs today. [How yachat compares](docs/COMPARISON.md) has the
-detail and sources.
+[How yachat compares](docs/COMPARISON.md) has the detail and sources.
 
 ## Docs
 
@@ -187,7 +202,7 @@ detail and sources.
 |---|---|
 | write and tune a bot | [Writing an agent](docs/WRITING_AN_AGENT.md) |
 | look up a policy key | [The policy language](docs/POLICY_LANGUAGE.md) |
-| use the console, channels, memory, handoff, documents, Claude | [Features](docs/FEATURES.md) |
+| use the console, channels, memory, handoff, documents, Claude Code | [Features](docs/FEATURES.md) |
 | add a tool, step, guardrail or channel | [Adding a capability](docs/ADDING_A_CAPABILITY.md) |
 | test and measure quality | [Evals](docs/EVALS.md) |
 | look up the CLI, API, settings, deployment | [Reference](docs/REFERENCE.md) |
