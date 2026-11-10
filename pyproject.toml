@@ -81,7 +81,7 @@ mem0 = [
 #: `yachat evals run`: DeepEval and Ragas metrics scored by a judge model over litellm
 evals = [
     "deepeval>=3.0",
-    "langchain-community>=0.4,<0.4.2",  # ragas 0.4.3 imports chat_models.vertexai, removed in 0.4.2
+    "langchain-community>=0.4,<0.4.3",  # ragas 0.4.3 imports chat_models.vertexai, removed in 0.4.2
     "litellm>=1.50",
     "ragas>=0.4,<0.5",  # tested range; lift with the langchain-community cap once ragas drops that import
 ]
@@ -130,7 +130,7 @@ dev = [
     "python-multipart>=0.0.9",
     "cryptography>=43",
     "ragas>=0.4,<0.5",
-    "langchain-community>=0.4,<0.4.2",
+    "langchain-community>=0.4,<0.4.3",
 ]
 
 [build-system]
