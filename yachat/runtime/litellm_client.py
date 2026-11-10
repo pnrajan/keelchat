@@ -10,8 +10,30 @@ import json
 import os
 from typing import Any
 
+from yachat.logging import get_logger
 from yachat.runtime.llm import LLMClient, LLMError, LLMRequest
 from yachat.runtime.usage import metered
+
+log = get_logger("litellm")
+
+
+def _direct() -> bool:
+    """Called straight at the provider, not through a gateway (whose config then owns these settings)."""
+    return not (os.getenv("LITELLM_PROXY_URL") or os.getenv("HEADROOM_PROXY_URL"))
+
+
+#: models whose provider refused `reasoning: off` ("Reasoning is mandatory": OpenRouter's Claude Sonnet 5.5, Opus 5.5);
+#: they get the provider's default from then on
+MUST_REASON: set[str] = set()
+
+
+def _reasoning_off(model: str) -> bool:
+    """We switch hidden reasoning off for this model: it would consume max_tokens (budgets here assume none)."""
+    return _direct() and model.startswith(("siliconflow/", "openrouter/")) and model not in MUST_REASON
+
+
+def _must_reason(e: LLMError) -> bool:
+    return "reasoning is mandatory" in f"{e} {e.__cause__}".lower()
 
 
 def _provider_model(req: LLMRequest) -> str:
@@ -37,8 +59,11 @@ class LiteLLMClient(LLMClient):
         settings = litellm_settings(req.model)
         model = str(settings["model_name"])
         extra_body: dict[str, Any] = {}
-        if req.model.startswith("siliconflow/") and not os.getenv("LITELLM_PROXY_URL"):  # via a gateway, its config owns this
-            extra_body["enable_thinking"] = False  # Qwen3 hybrid models: reasoning would consume max_tokens and empty the reply
+        if _reasoning_off(req.model):
+            if req.model.startswith("siliconflow/"):
+                extra_body["enable_thinking"] = False  # Qwen3 hybrid models
+            else:
+                extra_body["reasoning"] = {"enabled": False}  # OpenRouter turns it on for some models (Claude Haiku 5.5)
         kwargs: dict[str, Any] = {
             "extra_body": extra_body,
             "model": model,
@@ -54,7 +79,17 @@ class LiteLLMClient(LLMClient):
             kwargs["api_key"] = self.api_key or settings["api_key"]
         if self.api_base or settings["api_base"]:
             kwargs["api_base"] = self.api_base or settings["api_base"]
-        return await self._send(req, **kwargs)
+        try:
+            return await self._send(req, **kwargs)
+        except LLMError as e:
+            if "reasoning" not in extra_body or not _must_reason(e):
+                raise
+            MUST_REASON.add(req.model)
+            log.info("reasoning cannot be turned off; using the provider's default", model=req.model)
+            kwargs["extra_body"] = {k: v for k, v in extra_body.items() if k != "reasoning"}
+            if "claude" in req.model and kwargs.get("tool_choice") not in (None, "auto"):
+                kwargs["tool_choice"] = "auto"  # Claude refuses a forced tool while it reasons
+            return await self._send(req, **kwargs)
 
     @metered(provider_model=_provider_model)
     async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
@@ -71,8 +106,10 @@ class LiteLLMClient(LLMClient):
 
     async def structured(self, req: LLMRequest, schema: dict[str, Any]) -> dict[str, Any]:
         name = f"emit_{req.purpose}"
-        # newer Claude models refuse a forced tool choice (as the Anthropic client does, they are left to pick it)
-        choice: Any = "auto" if "claude" in req.model else {"type": "function", "function": {"name": name}}
+        # Claude with reasoning on refuses a forced tool choice (as the Anthropic client does, it is left to pick it); with
+        # reasoning off it is forced, or it may answer in prose and the call fails
+        forced = "claude" not in req.model or _reasoning_off(req.model)
+        choice: Any = {"type": "function", "function": {"name": name}} if forced else "auto"
         last: LLMError | None = None
         for attempt in range(2):  # open-weight models occasionally emit a truncated/malformed tool call; one retry
             resp = await self._call(
