@@ -1,0 +1,35 @@
+# yachat on Fly.io, in your own Fly account: the API with the console, on the smallest machine, stopped when idle.
+# No app name here: each deploy names its own (Fly app names are global). From a clone or your fork:
+#
+#   fly apps create <your-app>
+#   fly secrets set -a <your-app> YACHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
+#   fly deploy -c deploy/fly.toml -a <your-app> .
+#
+# To redeploy from GitHub when CI passes on main (your fork's .github/workflows/deploy.yml):
+#   fly tokens create deploy -a <your-app> | gh secret set FLY_API_TOKEN
+#   gh variable set FLY_APP --body <your-app>
+# State is in memory unless you set DATABASE_URL (and REDIS_URL) as secrets: saved bots go on restart without them.
+
+primary_region = "iad"
+swap_size_mb = 512
+
+[build]
+  dockerfile = "../Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

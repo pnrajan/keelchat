@@ -1,0 +1,48 @@
+name: Deploy
+# Deploys main to your own Fly.io app after CI passes on it. Does nothing until the repository (your fork) has a
+# FLY_API_TOKEN secret. Repository variables: FLY_APP (your Fly app, required), FLY_CONFIG (default deploy/fly.toml).
+# Setup: docs/REFERENCE.md#deploy-from-github
+on:
+  workflow_run: {workflows: [CI], types: [completed], branches: [main]}
+  workflow_dispatch:
+
+concurrency: {group: deploy, cancel-in-progress: false}
+
+jobs:
+  gate:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.token.outputs.ready }}
+    steps:
+      - id: token
+        env: {FLY_API_TOKEN: "${{ secrets.FLY_API_TOKEN }}"}
+        run: |
+          if [ -n "$FLY_API_TOKEN" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "FLY_API_TOKEN secret not set; nothing deployed" >> "$GITHUB_STEP_SUMMARY"; fi
+
+  fly:
+    needs: gate
+    if: needs.gate.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      CONFIG: ${{ vars.FLY_CONFIG || 'deploy/fly.toml' }}
+      APP: ${{ vars.FLY_APP }}
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: "${{ github.event.workflow_run.head_sha || github.sha }}"}
+      - uses: superfly/flyctl-actions/setup-flyctl@1.6
+      - id: deploy
+        run: |
+          app=${APP:-$(sed -n 's/^app *= *"\(.*\)"/\1/p' "$CONFIG")}
+          [ -n "$app" ] || { echo "::error::set the FLY_APP repository variable to your Fly app"; exit 1; }
+          # the console and API must stay locked: never deploy an app without its key
+          flyctl secrets list -a "$app" --json | grep -q '"YACHAT_API_KEY"' \
+            || { echo "::error::set YACHAT_API_KEY on $app first: fly secrets set -a $app YACHAT_API_KEY=..."; exit 1; }
+          flyctl deploy -c "$CONFIG" -a "$app" --remote-only --ha=false .
+          echo "url=https://$app.fly.dev" >> "$GITHUB_OUTPUT"
+      - name: health
+        run: |
+          for _ in $(seq 1 20); do curl -sf "${{ steps.deploy.outputs.url }}/health" && exit 0; sleep 3; done
+          echo "::error::${{ steps.deploy.outputs.url }}/health is not answering"; exit 1

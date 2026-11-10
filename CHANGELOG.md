@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Deploy from GitHub to your own Render or Fly.io account: `render.yaml` (Render Blueprint, **Deploy to Render**
+  button) and `.github/workflows/deploy.yml` (Fly.io, `deploy/fly.toml`), each redeploying your fork's `main` when CI
+  passes, on the smallest plan. The Fly workflow does nothing without `FLY_API_TOKEN`
+  and refuses an app without `YACHAT_API_KEY`.
 - Demo: `YACHAT_DEMO_DRAFT_MODEL`, a stronger model for writing bots than for chatting. The demo's models are now in
   `deploy/demo/fly.toml` (Claude Haiku 5.5 to chat, Sonnet 5.5 to draft, via OpenRouter); `scripts/demo.sh --secrets`
   copies only the provider key.
@@ -60,6 +64,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `scripts/demo.sh --secrets` lists the secret names again (Fly's JSON uses `name`).
 - Claude Haiku 5.5 through OpenRouter: hidden reasoning used the whole token budget, so the intent detector got no
   answer and every message was asked again. Reasoning is off for OpenRouter models, and models that require it
   (Sonnet 5.5, Opus 5.5) are sent the provider's default instead.

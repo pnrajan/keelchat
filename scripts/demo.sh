@@ -16,7 +16,7 @@ if [ "${1:-}" = "--secrets" ]; then
   [ -f .env ] || { echo "no .env" >&2; exit 1; }
   # shellcheck disable=SC2046
   fly secrets set -c "$CONFIG" --stage $(grep -E "^(${KEYS// /|})=" .env | xargs) >/dev/null
-  fly secrets list -c "$CONFIG" --json | python3 -c 'import json,sys; print("secrets:", ", ".join(s["Name"] for s in json.load(sys.stdin)))'
+  fly secrets list -c "$CONFIG" --json | python3 -c 'import json,sys; print("secrets:", ", ".join(s["name"] for s in json.load(sys.stdin)))'
 fi
 # the console and API stay locked: set a random key once, never print it
 fly secrets list -c "$CONFIG" --json | grep -q '"YACHAT_API_KEY"' || fly secrets set -c "$CONFIG" --stage YACHAT_API_KEY="$(openssl rand -hex 24)" >/dev/null
