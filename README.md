@@ -69,6 +69,11 @@ scripts/try.sh              # the console with a sample bot, everything in memor
 Or run the whole stack in Docker (API, console, Redis and Postgres, with data that survives restarts):
 `scripts/local.sh up`.
 
+To put it online in your own account, fork the repo and deploy it to Render or Fly.io; both redeploy when CI passes
+on your fork's `main` ([Deploy from GitHub](docs/REFERENCE.md#deploy-from-github)).
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pnrajan/yachat)
+
 Open **Compose** and describe a bot, or pick **Support assistant**, press **Build & try**, then **New session**, and
 chat. The **Inspector** shows why each reply was chosen.
 

@@ -137,8 +137,34 @@ One image serves the API (with the console), the Knowledge Service or the Analyt
 picks which (`deploy/entrypoint.sh`). It runs as a non-root user and exposes `/health`. `docker-compose.yml` runs
 Redis, Postgres and an optional LiteLLM gateway next to it.
 
-Where the code lives: the table in [`CLAUDE.md`](../CLAUDE.md#code-organization), or by task in
-[`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md#where-things-live).
+### Deploy from GitHub
+
+Deploy to your own Render or Fly.io account, on its smallest plan. Fork the repository first: the deploy then follows
+your fork, rebuilding when CI passes on its `main`. State is in memory until you set `DATABASE_URL` (and
+`REDIS_URL`): without them, saved bots go when the app restarts. The console asks for `YACHAT_API_KEY` to sign in.
+
+**Render.** Open `https://render.com/deploy?repo=<your fork's URL>` and sign in to Render. It reads
+[`render.yaml`](../render.yaml), asks for `ANTHROPIC_API_KEY`, and generates `YACHAT_API_KEY` (on the service's
+**Environment** page). For another provider, set `YACHAT_LLM=litellm`, the two `YACHAT_MODEL_*` and its key there,
+as in `.env.example`. The free plan sleeps when idle.
+
+**Fly.io.** In your fork, with [`flyctl`](https://fly.io/docs/flyctl/install/) signed in to your account:
+
+```bash
+fly apps create <your-app>
+fly secrets set -a <your-app> YACHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
+fly deploy -c deploy/fly.toml -a <your-app> .          # the first deploy
+fly tokens create deploy -a <your-app> | gh secret set FLY_API_TOKEN
+gh variable set FLY_APP --body <your-app>
+```
+
+From then on [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) deploys
+[`deploy/fly.toml`](../deploy/fly.toml) to that app after CI passes on `main`; **Actions → Deploy → Run workflow**
+deploys by hand. Without `FLY_API_TOKEN` it does nothing, and it refuses an app without `YACHAT_API_KEY`. The
+`FLY_CONFIG` variable picks another config (`deploy/demo/fly.toml` is the public demo's).
+
+Elsewhere (Railway, Koyeb, Cloud Run, a VM): build the `Dockerfile`, serve port 8080, check `/health`, and set the
+same variables.
 
 ## Troubleshooting
 
