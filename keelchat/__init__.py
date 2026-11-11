@@ -16,6 +16,8 @@ if TYPE_CHECKING:  # explicit re-exports, so type checkers see them (mypy --stri
     from keelchat.capabilities.nodes.common import answers_for as answers_for
     from keelchat.capabilities.tools import ToolError as ToolError
     from keelchat.channels.base import Channel as Channel
+    from keelchat.knowledge.embedder import Embedder as Embedder
+    from keelchat.knowledge.embedder import embedder as embedder
     from keelchat.registry.contract import check_capability as check_capability
     from keelchat.registry.core import CapabilityConfig as CapabilityConfig
     from keelchat.registry.core import GuardContext as GuardContext
@@ -49,6 +51,8 @@ _EXPORTS = {
     "TurnContext": "keelchat.runtime.context",
     "Channel": "keelchat.channels.base",
     "check_capability": "keelchat.registry.contract",
+    "Embedder": "keelchat.knowledge.embedder",
+    "embedder": "keelchat.knowledge.embedder",
 }
 
 __all__ = sorted(_EXPORTS)

@@ -12,7 +12,7 @@ from keelchat.datasets.models import Dataset, UnstructuredDataset
 from keelchat.datasets.sources import read_bytes
 from keelchat.knowledge.chunker import SemanticChunker
 from keelchat.knowledge.docstore import DocumentStore, InMemoryDocumentStore
-from keelchat.knowledge.embedder import Embedder, FakeEmbedder
+from keelchat.knowledge.embedder import Embedder, embedder_from_env, index_table
 from keelchat.knowledge.models import Document, Hit, Passage, Strategy
 from keelchat.knowledge.strategies import ContextualIndexer, FullContextIndexer, Indexer, RaptorIndexer, SimpleIndexer
 from keelchat.knowledge.vectorstore import InMemoryIndex, VectorIndex
@@ -263,16 +263,12 @@ def service_from_env(llm: LLMClient | None = None, models: ModelConfig | None = 
         from keelchat.state.artifacts import S3ArtifactStore
 
         docs = ArtifactDocumentStore(S3ArtifactStore(bucket), prefix=prefix)
-    embedder: Embedder = FakeEmbedder()
-    if os.getenv("SILICONFLOW_API_KEY"):
-        from keelchat.knowledge.embedder import SiliconFlowEmbedder
-
-        embedder = SiliconFlowEmbedder()
+    embedder = embedder_from_env()
     index: VectorIndex = InMemoryIndex()
     if uri := index_uri(bucket, prefix):
         from keelchat.knowledge.vectorstore import LanceDBIndex
 
-        index = LanceDBIndex(uri, dim=embedder.dim)
+        index = LanceDBIndex(uri, table=index_table(embedder), dim=embedder.dim)  # one table per embedder
         log.info("knowledge index", index_uri=uri.split("?")[0])
     return KnowledgeService(docs, index, embedder, make_indexer(strategy, embedder, llm, models), llm=llm, models=models, auto=auto)
 

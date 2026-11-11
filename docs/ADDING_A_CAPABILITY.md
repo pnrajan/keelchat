@@ -219,6 +219,36 @@ Open sessions with `"channel": "telegram"` and post the raw update as the turn's
 rendered messages back. Override `compliance()` for opt-out words the platform requires (see `channels/sms.py`). Full
 example: [`examples/extensions/booking_caps/telegram.py`](../examples/extensions/booking_caps/telegram.py).
 
+## Embedder
+
+An embedder turns text into vectors for knowledge-base search. keelchat has `litellm` (any embedding model litellm
+reaches), `sentence-transformers` (a local model), `siliconflow` and `hash` (word matching, no model). To use another
+provider or a model of your own, subclass `Embedder`: `dim` is the vector size (0 until known), `id` names the model,
+and `embed` returns one vector per text.
+
+```python
+from keelchat import Embedder, embedder
+
+
+@embedder("acme")
+class AcmeEmbedder(Embedder):
+    dim = 768
+
+    def __init__(self, model: str = "acme-embed-1"):
+        self.model = model
+
+    @property
+    def id(self) -> str:
+        return f"acme:{self.model}"
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return await acme_client.embed(self.model, texts)
+```
+
+Set `KNOWLEDGE_EMBEDDER=acme` (and `KNOWLEDGE_EMBED_MODEL` to pass a model name), with the package made discoverable as
+below. Or skip the decorator and set `KNOWLEDGE_EMBEDDER=acme_caps.embed:AcmeEmbedder`. Each embedder's vectors go in
+their own index table, so switching embedders re-indexes rather than mixing vectors that can't be compared.
+
 ## Make it discoverable
 
 - In this repo: put the module under `keelchat/capabilities/`.
