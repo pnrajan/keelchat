@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
 ### Changed
 
 - **yachat is now keelchat.** The repository (`github.com/pnrajan/keelchat`), the Python package (`import keelchat`),

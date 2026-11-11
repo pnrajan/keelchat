@@ -1,6 +1,6 @@
 [project]
 name = "keelchat"
-version = "0.1.0"
+version = "0.2.0"
 description = "Open-source framework for chatbots written in YAML and extended in Python"
 readme = "README.md"
 license = "Apache-2.0"

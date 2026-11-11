@@ -19,7 +19,7 @@ The runtime, not the model, enforces its steps, limits and handover to a person.
 
 <br>
 
-<img src="docs/assets/make-a-bot.gif" alt="In the keelchat console: a dental clinic's booking bot is described in two sentences, keelchat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" width="900">
+<img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/make-a-bot.gif" alt="In the keelchat console: a dental clinic's booking bot is described in two sentences, keelchat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" width="900">
 
 </div>
 
@@ -111,7 +111,7 @@ to chat with it (its tools answer with sample data), and see what it needs conne
 link can start a draft:
 [`?describe=Book haircuts and ask for a phone number`](https://keelchat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
 
-<p align="center"><img src="docs/assets/demo-make.jpg" alt="The demo: a dental booking bot described in one sentence, its YAML with Copy and Download, and what it needs connecting: a booking calendar (Open Dental, Dentrix, Calendly), a model key, somewhere for handed-over chats, and where people talk to it" width="560"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-make.jpg" alt="The demo: a dental booking bot described in one sentence, its YAML with Copy and Download, and what it needs connecting: a booking calendar (Open Dental, Dentrix, Calendly), a model key, somewhere for handed-over chats, and where people talk to it" width="560"></p>
 
 ### Run it locally
 
