@@ -219,6 +219,54 @@ Open sessions with `"channel": "telegram"` and post the raw update as the turn's
 rendered messages back. Override `compliance()` for opt-out words the platform requires (see `channels/sms.py`). Full
 example: [`examples/extensions/booking_caps/telegram.py`](../examples/extensions/booking_caps/telegram.py).
 
+## Knowledge search parts
+
+Knowledge search has four replaceable parts. Each has an interface, a decorator that registers it by name, and a
+setting that picks it (a registered name, or `package.module:Name` without registering). All are importable from
+`keelchat`.
+
+| Part | Interface | Register | Setting | Built in |
+|---|---|---|---|---|
+| Embedding model | `Embedder`: `dim`, `id`, `embed(texts)` | `@embedder("name")` | `KNOWLEDGE_EMBEDDER` (+ `KNOWLEDGE_EMBED_MODEL`) | `litellm`, `sentence-transformers`, `siliconflow`, `hash` |
+| Splitting into passages | `Chunker`: `chunk(text)` | `@chunker("name")` | `KNOWLEDGE_CHUNKER` | `semantic` (default), `sentences` |
+| Indexing method | `Indexer`: `chunks(doc)` | `@indexer("name")` | `KNOWLEDGE_STRATEGY`, or `strategy:` on a knowledge base | `simple`, `contextual`, `raptor`, `full_context` |
+| Vector store | `VectorIndex`: `upsert`, `search`, `delete_doc`, `count` | `@vector_store("name")` | `KNOWLEDGE_VECTOR_STORE` | `memory`, `lancedb` |
+
+What each factory receives: an embedder its model name (`KNOWLEDGE_EMBED_MODEL`, or nothing); a chunker the
+embedder; an indexing method an `IndexContext` (`embedder`, `chunker`, and `llm`/`models` for summaries, which
+`need_llm()` returns or refuses); a vector store a `VectorStoreConfig` (`uri`, a `table` per embedder, `dim`).
+
+```python
+from keelchat import Embedder, VectorIndex, VectorStoreConfig, embedder, vector_store
+
+
+@embedder("acme")
+class AcmeEmbedder(Embedder):
+    dim = 768
+
+    def __init__(self, model: str = "acme-embed-1"):
+        self.model = model
+
+    @property
+    def id(self) -> str:  # names the model: each embedder's vectors get their own table
+        return f"acme:{self.model}"
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return await acme_client.embed(self.model, texts)
+
+
+@vector_store("pgvector")
+class PgVectorIndex(VectorIndex):
+    def __init__(self, cfg: VectorStoreConfig):
+        self.table, self.dim = cfg.table, cfg.dim
+
+    ...  # upsert, search (filter on chunk.dataset), delete_doc, count
+```
+
+Then `KNOWLEDGE_EMBEDDER=acme KNOWLEDGE_VECTOR_STORE=pgvector`, with the package made discoverable as below. A custom
+indexing method is also offered in the console's **Knowledge base** panel. `GET /v1/registry` lists every part under
+`knowledge`, and which are in use. Switching embedders re-indexes rather than mixing vectors that can't be compared.
+
 ## Make it discoverable
 
 - In this repo: put the module under `keelchat/capabilities/`.

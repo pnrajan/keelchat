@@ -16,6 +16,19 @@ if TYPE_CHECKING:  # explicit re-exports, so type checkers see them (mypy --stri
     from keelchat.capabilities.nodes.common import answers_for as answers_for
     from keelchat.capabilities.tools import ToolError as ToolError
     from keelchat.channels.base import Channel as Channel
+    from keelchat.knowledge.chunker import Chunker as Chunker
+    from keelchat.knowledge.chunker import chunker as chunker
+    from keelchat.knowledge.embedder import Embedder as Embedder
+    from keelchat.knowledge.embedder import embedder as embedder
+    from keelchat.knowledge.models import Chunk as Chunk
+    from keelchat.knowledge.models import Document as Document
+    from keelchat.knowledge.models import Hit as Hit
+    from keelchat.knowledge.strategies import IndexContext as IndexContext
+    from keelchat.knowledge.strategies import Indexer as Indexer
+    from keelchat.knowledge.strategies import indexer as indexer
+    from keelchat.knowledge.vectorstore import VectorIndex as VectorIndex
+    from keelchat.knowledge.vectorstore import VectorStoreConfig as VectorStoreConfig
+    from keelchat.knowledge.vectorstore import vector_store as vector_store
     from keelchat.registry.contract import check_capability as check_capability
     from keelchat.registry.core import CapabilityConfig as CapabilityConfig
     from keelchat.registry.core import GuardContext as GuardContext
@@ -49,6 +62,19 @@ _EXPORTS = {
     "TurnContext": "keelchat.runtime.context",
     "Channel": "keelchat.channels.base",
     "check_capability": "keelchat.registry.contract",
+    "Embedder": "keelchat.knowledge.embedder",
+    "embedder": "keelchat.knowledge.embedder",
+    "Chunker": "keelchat.knowledge.chunker",
+    "chunker": "keelchat.knowledge.chunker",
+    "Indexer": "keelchat.knowledge.strategies",
+    "indexer": "keelchat.knowledge.strategies",
+    "IndexContext": "keelchat.knowledge.strategies",
+    "VectorIndex": "keelchat.knowledge.vectorstore",
+    "vector_store": "keelchat.knowledge.vectorstore",
+    "VectorStoreConfig": "keelchat.knowledge.vectorstore",
+    "Chunk": "keelchat.knowledge.models",
+    "Document": "keelchat.knowledge.models",
+    "Hit": "keelchat.knowledge.models",
 }
 
 __all__ = sorted(_EXPORTS)

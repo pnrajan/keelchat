@@ -1,20 +1,51 @@
 """Indexing strategies. Each turns a Document into Chunks to embed; `full_context` indexes nothing.
-Leaf text comes from the SemanticChunker (whole sentences, topic breakpoints), never from a word count."""
+Leaf text comes from the chunker (by default the SemanticChunker: whole sentences, topic breakpoints)."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Literal
 
-from keelchat.knowledge.chunker import SemanticChunker
+from keelchat.knowledge.chunker import Chunker
+from keelchat.knowledge.embedder import Embedder
 from keelchat.knowledge.models import Chunk, Document, Strategy
+from keelchat.knowledge.plugins import Plugins
 from keelchat.runtime.llm import LLMClient, LLMRequest, ModelConfig
 
 
 class Indexer(ABC):
+    """Turns a document into the chunks to embed (or none, for `full_context`). Register yours with `@indexer("name")`:
+    a function taking an `IndexContext`, or a class built as `cls(ctx)`. A knowledge base then uses it with
+    `strategy: name`, or every one with KNOWLEDGE_STRATEGY=name. Set `retrieval = "whole_documents"` for a method that
+    indexes nothing and answers from whole documents (as `full_context` does)."""
+
     name: Strategy
+    #: how a search reads what this method indexed: nearest vectors, or whole documents within the prompt budget
+    retrieval: Literal["vectors", "whole_documents"] = "vectors"
 
     @abstractmethod
     async def chunks(self, doc: Document) -> list[Chunk]: ...
+
+
+@dataclass(frozen=True)
+class IndexContext:
+    """What an indexing method may use: the embedder, the chunker, and a model for summaries (None when none is
+    configured; methods that need one raise)."""
+
+    embedder: Embedder
+    chunker: Chunker
+    llm: LLMClient | None = None
+    models: ModelConfig | None = None
+
+    def need_llm(self, name: str) -> tuple[LLMClient, ModelConfig]:
+        if self.llm is None:
+            raise ValueError(f"strategy {name!r} needs a model (an LLMClient)")
+        return self.llm, self.models or ModelConfig()
+
+
+indexers: Plugins[Indexer] = Plugins("indexer", "strategy", Indexer)
+indexer = indexers.register
 
 
 class SimpleIndexer(Indexer):
@@ -22,7 +53,7 @@ class SimpleIndexer(Indexer):
 
     name: Strategy = "simple"
 
-    def __init__(self, chunker: SemanticChunker):
+    def __init__(self, chunker: Chunker):
         self.chunker = chunker
 
     async def chunks(self, doc: Document) -> list[Chunk]:
@@ -38,7 +69,7 @@ class ContextualIndexer(Indexer):
 
     name: Strategy = "contextual"
 
-    def __init__(self, llm: LLMClient, models: ModelConfig, chunker: SemanticChunker, max_doc_chars: int = 60_000):
+    def __init__(self, llm: LLMClient, models: ModelConfig, chunker: Chunker, max_doc_chars: int = 60_000):
         self.llm, self.models, self.chunker, self.max_doc_chars = llm, models, chunker, max_doc_chars
 
     async def _context(self, doc: Document, chunk: str) -> str:
@@ -72,7 +103,7 @@ class RaptorIndexer(Indexer):
 
     name: Strategy = "raptor"
 
-    def __init__(self, llm: LLMClient, models: ModelConfig, chunker: SemanticChunker, fanout: int = 4, max_levels: int = 4):
+    def __init__(self, llm: LLMClient, models: ModelConfig, chunker: Chunker, fanout: int = 4, max_levels: int = 4):
         self.llm, self.models, self.chunker, self.fanout, self.max_levels = llm, models, chunker, fanout, max_levels
 
     async def _summarize(self, doc: Document, texts: list[str]) -> str:
@@ -121,6 +152,25 @@ class FullContextIndexer(Indexer):
     """No vectors: retrieval returns whole documents that fit the prompt budget (small corpora, long-context models)."""
 
     name: Strategy = "full_context"
+    retrieval = "whole_documents"
 
     async def chunks(self, doc: Document) -> list[Chunk]:
         return []
+
+
+indexer("simple")(lambda ctx: SimpleIndexer(ctx.chunker))
+
+
+@indexer("contextual")
+def _contextual(ctx: IndexContext) -> Indexer:
+    llm, models = ctx.need_llm("contextual")
+    return ContextualIndexer(llm, models, ctx.chunker)
+
+
+@indexer("raptor")
+def _raptor(ctx: IndexContext) -> Indexer:
+    llm, models = ctx.need_llm("raptor")
+    return RaptorIndexer(llm, models, ctx.chunker)
+
+
+indexer("full_context")(lambda ctx: FullContextIndexer())

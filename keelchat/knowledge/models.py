@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-Strategy = Literal["simple", "contextual", "raptor", "full_context"]
+#: an indexing method: a built-in (simple, contextual, raptor, full_context) or one registered with @indexer
+Strategy = str
 
 
 def doc_id_for(source: str, text: str) -> str:

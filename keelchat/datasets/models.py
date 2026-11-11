@@ -81,7 +81,8 @@ class StructuredDataset(_Model):
 
 
 #: how a knowledge base is indexed; "auto" picks from its documents when they are indexed
-IndexStrategy = Literal["auto", "simple", "contextual", "raptor", "full_context"]
+#: built-ins: simple, contextual, raptor, full_context; or a method registered with @indexer (checked when indexed)
+IndexStrategy = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_-]{0,40}$")]
 #: values of the knowledge-base settings that leave a dataset's version as it was before they existed
 _UNSTRUCTURED_DEFAULTS = {"strategy": "auto", "top_k": 5}
 

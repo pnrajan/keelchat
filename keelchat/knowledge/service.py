@@ -10,33 +10,32 @@ from typing import Any
 
 from keelchat.datasets.models import Dataset, UnstructuredDataset
 from keelchat.datasets.sources import read_bytes
-from keelchat.knowledge.chunker import SemanticChunker
+from keelchat.knowledge.chunker import Chunker, SemanticChunker, chunker_from_env
 from keelchat.knowledge.docstore import DocumentStore, InMemoryDocumentStore
-from keelchat.knowledge.embedder import Embedder, FakeEmbedder
+from keelchat.knowledge.embedder import Embedder, embedder_from_env, index_table
 from keelchat.knowledge.models import Document, Hit, Passage, Strategy
-from keelchat.knowledge.strategies import ContextualIndexer, FullContextIndexer, Indexer, RaptorIndexer, SimpleIndexer
-from keelchat.knowledge.vectorstore import InMemoryIndex, VectorIndex
+from keelchat.knowledge.plugins import plugin_name
+from keelchat.knowledge.strategies import IndexContext, Indexer, indexers
+from keelchat.knowledge.vectorstore import VectorIndex, VectorStoreConfig, vector_stores
 from keelchat.logging import get_logger
 from keelchat.runtime.llm import LLMClient, ModelConfig
 
 log = get_logger("knowledge")
 
 
-def make_indexer(strategy: Strategy, embedder: Embedder, llm: LLMClient | None = None, models: ModelConfig | None = None) -> Indexer:
-    """The embedder also drives chunk boundaries (SemanticChunker); contextual and raptor need a model as well."""
-    models = models or ModelConfig()
-    chunker = SemanticChunker(embedder)
-    if strategy == "simple":
-        return SimpleIndexer(chunker)
-    if strategy == "full_context":
-        return FullContextIndexer()
-    if llm is None:
-        raise ValueError(f"strategy {strategy!r} needs an LLMClient")
-    if strategy == "contextual":
-        return ContextualIndexer(llm, models, chunker)
-    if strategy == "raptor":
-        return RaptorIndexer(llm, models, chunker)
-    raise ValueError(f"unknown strategy {strategy!r}")
+def make_indexer(
+    strategy: Strategy, embedder: Embedder, llm: LLMClient | None = None, models: ModelConfig | None = None, chunker: Chunker | None = None
+) -> Indexer:
+    """The indexing method registered as `strategy` (built-in or @indexer), known by that name. The chunker defaults to
+    the semantic one (the embedder drives the breaks); contextual and raptor need a model as well."""
+    ctx = IndexContext(embedder, chunker or SemanticChunker(embedder), llm, models or ModelConfig())
+    made = indexers.make(strategy, ctx)
+    if getattr(made, "name", None) != strategy:
+        try:
+            made.name = strategy  # one name everywhere: chunks, logs, the method a knowledge base reports
+        except AttributeError:
+            raise ValueError(f"strategy {strategy!r} made an indexer named {made.name!r} that cannot be renamed") from None
+    return made
 
 
 #: a document this long (characters) is better served by RAPTOR's layered summaries than by passages alone
@@ -69,6 +68,7 @@ class KnowledgeService:
         llm: LLMClient | None = None,
         models: ModelConfig | None = None,
         auto: bool = False,
+        chunker: Chunker | None = None,
     ):
         self.docs, self.index, self.embedder, self.indexer = docs, index, embedder, indexer
         self.full_context_budget_chars = full_context_budget_chars
@@ -76,6 +76,7 @@ class KnowledgeService:
         self.llm, self.models = llm, models
         #: "auto" knowledge bases pick their method; otherwise they use this service's (KNOWLEDGE_STRATEGY)
         self.auto = auto
+        self.chunker = chunker or SemanticChunker(embedder)  # what further indexing methods split documents with
         self._indexers: dict[str, Indexer] = {indexer.name: indexer}
         #: dataset ref → (method, why), as last indexed by this process
         self._methods: dict[str, tuple[Strategy, str]] = {}
@@ -92,7 +93,7 @@ class KnowledgeService:
 
     def _indexer(self, strategy: Strategy) -> Indexer:
         if strategy not in self._indexers:
-            self._indexers[strategy] = make_indexer(strategy, self.embedder, self.llm, self.models)
+            self._indexers[strategy] = make_indexer(strategy, self.embedder, self.llm, self.models, self.chunker)
         return self._indexers[strategy]
 
     def method(self, ref: str) -> tuple[Strategy, str] | None:
@@ -107,7 +108,7 @@ class KnowledgeService:
 
     async def reindex_if_empty(self) -> int:
         """Stored documents outlive an in-memory index (S3 documents, no KNOWLEDGE_INDEX_URI): rebuild it at startup."""
-        if self.strategy == "full_context" or await self.index.count(dataset="") > 0:  # the shared corpus only
+        if self.indexer.retrieval == "whole_documents" or await self.index.count(dataset="") > 0:  # the shared corpus only
             return 0
         docs = await self.docs.list("")  # datasets re-index on first use, from their sources
         n = sum([await self._index(d) for d in docs])
@@ -147,6 +148,7 @@ class KnowledgeService:
                 strategy, why = choose_strategy([d.text for d in docs], self.full_context_budget_chars, self.llm is not None)
             else:
                 strategy, why = spec.strategy, "Chosen when the knowledge base was made."
+            indexer = self._indexer(strategy)  # before anything is removed: an unknown method changes nothing
             keep = {d.id for d in docs}
             stored = await self.docs.ids(dataset.ref)  # names only: nothing is downloaded
             prev = self._methods.get(dataset.ref)
@@ -155,7 +157,6 @@ class KnowledgeService:
             stored = await self.docs.ids(dataset.ref)
             # ids come from the content: a document already stored is unchanged, so it is not embedded again (a
             # restart, another replica, or a new version that only changed the description)
-            indexer = self._indexer(strategy)
             n = sum([await (self.add(d) if indexer is self.indexer else self.add(d, indexer)) for d in docs if d.id not in stored])
             self._indexed[dataset.ref] = dataset.version
             self._methods[dataset.ref] = (strategy, why)
@@ -202,7 +203,7 @@ class KnowledgeService:
             strategy = self._methods[ref][0] if ref in self._methods else strategy
             if isinstance(dataset.spec, UnstructuredDataset):
                 k = dataset.spec.top_k
-        if strategy == "full_context":
+        if self._indexer(strategy).retrieval == "whole_documents":
             return await self._full_context(query, ref)
         [qv] = await self.embedder.embed([query])
         hits: list[Hit] = await self.index.search(qv, k=k, dataset=ref)
@@ -254,7 +255,7 @@ def index_uri(bucket: str | None, docs_prefix: str) -> str | None:
 
 def service_from_env(llm: LLMClient | None = None, models: ModelConfig | None = None) -> KnowledgeService:
     """Wire from environment. Fakes when nothing is configured; a configured real adapter with a missing key raises."""
-    strategy: Strategy = os.getenv("KNOWLEDGE_STRATEGY") or "simple"  # type: ignore[assignment]  # blank in .env = default
+    strategy: Strategy = os.getenv("KNOWLEDGE_STRATEGY") or "simple"  # blank in .env = default
     auto = not os.getenv("KNOWLEDGE_STRATEGY")  # unset: each knowledge base set to "auto" picks its own method
     docs: DocumentStore = InMemoryDocumentStore()
     bucket, prefix = os.getenv("KNOWLEDGE_S3_BUCKET"), os.getenv("KNOWLEDGE_S3_PREFIX", "knowledge/docs/")
@@ -263,18 +264,16 @@ def service_from_env(llm: LLMClient | None = None, models: ModelConfig | None = 
         from keelchat.state.artifacts import S3ArtifactStore
 
         docs = ArtifactDocumentStore(S3ArtifactStore(bucket), prefix=prefix)
-    embedder: Embedder = FakeEmbedder()
-    if os.getenv("SILICONFLOW_API_KEY"):
-        from keelchat.knowledge.embedder import SiliconFlowEmbedder
-
-        embedder = SiliconFlowEmbedder()
-    index: VectorIndex = InMemoryIndex()
-    if uri := index_uri(bucket, prefix):
-        from keelchat.knowledge.vectorstore import LanceDBIndex
-
-        index = LanceDBIndex(uri, dim=embedder.dim)
-        log.info("knowledge index", index_uri=uri.split("?")[0])
-    return KnowledgeService(docs, index, embedder, make_indexer(strategy, embedder, llm, models), llm=llm, models=models, auto=auto)
+    embedder = embedder_from_env()
+    chunker = chunker_from_env(embedder)
+    uri = index_uri(bucket, prefix)
+    # KNOWLEDGE_VECTOR_STORE: memory, lancedb, a registered name or package.module:Name; unset, lancedb when there is
+    # somewhere to keep it, else memory. Each embedder's vectors get their own table.
+    store = os.getenv("KNOWLEDGE_VECTOR_STORE") or ("lancedb" if uri else "memory")
+    index = vector_stores.make(store, VectorStoreConfig(uri, index_table(embedder), embedder.dim))
+    log.info("knowledge index", store=store, index_uri=(uri or "").split("?")[0], embedder=embedder.id, chunker=plugin_name(chunker))
+    indexer = make_indexer(strategy, embedder, llm, models, chunker)
+    return KnowledgeService(docs, index, embedder, indexer, llm=llm, models=models, auto=auto, chunker=chunker)
 
 
 def local_service_from_env(llm: LLMClient | None = None, models: ModelConfig | None = None) -> KnowledgeService | None:
