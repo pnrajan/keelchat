@@ -29,7 +29,8 @@ A bot that books appointments or takes support requests has a job to finish. Pro
 questions, loop, or promise a person and never hand over. yachat keeps the model for reading and phrasing, and puts
 every decision in code you can review.
 
-A patient mid-booking writes *"I just knocked a tooth out playing football"*:
+A patient mid-booking writes *"I just knocked a tooth out playing football"*. Replies from the dental example bot,
+before and after [#31](https://github.com/pnrajan/yachat/pull/31); the model picks the words, code makes the handover:
 
 | Where the rule lives | What happens |
 |---|---|
@@ -55,8 +56,8 @@ conversation.
 <td width="33%" valign="top">
 
 **Safe by default**<br>
-Tools go through one gateway (allow list, timeouts, circuit breaker), with input and output guardrails and memory
-only with consent.
+Tools go through one gateway (allow list, timeouts, circuit breaker), with input and output guardrails. Memory
+keeps only listed items, with consent for sensitive ones.
 
 </td>
 </tr>
@@ -77,8 +78,8 @@ Test sets are generated from the YAML; a stronger model reviews trial chats and 
 <td valign="top">
 
 **Yours to run and extend**<br>
-Apache-2.0, one Docker image. A tool, step, guardrail or channel is one Python function or class, or an MCP
-server.
+Apache-2.0, one Docker image. A tool, step, guardrail or channel is one decorated Python function or class, or an
+MCP server.
 
 </td>
 </tr>
@@ -141,13 +142,15 @@ Run yachat in your own Render account, on the free plan.
 4. On the service's **Environment** page, copy `YACHAT_API_KEY`. Render generated it; it locks the console and API.
 5. Open `https://<service>.onrender.com`. The console asks for the key once.
 
+> [!IMPORTANT]
+> Saved bots need a database. Without `DATABASE_URL` (and `REDIS_URL`), everything is in memory and is lost when the
+> service restarts or sleeps. Add a Postgres URL on the **Environment** page.
+
 <details>
-<summary><b>Good to know:</b> other model providers, saving bots, updates, sleeping</summary>
+<summary><b>Good to know:</b> other model providers, updates, sleeping</summary>
 
 - **Another model provider:** on the **Environment** page, set `YACHAT_LLM=litellm`, `YACHAT_MODEL_GENERATE`,
   `YACHAT_MODEL_CLASSIFY` and the provider's key (e.g. `OPENROUTER_API_KEY`), as in [`.env.example`](.env.example).
-- **Saved bots need a database.** Without `DATABASE_URL` (and `REDIS_URL`), everything is in memory and is lost when
-  the service restarts or sleeps. Add a Postgres URL on the **Environment** page.
 - **Updates are not automatic.** To redeploy each time CI passes on your fork, set **Auto-Deploy** to "After CI
   checks pass" in the service's **Settings**, or press **Manual Deploy**.
 - **The free plan sleeps** when idle, so the first request after that is slow. A paid plan stays awake.
@@ -281,12 +284,14 @@ the detail.
 Alpha (0.x): the policy language and APIs may still change between minor versions; [CHANGELOG.md](CHANGELOG.md)
 lists every change.
 
+## License
+
+[Apache-2.0](LICENSE)
+
 <div align="center">
 
 <br>
 
 **If yachat is useful to you, a ⭐ helps others find it.**
-
-[Apache-2.0](LICENSE) · [Website](https://pnrajan.github.io/yachat/) · [Demo](https://yachat-demo.fly.dev)
 
 </div>
