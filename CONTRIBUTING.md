@@ -37,6 +37,15 @@ uv run keelchat evals run        # when a policy, prompt or example agent change
 - Prompts live next to the code that sends them (`intent_examples.yaml`, `planner.py:verify_system`); changes to
   them are reviewed like code and need a replay case.
 
+## Releasing (maintainers)
+
+1. Bump `version` in `pyproject.toml`, and rename the CHANGELOG's `[Unreleased]` to `[<version>] - <date>` above a new
+   empty `[Unreleased]`. Merge.
+2. Publish a GitHub release tagged `v<version>` (`gh release create v<version> --generate-notes`).
+
+`.github/workflows/release.yml` checks the tag matches the version, builds, and publishes to PyPI with Trusted
+Publishing; no token is stored.
+
 ## Reporting problems
 
 Questions and ideas: GitHub Discussions. Bugs and feature requests: GitHub issues (templates provided). Security issues: see `SECURITY.md`, do not open a
