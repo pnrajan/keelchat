@@ -21,6 +21,7 @@ def clean_env(monkeypatch):
     for v in ENV:
         monkeypatch.delenv(v, raising=False)
     monkeypatch.setattr(emb, "_sentence_transformers_installed", lambda: False)
+    monkeypatch.setattr(emb, "_chonkie_installed", lambda: False)
     return monkeypatch
 
 
@@ -87,6 +88,9 @@ def test_unset_picks_the_best_available(clean_env):
 
     clean_env.setitem(EMBEDDERS, "sentence-transformers", lambda model: FakeST(model))
     assert isinstance(embedder_from_env(), FakeST)  # installed: a local model
+    clean_env.setattr(emb, "_chonkie_installed", lambda: True)
+    clean_env.setitem(EMBEDDERS, "chonkie", lambda model: FakeEmbedder(dim=7))
+    assert embedder_from_env().dim == 7  # chonkie's small model2vec model comes first (no PyTorch)
     clean_env.setenv("OPENAI_API_KEY", "sk-test")
     assert embedder_from_env().id == "litellm:openai/text-embedding-3-small"
     clean_env.setenv("KNOWLEDGE_EMBED_MODEL", "voyage/voyage-3")

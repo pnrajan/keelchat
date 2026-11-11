@@ -227,10 +227,10 @@ setting that picks it (a registered name, or `package.module:Name` without regis
 
 | Part | Interface | Register | Setting | Built in |
 |---|---|---|---|---|
-| Embedding model | `Embedder`: `dim`, `id`, `embed(texts)` | `@embedder("name")` | `KNOWLEDGE_EMBEDDER` (+ `KNOWLEDGE_EMBED_MODEL`) | `litellm`, `sentence-transformers`, `siliconflow`, `hash` |
-| Splitting into passages | `Chunker`: `chunk(text)` | `@chunker("name")` | `KNOWLEDGE_CHUNKER` | `semantic` (default), `sentences` |
+| Embedding model | `Embedder`: `dim`, `id`, `embed(texts)` | `@embedder("name")` | `KNOWLEDGE_EMBEDDER` (+ `KNOWLEDGE_EMBED_MODEL`) | `litellm`, `chonkie`, `sentence-transformers`, `siliconflow`, `hash` |
+| Splitting into passages | `Chunker`: `chunk(text)` | `@chunker("name")` | `KNOWLEDGE_CHUNKER` | `chonkie` (default when installed), `semantic`, `sentences` |
 | Indexing method | `Indexer`: `chunks(doc)` | `@indexer("name")` | `KNOWLEDGE_STRATEGY`, or `strategy:` on a knowledge base | `simple`, `contextual`, `raptor`, `full_context` |
-| Vector store | `VectorIndex`: `upsert`, `search`, `delete_doc`, `count` | `@vector_store("name")` | `KNOWLEDGE_VECTOR_STORE` | `memory`, `lancedb` |
+| Vector store | `VectorIndex`: `upsert`, `search`, `delete_doc`, `count` | `@vector_store("name")` | `KNOWLEDGE_VECTOR_STORE` | `memory`, `lancedb`, `qdrant`, `chroma`, `pgvector` |
 
 What each factory receives: an embedder its model name (`KNOWLEDGE_EMBED_MODEL`, or nothing); a chunker the
 embedder; an indexing method an `IndexContext` (`embedder`, `chunker`, and `llm`/`models` for summaries, which
@@ -261,6 +261,17 @@ class PgVectorIndex(VectorIndex):
         self.table, self.dim = cfg.table, cfg.dim
 
     ...  # upsert, search (filter on chunk.dataset), delete_doc, count
+```
+
+A vector store must keep datasets apart, honour `max_level`, replace a chunk upserted again with the same id, and return
+whole chunks with cosine similarity as the score. `check_vector_store` tests all of it; run it on an empty store:
+
+```python
+from keelchat.testing import check_vector_store
+
+
+async def test_my_store():
+    await check_vector_store(PgVectorIndex(VectorStoreConfig(uri=None, table="chunks_test", dim=0)))
 ```
 
 Then `KNOWLEDGE_EMBEDDER=acme KNOWLEDGE_VECTOR_STORE=pgvector`, with the package made discoverable as below. A custom

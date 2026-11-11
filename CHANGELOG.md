@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- chonkie splits documents into passages (semantic by default) and provides a small local embedding model, used when
+  no API embedding model is set; included in the `api` and `knowledge` extras and the Docker image.
+- Vector stores for Qdrant, Chroma and pgvector (`KNOWLEDGE_VECTOR_STORE`), and `keelchat.testing.check_vector_store`
+  to test any store, your own included.
 - Knowledge search parts are replaceable: embedding model (`@embedder`: any provider through litellm,
   sentence-transformers locally), passage splitting (`@chunker`), indexing method (`@indexer`, also usable as a
   knowledge base's `strategy`), and vector store (`@vector_store`). Each is picked by a setting
@@ -22,6 +26,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A knowledge base whose documents were kept but whose vectors were missing (a new vector store or embedding model) is
+  embedded again instead of being skipped as unchanged.
 - A nested object sent by the model as a JSON string is read as the object; a plan cut off mid-way is asked for again.
 - The launch checklist no longer calls a bot's knowledge base sample data.
 - Dataset responses include `kind`, which the console's YAML editor reads.

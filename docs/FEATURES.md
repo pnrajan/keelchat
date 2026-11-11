@@ -137,14 +137,19 @@ which and why:
 Set `strategy` to one of these to choose, and `top_k` (1–20, default 5) for the passages each answer gets.
 `KNOWLEDGE_STRATEGY` on the server makes every knowledge base use one method.
 
-**Embeddings.** Search finds passages by meaning with an embedding model. `KNOWLEDGE_EMBEDDER` picks it: `litellm`
-with `KNOWLEDGE_EMBED_MODEL` for any provider's model (`openai/text-embedding-3-small`, `voyage/voyage-3`,
-`cohere/embed-english-v3.0`, `gemini/text-embedding-004`, `ollama/nomic-embed-text`), `sentence-transformers` for a
-local model (`pip install sentence-transformers`; `sentence-transformers/all-MiniLM-L6-v2` by default), or your own
-([Adding a capability](ADDING_A_CAPABILITY.md#knowledge-search-parts)). Unset, the best available is used: SiliconFlow, then OpenAI,
-then a local model if installed; with none of them, search matches words rather than meaning, and the server log says
-so. Full context needs no embeddings. How documents are split, the indexing method and the vector store can be
-replaced the same way ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)).
+**Passages and embeddings.** Documents are split into passages with [chonkie](https://github.com/chonkie-inc/chonkie)'s
+semantic chunker (breaks where the meaning shifts; `KNOWLEDGE_CHONKIE=recursive|sentence|token` for others,
+`KNOWLEDGE_CHUNK_SIZE` in tokens). Search finds passages by meaning with an embedding model, picked by
+`KNOWLEDGE_EMBEDDER`: `litellm` with `KNOWLEDGE_EMBED_MODEL` for any provider's model (`openai/text-embedding-3-small`,
+`voyage/voyage-3`, `cohere/embed-english-v3.0`, `gemini/text-embedding-004`, `ollama/nomic-embed-text`), `chonkie`
+for a small local model (`minishlab/potion-base-8M`, no key, in the Docker image), `sentence-transformers` for a
+local PyTorch model, or your own. Unset, the best available is used: SiliconFlow, then OpenAI, then chonkie's local
+model. The local model is cheap and offline but weaker on paraphrases ("somewhere to leave my car" vs "parking"); an
+API model or a sentence-transformers model does better there. Full context needs no embeddings.
+
+**Vector stores.** `KNOWLEDGE_VECTOR_STORE` picks where vectors live: `memory`, `lancedb` (a folder or S3), `qdrant`
+(`QDRANT_URL`), `chroma` (`CHROMA_URL`), `pgvector` (`KNOWLEDGE_PGVECTOR_URL` or `DATABASE_URL`), or your own. Each
+keeps one collection per embedding model, so switching re-embeds the documents. Every part can be replaced with your own ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)).
 
 **Where it runs.** Without `KNOWLEDGE_URL`, the API indexes and searches knowledge bases itself, so a single deploy
 (Render, Fly.io, `scripts/try.sh`) needs nothing else; the index is in memory and rebuilt from the documents after a

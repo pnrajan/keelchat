@@ -29,10 +29,14 @@ RUN uv sync --frozen --no-dev $(for e in $EXTRAS; do printf -- "--extra %s " "$e
 # with the Iceberg audit archive, the dashboards' DuckDB reads it on S3: install its extensions now, not at runtime
 ENV KEELCHAT_DUCKDB_EXTENSIONS=/opt/duckdb-extensions
 RUN case " $EXTRAS " in *" audit "*) /app/.venv/bin/python -c "import duckdb, os; c = duckdb.connect(config={'extension_directory': os.environ['KEELCHAT_DUCKDB_EXTENSIONS']}); [c.install_extension(e) for e in ('iceberg', 'avro', 'httpfs', 'aws')]";; esac
+# chonkie's small embedding model, in the image: knowledge search works offline and the first question isn't slowed by a download
+ENV HF_HOME=/opt/hf
+RUN /app/.venv/bin/python -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('chonkie') is None else 1)" \
+    || /app/.venv/bin/python -c "from chonkie import AutoEmbeddings; AutoEmbeddings.get_embeddings('minishlab/potion-base-8M')"
 COPY --from=ui /ui/dist frontend/dist
 COPY deploy/entrypoint.sh /entrypoint.sh
 # the app only writes to /data; /app stays root-owned and readable (chown -R /app would copy every installed file into a new layer)
-RUN useradd -r -u 10001 app && mkdir -p /data && chown -R app /data && chmod +x /entrypoint.sh
+RUN useradd -r -u 10001 app && mkdir -p /data /opt/hf && chown -R app /data /opt/hf && chmod +x /entrypoint.sh
 ENV PATH="/app/.venv/bin:$PATH"
 # uploaded documents and local datasets live here (the only folder the app writes to)
 ENV KEELCHAT_DATA_ROOT=/data

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib
+import importlib.util
 import math
 import os
 import re
@@ -183,17 +184,24 @@ def _sentence_transformers_installed() -> bool:
     return importlib.util.find_spec("sentence_transformers") is not None
 
 
+def _chonkie_installed() -> bool:
+    return importlib.util.find_spec("chonkie") is not None
+
+
 def embedder_from_env() -> Embedder:
     """KNOWLEDGE_EMBEDDER: a registered name (`litellm`, `sentence-transformers`, `siliconflow`, `hash`, or one from
     a capability package) or an import path `package.module:Name`; KNOWLEDGE_EMBED_MODEL picks its model. Unset: the
     first that works of SiliconFlow (SILICONFLOW_API_KEY), an embedding model named in KNOWLEDGE_EMBED_MODEL or OpenAI's
-    (OPENAI_API_KEY), sentence-transformers (when installed), and the word-hashing fallback."""
+    (OPENAI_API_KEY), chonkie's local model2vec model (when chonkie is installed), sentence-transformers (when installed),
+    and the word-hashing fallback."""
     choice, model = os.getenv("KNOWLEDGE_EMBEDDER", "").strip(), os.getenv("KNOWLEDGE_EMBED_MODEL") or None
     if not choice:
         if os.getenv("SILICONFLOW_API_KEY"):
             choice = "siliconflow"
         elif model or os.getenv("OPENAI_API_KEY"):
             choice = "litellm"
+        elif _chonkie_installed():
+            choice = "chonkie"
         elif _sentence_transformers_installed():
             choice = "sentence-transformers"
         else:

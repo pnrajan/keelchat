@@ -115,7 +115,8 @@ the model provider is required; everything else runs in memory when unset.
 | `KEELCHAT_CAPABILITY_PACKAGES`, `KEELCHAT_MCP_SERVERS` | extension packages and MCP servers to load capabilities from |
 | `KNOWLEDGE_URL`, `ANALYTICS_URL`, `KEELCHAT_DATA_ROOT`, `KEELCHAT_DATA_BUCKETS` | the Knowledge and Analytics Services, and where dataset sources may live. Without `KNOWLEDGE_URL`, knowledge bases are indexed and searched inside the API. The Docker image sets `KEELCHAT_DATA_ROOT=/data` |
 | `KNOWLEDGE_EMBEDDER`, `KNOWLEDGE_EMBED_MODEL`, `KNOWLEDGE_EMBED_DIM`, `KNOWLEDGE_EMBED_API_BASE` | the embedding model for knowledge search: `litellm`, `sentence-transformers`, `siliconflow`, `hash`, a registered name or `package.module:Name`; unset, the best available ([Embeddings](FEATURES.md#answer-from-documents)) |
-| `KNOWLEDGE_CHUNKER`, `KNOWLEDGE_VECTOR_STORE` | how documents are split (`semantic`, `sentences`) and where vectors are kept (`memory`, `lancedb`), or your own ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)) |
+| `KNOWLEDGE_CHUNKER`, `KNOWLEDGE_CHONKIE`, `KNOWLEDGE_CHUNK_SIZE` | how documents are split: `chonkie` (default when installed; `semantic`, `recursive`, `sentence` or `token`, size in tokens), `semantic`, `sentences`, or your own |
+| `KNOWLEDGE_VECTOR_STORE`, `QDRANT_URL`, `QDRANT_API_KEY`, `CHROMA_URL`, `KNOWLEDGE_PGVECTOR_URL` | where vectors are kept: `memory`, `lancedb`, `qdrant`, `chroma`, `pgvector`, or your own ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)) |
 | `KNOWLEDGE_STRATEGY` | unset: each knowledge base picks its indexing method from its documents; set to use one method for all |
 | `KEELCHAT_SANDBOX` | `local` or `agentcore`: where statistics code runs; unset for SQL-only answers |
 | `KEELCHAT_UPLOADS_BUCKET` | S3 bucket for uploaded content and files; unset, a folder under `KEELCHAT_DATA_ROOT` |
