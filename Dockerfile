@@ -34,6 +34,8 @@ COPY deploy/entrypoint.sh /entrypoint.sh
 # the app only writes to /data; /app stays root-owned and readable (chown -R /app would copy every installed file into a new layer)
 RUN useradd -r -u 10001 app && mkdir -p /data && chown -R app /data && chmod +x /entrypoint.sh
 ENV PATH="/app/.venv/bin:$PATH"
+# uploaded documents and local datasets live here (the only folder the app writes to)
+ENV KEELCHAT_DATA_ROOT=/data
 EXPOSE 8080
 # starts as root only to take ownership of mounted volumes (e.g. /data), then drops to `app`
 ENTRYPOINT ["/entrypoint.sh"]

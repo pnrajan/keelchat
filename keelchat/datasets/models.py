@@ -80,9 +80,18 @@ class StructuredDataset(_Model):
         return self
 
 
+#: how a knowledge base is indexed; "auto" picks from its documents when they are indexed
+IndexStrategy = Literal["auto", "simple", "contextual", "raptor", "full_context"]
+#: values of the knowledge-base settings that leave a dataset's version as it was before they existed
+_UNSTRUCTURED_DEFAULTS = {"strategy": "auto", "top_k": 5}
+
+
 class UnstructuredDataset(_Model):
     kind: Literal["unstructured"] = "unstructured"
     documents: list[DocumentSource] = Field(min_length=1, max_length=1_000)
+    strategy: IndexStrategy = "auto"
+    #: passages given to the model for each question
+    top_k: int = Field(default=5, ge=1, le=20)
 
 
 DatasetSpec = Annotated[StructuredDataset | UnstructuredDataset, Field(discriminator="kind")]
@@ -115,7 +124,11 @@ class Dataset(_Model):
 
     @classmethod
     def create(cls, tenant: str, name: str, body: DatasetIn) -> Dataset:
-        canon = json.dumps({"d": body.description, "s": body.spec.model_dump(mode="json")}, sort_keys=True)
+        spec = body.spec.model_dump(mode="json")
+        for k, default in _UNSTRUCTURED_DEFAULTS.items():  # unchanged settings keep existing versions stable
+            if spec.get(k) == default:
+                spec.pop(k)
+        canon = json.dumps({"d": body.description, "s": spec}, sort_keys=True)
         return cls(tenant=tenant, name=name, description=body.description, spec=body.spec, version=hashlib.sha256(canon.encode()).hexdigest()[:12])
 
 

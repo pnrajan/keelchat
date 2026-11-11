@@ -28,6 +28,7 @@ while curl -s -o /dev/null "http://127.0.0.1:$PORT/"; do PORT=$((PORT + 1)); don
 # empty values win over .env (the app reads it too): in-memory stores, no API key, sample tools, judge off unless asked
 export DATABASE_URL='' REDIS_URL='' KEELCHAT_API_KEY=''
 export KEELCHAT_TOOLS=fake  # tools without a backend URL answer from built-in sample data (knowledge, jobs)
+export KEELCHAT_DATA_ROOT="${KEELCHAT_DATA_ROOT:-$PWD/.data}"  # uploaded documents
 [ -n "$JUDGE" ] || export EVALS_JUDGE_MODEL=''
 
 uv sync -q --inexact

@@ -87,3 +87,17 @@ async def test_consent_after_the_form_blocks_launch():
     async with client() as c:
         items = by_id((await c.post("/v1/tenants/default/agents/readiness", json={"yaml": text})).json())
         assert items["consent"]["status"] == "missing" and "form_fill" in items["consent"]["detail"]
+
+
+async def test_a_bot_answering_from_its_knowledge_base_is_connected(monkeypatch):
+    """A knowledge base named in the policy is searched for real (built into the server, or the Knowledge Service),
+    so the checklist does not call it sample data."""
+    from keelchat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
+
+    monkeypatch.delenv("KNOWLEDGE_URL", raising=False)
+    async with client() as c:
+        rt = c._transport.app.state.runtime  # type: ignore[attr-defined]
+        await rt.datasets.put(Dataset.create("default", "kb_faq", DatasetIn(spec=UnstructuredDataset(documents=[DocumentSource(uri="faq.md")]))))
+        text = edited(SUPPORT, flow=[*yaml.safe_load(SUPPORT)["flow"], {"knowledge": {"dataset": "kb_faq"}}])
+        item = by_id((await c.post("/v1/tenants/default/agents/readiness", json={"yaml": text})).json())["tool:knowledge_search"]
+        assert item["status"] == "ok" and "kb_faq" in item["detail"], item

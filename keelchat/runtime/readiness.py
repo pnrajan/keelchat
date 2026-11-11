@@ -48,7 +48,7 @@ class Report(BaseModel):
     ready: bool
 
 
-def _tool_items(policy: CompiledPolicy, impls: set[str]) -> list[Item]:
+def _tool_items(policy: CompiledPolicy, impls: set[str], datasets: Mapping[str, DatasetKind]) -> list[Item]:
     out = []
     for name in policy.allowed_tools:
         env = TOOL_BACKENDS.get(name)
@@ -56,6 +56,9 @@ def _tool_items(policy: CompiledPolicy, impls: set[str]) -> list[Item]:
         label = (spec.description.split("\n")[0].rstrip(".") if spec else name) or name
         if env is None or os.getenv(env):
             out.append(Item(id=f"tool:{name}", area="connections", status="ok", title=f"{name} is connected", detail=label))
+        elif name == "knowledge_search" and (kbs := ", ".join(d for d in policy.datasets if datasets.get(d) == "unstructured")):
+            # its knowledge bases are searched for real (built into the server, or the Knowledge Service), never sample data
+            out.append(Item(id=f"tool:{name}", area="connections", status="ok", title="Answers from your knowledge base", detail=kbs))
         elif name in impls:
             out.append(
                 Item(
@@ -196,7 +199,7 @@ async def readiness(
         return _report(None, items)
     items.append(Item(id="builds", area="policy", status="ok", title="The policy builds"))
     items += _policy_items(policy)
-    items += _tool_items(policy, impls)
+    items += _tool_items(policy, impls, datasets)
     active = await versions.active(tenant, policy.agent)
     saved = await versions.versions(tenant, policy.agent)
     if active is not None and active.hash == policy.hash:

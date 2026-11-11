@@ -65,12 +65,16 @@ class Health(BaseModel):
 
 
 def _llm_for(strategy: str) -> LLMClient | None:
-    """contextual / raptor summarise with a model; simple / full_context need none."""
-    if strategy not in ("contextual", "raptor"):
-        return None
+    """contextual / raptor summarise with a model: required when it is the service's method, else used when a model is
+    configured, so knowledge bases set to "auto" can pick them."""
     from keelchat.runtime.llm_factory import llm_from_env
 
-    return llm_from_env()
+    if strategy in ("contextual", "raptor"):
+        return llm_from_env()
+    try:
+        return llm_from_env()
+    except RuntimeError:
+        return None
 
 
 def create_app(service: KnowledgeService | None = None) -> FastAPI:
@@ -131,7 +135,9 @@ def create_app(service: KnowledgeService | None = None) -> FastAPI:
     async def index_dataset(body: Dataset) -> dict[str, Any]:
         """Index (or re-index) an unstructured dataset now, so registration surfaces unreadable sources."""
         try:
-            return {"dataset": body.ref, "version": body.version, "chunks": await svc.index_dataset(body, register=True)}
+            chunks = await svc.index_dataset(body, register=True)
+            method, why = svc.method(body.ref) or (svc.strategy, "")
+            return {"dataset": body.ref, "version": body.version, "chunks": chunks, "strategy": method, "why": why}
         except (SourceRejected, OSError, ValueError) as e:
             log.error("dataset index failed", dataset=body.ref, error=f"{e.__class__.__name__}: {e}")
             raise HTTPException(422, str(e) if isinstance(e, SourceRejected | ValueError) else "source_unreadable") from None

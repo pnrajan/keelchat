@@ -2,7 +2,7 @@
 // plain words. Detailed settings and the YAML are one click away, folded, for people who want them.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { diffLines } from "diff";
-import { api, BotType, Dataset, ValidationError } from "./api";
+import { api, BotType, Dataset, IndexMethod, KnowledgeMade, ValidationError } from "./api";
 import { Config, Memory, memoryValue, readConfig, Rule, rulesValue, setKey, setStep } from "./policyDoc";
 import { type Root } from "./policySchema";
 import Setup from "./Setup";
@@ -175,6 +175,11 @@ export default function Compose(p: Props) {
           {msg && <div className={`callout ${msg.kind}`} role="status">{msg.text}</div>}
         </section>
 
+        <KnowledgeBase agent={cfg?.agent || check?.agent || undefined} busy={!!busy} onUse={(ds, about) => {
+          setAsk(`Answer questions from the knowledge base ${ds}`);
+          void edit(`Answer customers' questions from the knowledge base ${ds} (${about}): add "- knowledge: {dataset: ${ds}}" as the last step of the flow, or set that dataset on the knowledge step if there is one (side questions are answered from it at any point), keeping everything else`);
+        }} />
+
         <details className="compose-more">
           <summary><b>Fine-tune</b><span className="muted small">steps and questions, rules, handoff, memory, safety, launch checklist</span></summary>
           {!cfg ? <div className="callout err">The settings can't be shown until the YAML parses. Open Show YAML to fix it.</div>
@@ -191,6 +196,92 @@ export default function Compose(p: Props) {
         </details>
       </div>
     </main>
+  );
+}
+
+const METHODS: { id: IndexMethod; label: string; hint: string }[] = [
+  { id: "auto", label: "Auto (recommended)", hint: "picked from your documents" },
+  { id: "full_context", label: "Full context", hint: "small sets: the bot reads every document whole" },
+  { id: "contextual", label: "Contextual retrieval", hint: "many documents: passages with a line of context each" },
+  { id: "raptor", label: "RAPTOR", hint: "long documents: summaries at several levels" },
+  { id: "simple", label: "Search", hint: "passages found by meaning, no model needed to index" },
+];
+const methodLabel = (m?: string) => METHODS.find((x) => x.id === m)?.label.replace(" (recommended)", "") ?? m ?? "";
+
+// Knowledge bases: documents the bot answers from. Make one from files and web pages (the indexing method is picked
+// automatically unless set), or pick one already made; either way the bot change is proposed above, to apply or not.
+function KnowledgeBase({ agent, busy, onUse }: { agent?: string; busy: boolean; onUse: (dataset: string, about: string) => void }) {
+  const [list, setList] = useState<Dataset[]>([]);
+  const [name, setName] = useState("");
+  const [files, setFiles] = useState<FileList | null>(null);
+  const [urls, setUrls] = useState("");
+  const [method, setMethod] = useState<IndexMethod>("auto");
+  const [topK, setTopK] = useState(5);
+  const [working, setWorking] = useState(false);
+  const [made, setMade] = useState<KnowledgeMade | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = () => api.datasets().then((d) => setList(d.filter((x) => (x.kind ?? x.spec?.kind) === "unstructured")), () => undefined);
+  useEffect(() => { void load(); }, []);
+  const fallback = agent ? ("kb_" + agent.replace(/-/g, "_")).slice(0, 63) : "";
+
+  async function create() {
+    if (!agent) return;
+    const form = new FormData();
+    form.append("agent", agent); form.append("urls", urls); form.append("name", name.trim() || fallback);
+    form.append("strategy", method); form.append("top_k", String(topK));
+    Array.from(files || []).forEach((f) => form.append("files", f));
+    setWorking(true); setErr(null); setMade(null);
+    try {
+      const r = await api.addDocuments(form);
+      setMade(r); setFiles(null); setUrls(""); void load();
+      onUse(r.dataset, `${r.documents.length} document${r.documents.length === 1 ? "" : "s"}`);
+    } catch (e) { setErr((e as Error).message); } finally { setWorking(false); }
+  }
+
+  return (
+    <details className="compose-more">
+      <summary><b>Knowledge base</b><span className="muted small">documents and web pages it answers questions from</span></summary>
+      <p className="muted small">The bot answers only from these, and says so when they don't cover a question. A knowledge base can be shared by several bots.</p>
+      {list.length > 0 && (
+        <div className="field-row">
+          <select className="grow" aria-label="Use a knowledge base" defaultValue="" disabled={busy}
+            onChange={(e) => { if (e.target.value) onUse(e.target.value, "an existing knowledge base"); e.target.value = ""; }}>
+            <option value="" disabled>Use one you've made…</option>
+            {list.map((d) => (
+              <option key={d.name} value={d.name}>
+                {d.name} · {d.spec?.documents?.length ?? 0} docs · {methodLabel(d.spec?.strategy ?? "auto")}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="create-form">
+        <label>Name<input value={name} onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))} placeholder={fallback || "faq"} maxLength={63} /></label>
+        <label>Files<input type="file" multiple accept=".pdf,.txt,.md,.markdown,.csv,.html,.htm" onChange={(e) => setFiles(e.target.files)} /></label>
+        <label>Web pages, one per line<textarea rows={2} value={urls} onChange={(e) => setUrls(e.target.value)} placeholder="https://www.example.com/faq" /></label>
+        <details>
+          <summary className="muted small">How it's indexed: {methodLabel(method)}{method === "auto" ? "" : ` · ${topK} passages per answer`}</summary>
+          <label>Method
+            <select value={method} onChange={(e) => setMethod(e.target.value as IndexMethod)}>
+              {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}: {m.hint}</option>)}
+            </select>
+          </label>
+          <label>Passages per answer<input type="number" min={1} max={20} value={topK} onChange={(e) => setTopK(Math.min(20, Math.max(1, Number(e.target.value) || 5)))} /></label>
+        </details>
+        <div className="field-row">
+          <button className="primary compact" onClick={create} disabled={!agent || busy || working || (!urls.trim() && !files?.length)}>{working ? "Reading and indexing…" : "Create knowledge base"}</button>
+          {!agent && <span className="muted small">Finish the bot first so it has a name.</span>}
+        </div>
+      </div>
+      {made && (
+        <div className="callout ok" role="status">
+          <strong>{made.dataset}: {made.documents.length} document{made.documents.length === 1 ? "" : "s"}{made.strategy ? ` · ${methodLabel(made.strategy)}` : ""}</strong>
+          {made.why && <p className="small">{made.why}</p>}
+          <p className="small">Apply the change above so the bot uses it.</p>
+        </div>
+      )}
+      {err && <div className="callout err" role="status">{err}</div>}
+    </details>
   );
 }
 

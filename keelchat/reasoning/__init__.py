@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from keelchat.logging import get_logger
 from keelchat.runtime.llm import LLMClient, LLMError, LLMRequest, ModelConfig, untrusted
@@ -171,8 +171,15 @@ def normalize_checks(raw: list[dict[str, Any]], code: bool) -> list[Check]:
 async def prepare(llm: LLMClient, models: ModelConfig, task: Task[Any]) -> tuple[Plan, list[Check]]:
     system = PREPARE_SYSTEM.format(code_rule=task.code_rule or NO_CODE_RULE)
     req = LLMRequest("reasoning_prepare", models.generate, system, [{"role": "user", "content": task.brief()}], max_tokens=1500, effort="medium")
-    out = await llm.structured(req, PREPARE_SCHEMA)
-    return Plan.model_validate(out.get("plan") or {}), normalize_checks(list(out.get("checks") or []), bool(task.code_rule))
+    for attempt in (1, 2):  # a model can send the plan as a cut-off JSON string: ask once more
+        out = await llm.structured(req, PREPARE_SCHEMA)
+        raw, checks = out.get("plan"), normalize_checks(list(out.get("checks") or []), bool(task.code_rule))
+        try:
+            return Plan.model_validate(raw or {}), checks
+        except ValidationError:
+            log.warning("plan unreadable", attempt=attempt)
+    # still unreadable: its text is the method, so the reply goes ahead (the verifier still checks the result)
+    return Plan(method=str(raw or "")[:2000], rationale=""), checks
 
 
 async def verify(
