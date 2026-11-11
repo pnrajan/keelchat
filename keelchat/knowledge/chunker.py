@@ -8,9 +8,12 @@ model), plus paragraph breaks; a size cap keeps chunks within the embedding mode
 from __future__ import annotations
 
 import math
+import os
 import re
+from abc import ABC, abstractmethod
 
 from keelchat.knowledge.embedder import Embedder
+from keelchat.knowledge.plugins import Plugins
 
 _SENTENCE_GAP = re.compile(r"(?<=[.!?…。])\s+(?=\S)")
 _PARAGRAPH_GAP = re.compile(r"\n\s*\n")
@@ -34,7 +37,20 @@ def _distance(a: list[float], b: list[float]) -> float:
     return 1.0 - dot / (na * nb) if na and nb else 1.0
 
 
-class SemanticChunker:
+class Chunker(ABC):
+    """Splits a document's text into passages to embed and search. Register yours with `@chunker("name")` (built as
+    `cls(embedder)`) and set KNOWLEDGE_CHUNKER=name."""
+
+    @abstractmethod
+    async def chunk(self, text: str) -> list[str]: ...
+
+
+chunkers: Plugins[Chunker] = Plugins("chunker", "KNOWLEDGE_CHUNKER", Chunker)
+chunker = chunkers.register
+
+
+@chunker("semantic")
+class SemanticChunker(Chunker):
     def __init__(self, embedder: Embedder, *, max_words: int = 200, min_words: int = 40, breakpoint_percentile: int = 90):
         self.embedder, self.max_words, self.min_words, self.breakpoint_percentile = embedder, max_words, min_words, breakpoint_percentile
 
@@ -59,3 +75,32 @@ class SemanticChunker:
         if current:
             chunks.append(" ".join(current))
         return chunks
+
+
+@chunker("sentences")
+class SentenceWindowChunker(Chunker):
+    """Whole sentences, up to `max_words` a passage, starting afresh at each paragraph once `min_words` is reached. No
+    embedding calls: cheaper to index than `semantic`, with breaks only where the writer put them."""
+
+    def __init__(self, embedder: Embedder | None = None, *, max_words: int = 200, min_words: int = 40):
+        self.max_words, self.min_words = max_words, min_words
+
+    async def chunk(self, text: str) -> list[str]:
+        chunks: list[str] = []
+        current: list[str] = []
+        words = 0
+        for sentence, new_paragraph in split_sentences(text):
+            n = len(sentence.split())
+            if current and (words + n > self.max_words or (new_paragraph and words >= self.min_words)):
+                chunks.append(" ".join(current))
+                current, words = [], 0
+            current.append(sentence)
+            words += n
+        if current:
+            chunks.append(" ".join(current))
+        return chunks
+
+
+def chunker_from_env(embedder: Embedder) -> Chunker:
+    """KNOWLEDGE_CHUNKER: `semantic` (default), `sentences`, a registered name or `package.module:Name`."""
+    return chunkers.make(os.getenv("KNOWLEDGE_CHUNKER") or "semantic", embedder)

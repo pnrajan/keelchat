@@ -141,9 +141,10 @@ Set `strategy` to one of these to choose, and `top_k` (1–20, default 5) for th
 with `KNOWLEDGE_EMBED_MODEL` for any provider's model (`openai/text-embedding-3-small`, `voyage/voyage-3`,
 `cohere/embed-english-v3.0`, `gemini/text-embedding-004`, `ollama/nomic-embed-text`), `sentence-transformers` for a
 local model (`pip install sentence-transformers`; `sentence-transformers/all-MiniLM-L6-v2` by default), or your own
-([Adding a capability](ADDING_A_CAPABILITY.md#embedder)). Unset, the best available is used: SiliconFlow, then OpenAI,
+([Adding a capability](ADDING_A_CAPABILITY.md#knowledge-search-parts)). Unset, the best available is used: SiliconFlow, then OpenAI,
 then a local model if installed; with none of them, search matches words rather than meaning, and the server log says
-so. Full context needs no embeddings.
+so. Full context needs no embeddings. How documents are split, the indexing method and the vector store can be
+replaced the same way ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)).
 
 **Where it runs.** Without `KNOWLEDGE_URL`, the API indexes and searches knowledge bases itself, so a single deploy
 (Render, Fly.io, `scripts/try.sh`) needs nothing else; the index is in memory and rebuilt from the documents after a

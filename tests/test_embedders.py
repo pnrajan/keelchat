@@ -68,7 +68,7 @@ def test_a_wrong_choice_says_what_exists(clean_env):
         embedder_from_env()
 
 
-def not_an_embedder() -> object:
+def not_an_embedder(model: str | None) -> object:
     return object()
 
 
@@ -167,3 +167,207 @@ async def test_a_real_embedding_model_puts_similar_meanings_together():
         return sum(x * y for x, y in zip(a, b, strict=True)) / (math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b)))
 
     assert e.dim == 1536 and cos(q, para) > cos(q, other)
+
+
+# --- chunkers, indexing methods and vector stores are pluggable the same way -------------------------------------
+
+
+async def test_your_own_chunker_indexing_method_and_vector_store_are_used(monkeypatch):
+    """A knowledge base built entirely from parts a user wrote: each registered by name and picked by its setting."""
+    from keelchat import Chunk, Chunker, Document, Hit, IndexContext, Indexer, VectorIndex, VectorStoreConfig, chunker, indexer, vector_store
+    from keelchat.knowledge.chunker import chunkers
+    from keelchat.knowledge.service import service_from_env
+    from keelchat.knowledge.strategies import indexers
+    from keelchat.knowledge.vectorstore import vector_stores
+
+    @chunker("lines")
+    class Lines(Chunker):
+        def __init__(self, embedder: Embedder):
+            pass
+
+        async def chunk(self, text: str) -> list[str]:
+            return [line for line in text.splitlines() if line.strip()]
+
+    @indexer("shouty")
+    def shouty(ctx: IndexContext) -> Indexer:
+        class Shouty(Indexer):
+            name = "shouty"
+
+            async def chunks(self, doc: Document) -> list[Chunk]:
+                texts = await ctx.chunker.chunk(doc.text)
+                return [Chunk(id=f"{doc.id}:{i}", doc_id=doc.id, title=doc.title, text=t.upper(), strategy=self.name) for i, t in enumerate(texts)]
+
+        return Shouty()
+
+    @vector_store("listy")
+    class Listy(VectorIndex):
+        def __init__(self, cfg: VectorStoreConfig):
+            self.cfg, self.rows = cfg, []
+
+        async def upsert(self, chunks: list[Chunk], vectors: list[list[float]]) -> None:
+            self.rows += list(zip(chunks, vectors, strict=True))
+
+        async def search(self, vector: list[float], k: int = 5, max_level: int | None = None, dataset: str = "") -> list[Hit]:
+            from keelchat.knowledge.vectorstore import cosine
+
+            scored = sorted(((cosine(vector, v), c) for c, v in self.rows if c.dataset == dataset), key=lambda x: -x[0])
+            return [Hit(chunk=c, score=s) for s, c in scored[:k]]
+
+        async def delete_doc(self, doc_id: str) -> None:
+            self.rows = [(c, v) for c, v in self.rows if c.doc_id != doc_id]
+
+        async def count(self, dataset: str | None = None) -> int:
+            return len(self.rows)
+
+    try:
+        for k, v in {"KNOWLEDGE_EMBEDDER": "hash", "KNOWLEDGE_CHUNKER": "lines", "KNOWLEDGE_STRATEGY": "shouty", "KNOWLEDGE_VECTOR_STORE": "listy"}.items():
+            monkeypatch.setenv(k, v)
+        svc = service_from_env()
+        assert isinstance(svc.index, Listy) and isinstance(svc.chunker, Lines) and svc.strategy == "shouty"
+        await svc.add(Document.create("faq", "We open at 7am.\nParking is free behind the shop.", ""))
+        hits = await svc.search("parking", k=1)
+        assert [h.text for h in hits] == ["PARKING IS FREE BEHIND THE SHOP."]
+        assert svc.index.cfg.table.startswith("chunks_") and svc.index.cfg.dim == 512
+    finally:
+        chunkers.factories.pop("lines", None)
+        indexers.factories.pop("shouty", None)
+        vector_stores.factories.pop("listy", None)
+
+
+async def test_a_knowledge_base_can_name_a_registered_method(tmp_path, monkeypatch):
+    """`strategy:` on a knowledge base takes a registered method's name; an unknown one is refused when indexed."""
+    from keelchat import Chunk, Document, IndexContext, Indexer, indexer
+    from keelchat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
+    from keelchat.knowledge.docstore import InMemoryDocumentStore
+    from keelchat.knowledge.service import KnowledgeService, make_indexer
+    from keelchat.knowledge.strategies import indexers
+    from keelchat.knowledge.vectorstore import InMemoryIndex
+
+    @indexer("whole")
+    def whole(ctx: IndexContext) -> Indexer:
+        class Whole(Indexer):
+            name = "whole"
+
+            async def chunks(self, doc: Document) -> list[Chunk]:
+                return [Chunk(id=f"{doc.id}:0", doc_id=doc.id, title=doc.title, text=doc.text, strategy="whole")]
+
+        return Whole()
+
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
+    (tmp_path / "a.md").write_text("Opening hours are 7am to 6pm.")
+    svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()), auto=True)
+
+    def ds(strategy: str) -> Dataset:
+        return Dataset.create("t", "kb", DatasetIn(spec=UnstructuredDataset(documents=[DocumentSource(uri=str(tmp_path / "a.md"))], strategy=strategy)))
+
+    try:
+        await svc.index_dataset(ds("whole"), register=True)
+        assert svc.method("t/kb")[0] == "whole"
+        with pytest.raises(ValueError, match="unknown strategy 'nope'; known: .*whole"):
+            await svc.index_dataset(ds("nope"), register=True)
+    finally:
+        indexers.factories.pop("whole", None)
+
+
+async def test_the_sentence_window_chunker_needs_no_embeddings():
+    from keelchat.knowledge.chunker import SentenceWindowChunker
+
+    text = "First point here. Second point here.\n\nNew paragraph starts. It goes on."
+    assert await SentenceWindowChunker(max_words=200, min_words=2).chunk(text) == ["First point here. Second point here.", "New paragraph starts. It goes on."]
+    assert await SentenceWindowChunker(max_words=4, min_words=1).chunk("One two three. Four five six.") == ["One two three.", "Four five six."]
+
+
+async def test_the_registry_lists_the_knowledge_parts(monkeypatch):
+    from httpx import ASGITransport, AsyncClient
+
+    from keelchat.api.app import create_app
+    from keelchat.knowledge.docstore import InMemoryDocumentStore
+    from keelchat.knowledge.service import KnowledgeService, make_indexer
+    from keelchat.knowledge.vectorstore import InMemoryIndex
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryTenantToolStore
+    from tests.helpers import RecordingLLM
+
+    svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
+    app = create_app(Runtime(RecordingLLM(), {}, models=ModelConfig.from_env()), tool_store=InMemoryTenantToolStore(), knowledge=svc)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        k = (await c.get("/v1/registry")).json()["knowledge"]
+    assert {"litellm", "sentence-transformers", "hash"} <= set(k["embedders"]) and {"semantic", "sentences"} <= set(k["chunkers"])
+    assert {"simple", "contextual", "raptor", "full_context"} <= set(k["strategies"]) and {"memory", "lancedb"} <= set(k["vector_stores"])
+    assert k["using"] == {"embedder": "hash:512", "chunker": "SemanticChunker", "strategy": "simple"}
+
+
+async def test_a_bad_method_leaves_the_knowledge_base_as_it_was(tmp_path, monkeypatch):
+    """Re-registering with an unknown method fails before anything is removed, and the API refuses it with its path."""
+    from httpx import ASGITransport, AsyncClient
+
+    from keelchat.api.app import create_app
+    from keelchat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
+    from keelchat.knowledge.docstore import InMemoryDocumentStore
+    from keelchat.knowledge.service import KnowledgeService, make_indexer
+    from keelchat.knowledge.vectorstore import InMemoryIndex
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryTenantToolStore
+    from tests.helpers import RecordingLLM
+
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("KNOWLEDGE_URL", raising=False)
+    (tmp_path / "a.md").write_text("Opening hours are 7am to 6pm.")
+    svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
+
+    def ds(strategy: str) -> Dataset:
+        return Dataset.create("t", "kb", DatasetIn(spec=UnstructuredDataset(documents=[DocumentSource(uri=str(tmp_path / "a.md"))], strategy=strategy)))
+
+    await svc.index_dataset(ds("simple"), register=True)
+    before = (await svc.docs.ids("t/kb"), await svc.index.count("t/kb"))
+    with pytest.raises(ValueError, match="unknown strategy 'raptr'"):
+        await svc.index_dataset(ds("raptr"), register=True)
+    assert (await svc.docs.ids("t/kb"), await svc.index.count("t/kb")) == before and before[1] > 0
+
+    app = create_app(Runtime(RecordingLLM(), {}, models=ModelConfig.from_env()), tool_store=InMemoryTenantToolStore(), knowledge=svc)
+    body = {"spec": {"kind": "unstructured", "documents": [{"uri": str(tmp_path / "a.md")}], "strategy": "raptr"}}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.put("/v1/tenants/default/datasets/kb", json=body)
+    assert r.status_code == 422 and r.json()["detail"][0]["path"] == "spec.strategy" and "raptr" in r.json()["detail"][0]["message"]
+
+
+async def test_a_method_is_known_by_its_registered_name_and_can_read_whole_documents():
+    from keelchat import Chunk, Document, Indexer, indexer
+    from keelchat.knowledge.docstore import InMemoryDocumentStore
+    from keelchat.knowledge.plugins import plugin_name
+    from keelchat.knowledge.service import KnowledgeService, make_indexer
+    from keelchat.knowledge.strategies import indexers
+    from keelchat.knowledge.vectorstore import InMemoryIndex
+
+    class Whole(Indexer):
+        name = "something-else"
+        retrieval = "whole_documents"
+
+        async def chunks(self, doc: Document) -> list[Chunk]:
+            return []
+
+    indexer("whole")(lambda ctx: Whole())
+    try:
+        made = make_indexer("whole", FakeEmbedder())
+        assert made.name == "whole" and plugin_name(made) == "whole"
+        svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), made)
+        assert svc.strategy == "whole"
+        await svc.add(Document.create("faq", "We open at 7am.", ""))
+        assert [p.text for p in await svc.search("when do you open")] == ["We open at 7am."]  # whole documents, no vectors
+        assert await svc.reindex_if_empty() == 0
+    finally:
+        indexers.factories.pop("whole", None)
+
+
+def test_building_parts_reads_no_settings(monkeypatch):
+    """Only service_from_env reads the environment: a broken KNOWLEDGE_CHUNKER does not affect direct construction."""
+    from keelchat.knowledge.chunker import SemanticChunker
+    from keelchat.knowledge.docstore import InMemoryDocumentStore
+    from keelchat.knowledge.service import KnowledgeService, make_indexer
+    from keelchat.knowledge.vectorstore import InMemoryIndex
+
+    monkeypatch.setenv("KNOWLEDGE_CHUNKER", "not_installed.module:Nope")
+    svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
+    assert isinstance(svc.chunker, SemanticChunker)

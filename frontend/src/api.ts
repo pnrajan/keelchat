@@ -72,7 +72,7 @@ export type Dataset = {
   spec?: { kind: "structured" | "unstructured"; strategy?: IndexMethod; top_k?: number; documents?: { title?: string; uri: string }[] };
 };
 /** How a knowledge base is indexed; "auto" picks from its documents. */
-export type IndexMethod = "auto" | "full_context" | "contextual" | "raptor" | "simple";
+export type IndexMethod = string;  // auto, full_context, contextual, raptor, simple, or a registered method
 export type KnowledgeMade = { dataset: string; documents: string[]; strategy?: IndexMethod; why?: string; chunks?: number };
 export type ReadinessItem = { id: string; area: string; status: "ok" | "warning" | "missing"; title: string; detail: string; blocking: boolean; fix: string | null };
 export type Readiness = { agent: string | null; items: ReadinessItem[]; score: number; ready: boolean };
@@ -223,6 +223,8 @@ export const api = {
   version: (agent: string, n: number) => req<PolicyVersion>("GET", `${agentPath(agent)}/versions/${n}`),
   activate: (agent: string, n: number) => req<PolicyVersion>("POST", `${agentPath(agent)}/versions/${n}/activate`),
   datasets: () => req<Dataset[]>("GET", `/v1/tenants/${T}/datasets`),
+  /** The parts knowledge search can use: built in, or registered by capability packages. */
+  knowledgeParts: () => req<{ knowledge?: { strategies: string[]; remote?: boolean } }>("GET", "/v1/registry").then((r) => r.knowledge ?? { strategies: [] }),
   readiness: (yaml: string) => req<Readiness>("POST", `/v1/tenants/${T}/agents/readiness`, { yaml }),
   templates: () => req<BotType[]>("GET", `/v1/tenants/${T}/templates`),
   fromTemplate: (template: string, agent: string) => req<PolicyVersion>("POST", `/v1/tenants/${T}/agents/from-template`, { template, agent }),

@@ -9,13 +9,18 @@ import random
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
 from keelchat.knowledge.models import Chunk, Hit
+from keelchat.knowledge.plugins import Plugins
 
 
 class VectorIndex(ABC):
+    """Stores chunk vectors and finds the nearest. Register yours with `@vector_store("name")`: built as
+    `cls(VectorStoreConfig)` (or a function taking one), chosen with KNOWLEDGE_VECTOR_STORE=name."""
+
     @abstractmethod
     async def upsert(self, chunks: list[Chunk], vectors: list[list[float]]) -> None: ...
     @abstractmethod
@@ -27,6 +32,20 @@ class VectorIndex(ABC):
     @abstractmethod
     async def count(self, dataset: str | None = None) -> int:
         """Chunks in every scope, or in one ("" = the shared corpus)."""
+
+
+@dataclass(frozen=True)
+class VectorStoreConfig:
+    """Where and what a vector store keeps: `uri` (KNOWLEDGE_INDEX_URI, or beside the documents in S3; None when
+    neither is set), the table for this embedder's vectors, and their size (0 until the embedder knows it)."""
+
+    uri: str | None
+    table: str
+    dim: int
+
+
+vector_stores: Plugins[VectorIndex] = Plugins("vector_store", "KNOWLEDGE_VECTOR_STORE", VectorIndex)
+vector_store = vector_stores.register
 
 
 def cosine(a: list[float], b: list[float]) -> float:
@@ -170,3 +189,13 @@ class LanceDBIndex(VectorIndex):
             return int(table.count_rows() if dataset is None else table.count_rows(f"dataset = '{_quote(dataset)}'"))
 
         return await asyncio.to_thread(_do)  # S3 I/O off the event loop
+
+
+vector_stores.register("memory")(lambda cfg: InMemoryIndex())
+
+
+@vector_stores.register("lancedb")
+def _lancedb(cfg: VectorStoreConfig) -> VectorIndex:
+    if not cfg.uri:
+        raise ValueError("KNOWLEDGE_VECTOR_STORE=lancedb needs KNOWLEDGE_INDEX_URI (a local path or s3://...) or KNOWLEDGE_S3_BUCKET")
+    return LanceDBIndex(cfg.uri, table=cfg.table, dim=cfg.dim)

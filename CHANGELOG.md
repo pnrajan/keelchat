@@ -6,9 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Embedding models for knowledge search are pluggable: any provider through litellm, sentence-transformers run
-  locally, or your own with `@embedder("name")` (`from keelchat import Embedder, embedder`). `KNOWLEDGE_EMBEDDER`
-  picks one; unset, the best available. Each embedder gets its own index table.
+- Knowledge search parts are replaceable: embedding model (`@embedder`: any provider through litellm,
+  sentence-transformers locally), passage splitting (`@chunker`), indexing method (`@indexer`, also usable as a
+  knowledge base's `strategy`), and vector store (`@vector_store`). Each is picked by a setting
+  (`KNOWLEDGE_EMBEDDER`, `KNOWLEDGE_CHUNKER`, `KNOWLEDGE_STRATEGY`, `KNOWLEDGE_VECTOR_STORE`); `GET /v1/registry`
+  lists them. Each embedder gets its own index table.
 - **Knowledge bases** in Compose: upload files and web pages, or pick one you've made; the bot change is proposed to
   apply. `POST /v1/tenants/{t}/documents`.
 - Each knowledge base picks its indexing method from its documents (full context, contextual retrieval, RAPTOR, or

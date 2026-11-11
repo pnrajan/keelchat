@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
+from keelchat.knowledge.plugins import Plugins
 from keelchat.logging import get_logger
 
 log = get_logger("embedder")
@@ -38,26 +39,18 @@ class Embedder(ABC):
     async def embed(self, texts: list[str]) -> list[list[float]]: ...
 
 
-EmbedderFactory = Callable[[str | None], Embedder]
-#: name → factory(model or None); filled by @embedder
-EMBEDDERS: dict[str, EmbedderFactory] = {}
+def _build(factory: Callable[..., Embedder], model: str | None) -> Embedder:
+    """A class gets the model only when one is set (so its own default applies); a function always gets it."""
+    made: Embedder = (factory(model) if model else factory()) if isinstance(factory, type) else factory(model)
+    return made
 
 
-def embedder(name: str) -> Callable[[Any], Any]:
-    """Register an embedder under `name`. Decorate an `Embedder` subclass (built as `cls(model)` when
-    KNOWLEDGE_EMBED_MODEL is set, else `cls()`) or a function `(model: str | None) -> Embedder`."""
-
-    def register(obj: Any) -> Any:
-        if isinstance(obj, type):
-            if not issubclass(obj, Embedder):
-                raise TypeError(f"@embedder({name!r}) needs an Embedder subclass, got {obj.__name__}")
-            cls: Callable[..., Embedder] = obj  # subclasses take the model as their first argument
-            EMBEDDERS[name] = lambda model: cls(model) if model else cls()
-        else:
-            EMBEDDERS[name] = obj
-        return obj
-
-    return register
+#: name → an Embedder subclass or a function `(model: str | None) -> Embedder`; filled by @embedder
+embedders: Plugins[Embedder] = Plugins("embedder", "KNOWLEDGE_EMBEDDER", Embedder, call=_build)
+EMBEDDERS = embedders.factories
+#: register an embedder under a name: an `Embedder` subclass (built as `cls(model)` when KNOWLEDGE_EMBED_MODEL is set,
+#: else `cls()`) or a function `(model: str | None) -> Embedder`
+embedder = embedders.register
 
 
 class FakeEmbedder(Embedder):
@@ -206,20 +199,10 @@ def embedder_from_env() -> Embedder:
         else:
             log.warning("no embedding model configured: knowledge search matches words, not meaning (set KNOWLEDGE_EMBEDDER)")
             return FakeEmbedder()
-    if ":" in choice:  # package.module:Name
-        mod, _, attr = choice.partition(":")
-        obj = getattr(importlib.import_module(mod), attr)
-        made = obj(model) if model else obj()
-    else:
-        if choice not in EMBEDDERS:
-            from keelchat.registry.core import REGISTRY
-
-            REGISTRY.discover()  # capability packages and entry points register their embedders on import
-        if choice not in EMBEDDERS:
-            raise RuntimeError(f"unknown KNOWLEDGE_EMBEDDER {choice!r}; known: {', '.join(sorted(EMBEDDERS))}")
-        made = EMBEDDERS[choice](model)
-    if not isinstance(made, Embedder):
-        raise TypeError(f"KNOWLEDGE_EMBEDDER {choice!r} made a {type(made).__name__}, not an Embedder")
+    try:
+        made = embedders.make(choice, model)
+    except ValueError as e:
+        raise RuntimeError(str(e)) from None
     log.info("embedder", embedder=made.id)
     return made
 

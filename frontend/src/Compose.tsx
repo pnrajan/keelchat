@@ -212,6 +212,7 @@ const methodLabel = (m?: string) => METHODS.find((x) => x.id === m)?.label.repla
 // automatically unless set), or pick one already made; either way the bot change is proposed above, to apply or not.
 function KnowledgeBase({ agent, busy, onUse }: { agent?: string; busy: boolean; onUse: (dataset: string, about: string) => void }) {
   const [list, setList] = useState<Dataset[]>([]);
+  const [custom, setCustom] = useState<string[]>([]);  // methods registered by capability packages
   const [name, setName] = useState("");
   const [files, setFiles] = useState<FileList | null>(null);
   const [urls, setUrls] = useState("");
@@ -221,7 +222,11 @@ function KnowledgeBase({ agent, busy, onUse }: { agent?: string; busy: boolean; 
   const [made, setMade] = useState<KnowledgeMade | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const load = () => api.datasets().then((d) => setList(d.filter((x) => (x.kind ?? x.spec?.kind) === "unstructured")), () => undefined);
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+    api.knowledgeParts().then(  // a separate Knowledge Service may not have methods registered here: built-ins only
+      (k) => setCustom(k.remote ? [] : k.strategies.filter((s) => !METHODS.some((m) => m.id === s))), () => undefined);
+  }, []);
   const fallback = agent ? ("kb_" + agent.replace(/-/g, "_")).slice(0, 63) : "";
 
   async function create() {
@@ -264,6 +269,7 @@ function KnowledgeBase({ agent, busy, onUse }: { agent?: string; busy: boolean; 
           <label>Method
             <select value={method} onChange={(e) => setMethod(e.target.value as IndexMethod)}>
               {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}: {m.hint}</option>)}
+              {custom.map((m) => <option key={m} value={m}>{m}: your own method</option>)}
             </select>
           </label>
           <label>Passages per answer<input type="number" min={1} max={20} value={topK} onChange={(e) => setTopK(Math.min(20, Math.max(1, Number(e.target.value) || 5)))} /></label>

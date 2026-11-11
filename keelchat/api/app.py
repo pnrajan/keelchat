@@ -30,7 +30,7 @@ from keelchat.capabilities.nodes.survey_answers import SurveyQuestion
 from keelchat.capabilities.tools import ToolError
 from keelchat.channels import CHANNELS
 from keelchat.channels.whatsapp_cloud import WhatsAppSender
-from keelchat.datasets.models import NAME_PATTERN, Dataset, DatasetIn, IndexStrategy
+from keelchat.datasets.models import NAME_PATTERN, Dataset, DatasetIn, IndexStrategy, UnstructuredDataset
 from keelchat.datasets.sources import SourceRejected, check_sources
 from keelchat.evals.case import ReplayCase
 from keelchat.knowledge.service import KnowledgeService, local_service_from_env
@@ -918,6 +918,12 @@ def create_app(
         prev = await rt.datasets.get(tenant, name)
         if prev is not None and prev.kind != body.spec.kind:
             raise HTTPException(409, f"{name!r} is a {prev.kind} dataset; register a new name for {body.spec.kind} data")
+        from keelchat.knowledge.strategies import indexers
+
+        spec = body.spec
+        if isinstance(spec, UnstructuredDataset) and spec.strategy != "auto" and not os.getenv("KNOWLEDGE_URL") and not indexers.has(spec.strategy):
+            known = ", ".join(["auto", *indexers.names()])
+            raise HTTPException(422, [{"path": "spec.strategy", "message": f"unknown method {spec.strategy!r}; known: {known}"}])
         ds = Dataset.create(tenant, name, body)
         index: dict[str, Any] = {}
         try:
@@ -984,7 +990,22 @@ def create_app(
         for e in manifest["entries"]:
             if e["kind"] == "tool":
                 groups[e["properties"]["source"]].append(e)
-        return {"tools": groups, "entries": [e for e in manifest["entries"] if e["kind"] != "tool"]}
+        from keelchat.knowledge.chunker import chunkers
+        from keelchat.knowledge.embedder import embedders
+        from keelchat.knowledge.plugins import plugin_name
+        from keelchat.knowledge.strategies import indexers
+        from keelchat.knowledge.vectorstore import vector_stores
+
+        knowledge = {  # the parts knowledge search can use, built in or registered by capability packages
+            "embedders": embedders.names(),
+            "chunkers": chunkers.names(),
+            "strategies": indexers.names(),
+            "vector_stores": vector_stores.names(),
+            "using": {"embedder": kb.embedder.id, "chunker": plugin_name(kb.chunker), "strategy": kb.strategy} if kb else None,
+            # with a separate Knowledge Service, methods registered only in this process may not exist there
+            "remote": bool(os.getenv("KNOWLEDGE_URL")),
+        }
+        return {"tools": groups, "entries": [e for e in manifest["entries"] if e["kind"] != "tool"], "knowledge": knowledge}
 
     @app.get("/v1/whoami")
     async def whoami(request: Request) -> dict[str, Any]:
