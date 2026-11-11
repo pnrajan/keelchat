@@ -2,17 +2,22 @@
 
 # yachat
 
-**Customer-facing chatbots that follow your rules.**<br>
-Describe a bot in plain English or write it in YAML. The runtime, not the model, enforces its steps, limits and
-handover to a person.
+### Customer-facing chatbots that follow your rules.
+
+Describe a bot in plain English or write it in YAML.<br>
+The runtime, not the model, enforces its steps, limits and handover to a person.
 
 [![CI](https://github.com/pnrajan/yachat/actions/workflows/ci.yml/badge.svg)](https://github.com/pnrajan/yachat/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
 
-**[Try it in your browser](https://yachat-demo.fly.dev)** · [Run it locally](#run-it-locally) ·
-[Deploy to Render](#deploy-to-render) · [Docs](#docs) · [Website](https://pnrajan.github.io/yachat/)
+**[Try it in your browser →](https://yachat-demo.fly.dev)**
+
+[Run it locally](#run-it-locally) · [Deploy to Render](#deploy-to-render) · [Docs](#docs) ·
+[Website](https://pnrajan.github.io/yachat/)
+
+<br>
 
 <img src="docs/assets/make-a-bot.gif" alt="In the yachat console: a dental clinic's booking bot is described in two sentences, yachat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" width="900">
 
@@ -20,40 +25,89 @@ handover to a person.
 
 ## Why yachat
 
-A chatbot that books appointments or takes support requests has a job to finish. Prompt-only bots drift: they skip
+A bot that books appointments or takes support requests has a job to finish. Prompt-only bots drift: they skip
 questions, loop, or promise a person and never hand over. yachat keeps the model for reading and phrasing, and puts
 every decision in code you can review.
 
-- **Plain English in, a reviewable file out.** Describe the bot, read back what it will do, change it in plain words.
-  The result is one short YAML file.
-- **Code decides, the model phrases.** Answers are validated, re-asks and budgets are counted, and handover happens
-  in code. A model never decides to end a conversation.
-- **Safe by default.** Tools are called through one gateway (allow list, timeouts, circuit breaker), with input and
-  output guardrails, and memory only for listed items, with consent.
-- **Any model, any channel.** Anthropic, or anything litellm reaches (OpenAI, Gemini, Bedrock, OpenRouter, Ollama).
-  Web widget, WhatsApp, SMS, Slack and phone.
-- **Tested from the policy.** Test sets are generated from the YAML; a stronger model reviews trial chats and
-  proposes fixes.
-- **Yours to run and extend.** Apache-2.0 and one Docker image. A tool, step, guardrail or channel is one decorated
-  Python function or class, or an MCP server.
+A patient mid-booking writes *"I just knocked a tooth out playing football"*:
 
-**A good fit:** support triage, bookings, intake forms, surveys; many bots on one self-hosted runtime.
-**Not a fit:** a free-form assistant, multi-agent research, or anything that needs stable APIs today
+| Where the rule lives | What happens |
+|---|---|
+| **Rule in the prompt** | "No problem. Which dental treatment are you looking for? I need to connect you with a staff member right away." Nobody gets the chat. |
+| **Rule in code** (`handoff: true`) | "That sounds urgent, and I'm sorry you've been through that. I've passed this to a person on our team." A person gets the chat. |
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+**Plain English in, a file out**<br>
+Describe the bot, read back what it will do, change it in plain words. The result is one short YAML file you can
+review.
+
+</td>
+<td width="33%" valign="top">
+
+**Code decides, the model phrases**<br>
+Answers are validated, re-asks and budgets are counted, and handover happens in code. A model never ends a
+conversation.
+
+</td>
+<td width="33%" valign="top">
+
+**Safe by default**<br>
+Tools go through one gateway (allow list, timeouts, circuit breaker), with input and output guardrails and memory
+only with consent.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Any model, any channel**<br>
+Anthropic, or anything litellm reaches (OpenAI, Gemini, Bedrock, OpenRouter, Ollama). Web widget, WhatsApp, SMS,
+Slack, phone.
+
+</td>
+<td valign="top">
+
+**Tested from the policy**<br>
+Test sets are generated from the YAML; a stronger model reviews trial chats and proposes fixes.
+
+</td>
+<td valign="top">
+
+**Yours to run and extend**<br>
+Apache-2.0, one Docker image. A tool, step, guardrail or channel is one Python function or class, or an MCP
+server.
+
+</td>
+</tr>
+</table>
+
+**A good fit** for support triage, bookings, intake forms and surveys, with many bots on one self-hosted runtime.
+**Not a fit** for a free-form assistant, multi-agent research, or anything that needs stable APIs today
 ([comparison](#how-yachat-compares)).
 
 ## Get started
 
-| | Time | You need | |
-|---|---|---|---|
-| **Try it in your browser** | 1 min | nothing | [yachat-demo.fly.dev](https://yachat-demo.fly.dev) |
-| **Run it locally** | 5 min | macOS, Linux or WSL 2, a model key | [steps](#run-it-locally) |
-| **Deploy to Render** | 10 min | GitHub and Render accounts, a model key | [steps](#deploy-to-render) |
+<table>
+<tr>
+<th width="33%">Try it in your browser</th>
+<th width="33%">Run it locally</th>
+<th width="33%">Deploy to Render</th>
+</tr>
+<tr>
+<td valign="top">1 minute, nothing to install.<br><a href="https://yachat-demo.fly.dev"><b>Open the demo →</b></a></td>
+<td valign="top">5 minutes. macOS, Linux or WSL 2, and a model key.<br><a href="#run-it-locally"><b>Steps ↓</b></a></td>
+<td valign="top">10 minutes. GitHub and Render accounts, and a model key.<br><a href="#deploy-to-render"><b>Steps ↓</b></a></td>
+</tr>
+</table>
 
 ### Try it in your browser
 
-In the [demo](https://yachat-demo.fly.dev), with no install or sign-in, describe a bot and get its YAML. Press
-**Try this bot** to chat with it (its tools answer with sample data), and see what it needs connecting before real
-people use it. A link can start a draft:
+In the [demo](https://yachat-demo.fly.dev), with no sign-in, describe a bot and get its YAML. Press **Try this bot**
+to chat with it (its tools answer with sample data), and see what it needs connecting before real people use it. A
+link can start a draft:
 [`?describe=Book haircuts and ask for a phone number`](https://yachat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
 
 <p align="center"><img src="docs/assets/demo-make.jpg" alt="The demo: a dental booking bot described in one sentence, its YAML with Copy and Download, and what it needs connecting: a booking calendar (Open Dental, Dentrix, Calendly), a model key, somewhere for handed-over chats, and where people talk to it" width="560"></p>
@@ -67,17 +121,18 @@ scripts/try.sh    # opens the console with a sample bot, everything in memory
 ```
 
 In the console, open **Compose**, describe a bot, press **Create my bot**, then **Try it**. The **Inspector** shows
-why each reply was chosen. For the whole stack in Docker (API, console, Redis, Postgres, data kept between restarts):
-`scripts/local.sh up`. From Claude Code, the [yachat plugin](plugins/yachat) builds and tries bots when you ask in
-plain words.
+why each reply was chosen.
+
+- **Whole stack in Docker** (API, console, Redis, Postgres; data kept between restarts): `scripts/local.sh up`
+- **From Claude Code:** the [yachat plugin](plugins/yachat) builds and tries bots when you ask in plain words.
 
 ### Deploy to Render
 
-Run yachat in your own Render account on the free plan.
+Run yachat in your own Render account, on the free plan.
 
 1. **Fork** this repository, so the deploy follows your copy.
-2. Open `https://render.com/deploy?repo=https://github.com/<you>/yachat`. (The button below deploys this
-   repository as is, without your changes.)
+2. Open `https://render.com/deploy?repo=https://github.com/<you>/yachat`. The button below deploys this repository
+   as is, without your changes.
 
    [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pnrajan/yachat)
 
@@ -86,7 +141,8 @@ Run yachat in your own Render account on the free plan.
 4. On the service's **Environment** page, copy `YACHAT_API_KEY`. Render generated it; it locks the console and API.
 5. Open `https://<service>.onrender.com`. The console asks for the key once.
 
-Good to know:
+<details>
+<summary><b>Good to know:</b> other model providers, saving bots, updates, sleeping</summary>
 
 - **Another model provider:** on the **Environment** page, set `YACHAT_LLM=litellm`, `YACHAT_MODEL_GENERATE`,
   `YACHAT_MODEL_CLASSIFY` and the provider's key (e.g. `OPENROUTER_API_KEY`), as in [`.env.example`](.env.example).
@@ -97,6 +153,8 @@ Good to know:
 - **The free plan sleeps** when idle, so the first request after that is slow. A paid plan stays awake.
 - Settings are in [`render.yaml`](render.yaml). For **Fly.io** and other hosts, see
   [Deploy from GitHub](docs/REFERENCE.md#deploy-from-github).
+
+</details>
 
 ## Your first bot
 
@@ -212,18 +270,23 @@ the detail.
 
 ## Help and contributing
 
-Questions and bots to show go to [Discussions](https://github.com/pnrajan/yachat/discussions), bugs to
-[issues](https://github.com/pnrajan/yachat/issues/new/choose), vulnerabilities to [SECURITY.md](SECURITY.md).
-Contributions are welcome: start with a
-[good first issue](https://github.com/pnrajan/yachat/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), and
-see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
-If yachat is useful to you, a star helps others find it.
+- **Questions, and bots to show:** [Discussions](https://github.com/pnrajan/yachat/discussions)
+- **Bugs:** [issues](https://github.com/pnrajan/yachat/issues/new/choose); vulnerabilities: [SECURITY.md](SECURITY.md)
+- **Contributing:** start with a
+  [good first issue](https://github.com/pnrajan/yachat/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22),
+  and see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Status
 
 Alpha (0.x): the policy language and APIs may still change between minor versions; [CHANGELOG.md](CHANGELOG.md)
 lists every change.
 
-## License
+<div align="center">
 
-[Apache-2.0](LICENSE)
+<br>
+
+**If yachat is useful to you, a ⭐ helps others find it.**
+
+[Apache-2.0](LICENSE) · [Website](https://pnrajan.github.io/yachat/) · [Demo](https://yachat-demo.fly.dev)
+
+</div>
