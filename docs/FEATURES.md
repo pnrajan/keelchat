@@ -186,7 +186,7 @@ fixes of two kinds:
 Code checks what the model names: a problem or fix pointing at a turn that isn't in the conversation is dropped, and
 counts are capped.
 
-<p align="center"><img src="assets/console-judge.jpg" alt="The Judge tab: a summary of the test chat and its problems by turn, marked high or medium, each with the user's message and the agent's reply" width="900"></p>
+<p align="center"><img src="assets/console-judge.jpg" alt="The Judge tab: a summary of the test chat and its problems by turn, each marked by severity, each with the user's message and the agent's reply" width="900"></p>
 
 ```bash
 KEELCHAT_MODEL_CRITIC=claude-opus-5-5     # or any litellm id, e.g. openrouter/anthropic/claude-opus-5.5
