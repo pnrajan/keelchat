@@ -30,9 +30,10 @@ from keelchat.capabilities.nodes.survey_answers import SurveyQuestion
 from keelchat.capabilities.tools import ToolError
 from keelchat.channels import CHANNELS
 from keelchat.channels.whatsapp_cloud import WhatsAppSender
-from keelchat.datasets.models import NAME_PATTERN, Dataset, DatasetIn
+from keelchat.datasets.models import NAME_PATTERN, Dataset, DatasetIn, IndexStrategy
 from keelchat.datasets.sources import SourceRejected, check_sources
 from keelchat.evals.case import ReplayCase
+from keelchat.knowledge.service import KnowledgeService, local_service_from_env
 from keelchat.logging import configure, get_logger
 from keelchat.policy.compiler import CompiledPolicy, build
 from keelchat.policy.drafter import draft_policy
@@ -397,8 +398,9 @@ def stores_from_env() -> dict[str, Any]:
 DATASET_SERVICES = {"unstructured": "KNOWLEDGE_URL", "structured": "ANALYTICS_URL"}
 
 
-async def warm_dataset(ds: Dataset) -> None:
-    """Ask the data service to load the dataset. Its 422 reason (a rejected source) is passed on to the caller."""
+async def warm_dataset(ds: Dataset) -> dict[str, Any]:
+    """Ask the data service to load the dataset. Its 422 reason (a rejected source) is passed on to the caller; the
+    Knowledge Service answers with how it indexed the documents."""
     import httpx
 
     base = os.environ[DATASET_SERVICES[ds.kind]]
@@ -413,6 +415,8 @@ async def warm_dataset(ds: Dataset) -> None:
         raise SourceRejected(detail if isinstance(detail, str) else "the data service rejected the sources")
     if r.status_code >= 400:
         raise ToolError("dataset", "upstream", f"status {r.status_code}")
+    body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    return body if isinstance(body, dict) else {}
 
 
 async def purge_dataset(ds: Dataset) -> None:
@@ -566,6 +570,7 @@ def create_app(
     whatsapp: WhatsAppSender | None = None,
     jobs: JobStore | None = None,
     artifacts: ArtifactStore | None = None,
+    knowledge: KnowledgeService | None = None,
 ) -> FastAPI:
     load_dotenv()
     configure(logging.INFO)
@@ -579,6 +584,10 @@ def create_app(
         log.warning("FakeTools in use for tools without a configured backend", faked=sorted(tools))
     artifacts = artifacts or artifact_store_from_env()  # uploaded content and slide decks
     rt = runtime or Runtime(llm_from_env(), tools, models=ModelConfig.from_env(), **stores_from_env())
+    # documents without a separate Knowledge Service: the index runs in this process (KNOWLEDGE_URL unset)
+    kb = knowledge if knowledge is not None else (None if runtime else local_service_from_env(rt.llm, rt.models))
+    if kb is not None:
+        rt.tool_impls["knowledge_search"] = kb.tool_impl(shared=rt.tool_impls.get("knowledge_search"))
     tool_store = tool_store or tool_store_from_env()
 
     from keelchat.api.mcp_server import RequireKey, build_mcp
@@ -910,30 +919,39 @@ def create_app(
         if prev is not None and prev.kind != body.spec.kind:
             raise HTTPException(409, f"{name!r} is a {prev.kind} dataset; register a new name for {body.spec.kind} data")
         ds = Dataset.create(tenant, name, body)
+        index: dict[str, Any] = {}
         try:
             if os.getenv(DATASET_SERVICES[ds.kind]):  # the service reads the sources, on its own disk: it checks them
-                await warm_dataset(ds)
+                warmed = await warm_dataset(ds)
+                index = {k: warmed[k] for k in ("strategy", "why", "chunks") if k in warmed}
             else:
                 await asyncio.to_thread(check_sources, body.spec)  # filesystem checks off the event loop
-        except SourceRejected as e:
+                if ds.kind == "unstructured" and kb is not None:
+                    chunks = await kb.index_dataset(ds, register=True)  # indexed now, so unreadable documents fail here
+                    method, why = kb.method(ds.ref) or (kb.strategy, "")
+                    index = {"strategy": method, "why": why, "chunks": chunks}
+        except (SourceRejected, ValueError) as e:
             raise HTTPException(422, str(e)) from None
+        except OSError as e:
+            log.error("dataset documents unreadable", tenant=tenant, dataset=name, error=e.__class__.__name__)
+            raise HTTPException(422, "a document could not be read") from None
         except ToolError as e:
             log.error("dataset could not be loaded", tenant=tenant, dataset=name, error=str(e))
             raise HTTPException(422, f"the {ds.kind} data service could not load this dataset") from None
         await rt.datasets.put(ds)
-        log.info("dataset registered", tenant=tenant, dataset=name, kind=ds.kind, version=ds.version)
-        return ds.model_dump(mode="json")
+        log.info("dataset registered", tenant=tenant, dataset=name, kind=ds.kind, version=ds.version, **index)
+        return ds.model_dump(mode="json") | ({"index": index} if index else {})
 
     @app.get("/v1/tenants/{tenant}/datasets")
     async def list_datasets(tenant: TenantId) -> list[dict[str, Any]]:
-        return [d.model_dump(mode="json") for d in await rt.datasets.list(tenant)]
+        return [d.model_dump(mode="json") | {"kind": d.kind} for d in await rt.datasets.list(tenant)]  # the console reads kind
 
     @app.get("/v1/tenants/{tenant}/datasets/{name}")
     async def get_dataset(tenant: TenantId, name: DatasetName) -> dict[str, Any]:
         ds = await rt.datasets.get(tenant, name)
         if ds is None:
             raise NotFound(f"dataset {name!r}")
-        return ds.model_dump(mode="json")
+        return ds.model_dump(mode="json") | {"kind": ds.kind}
 
     @app.delete("/v1/tenants/{tenant}/datasets/{name}")
     async def delete_dataset(tenant: TenantId, name: DatasetName) -> dict[str, str]:
@@ -942,7 +960,9 @@ def create_app(
         ds = await rt.datasets.get(tenant, name)
         if ds is None:
             raise NotFound(f"dataset {name!r}")
-        if ds.kind == "unstructured" and os.getenv("KNOWLEDGE_URL"):
+        if ds.kind == "unstructured" and kb is not None:
+            await kb.drop_dataset(ds.ref, ds.version)
+        elif ds.kind == "unstructured" and os.getenv("KNOWLEDGE_URL"):
             try:
                 await purge_dataset(ds)
             except ToolError as e:
@@ -1762,6 +1782,68 @@ def create_app(
             w.writerow(["'" + c if c[:1] in ("=", "+", "-", "@", "\t", "\r") else c for c in row])
         return Response(buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{agent}-responses.csv"'})
 
+    async def ingest(
+        tenant: str,
+        agent: str,
+        name: str,
+        urls: str,
+        uploads: list[UploadFile],
+        dataset: str = "",
+        strategy: IndexStrategy = "auto",
+        top_k: int = 5,
+    ) -> tuple[str, list[str], dict[str, Any]]:
+        """Files and web pages → Markdown documents in the upload store → a knowledge base (`dataset`, by default
+        `kb_<agent>`), registered and indexed. The same name again replaces its content. Returns its name ("" when
+        empty), the document titles, and how it was indexed."""
+        from keelchat.datasets.models import DocumentSource, UnstructuredDataset
+        from keelchat.datasets.uploads import MAX_FILE_BYTES, MAX_FILES, MAX_URLS, UploadRejected, fetch_page, file_text, slug
+
+        if artifacts is None:
+            raise HTTPException(501, "uploads need KEELCHAT_UPLOADS_BUCKET (S3) or KEELCHAT_DATA_ROOT on the server")
+        links = [u.strip() for u in re.split(r"[\s,]+", urls) if u.strip()]
+        if len(uploads) > MAX_FILES or len(links) > MAX_URLS:
+            raise HTTPException(422, f"at most {MAX_FILES} files and {MAX_URLS} web pages")
+        docs: list[tuple[str, str]] = []
+        try:
+            for f in uploads:
+                data = await f.read(MAX_FILE_BYTES + 1)
+                docs.append((f.filename or "file", await asyncio.to_thread(file_text, f.filename or "file", data)))
+            for u in links:
+                docs.append(await fetch_page(u))
+        except UploadRejected as err:
+            raise HTTPException(422, str(err)) from None
+        if not docs:
+            return "", [], {}
+        sources = []
+        for n, (title, text) in enumerate(docs, 1):
+            key = f"uploads/{tenant}/{agent}/{n:02d}-{slug(title)}.md"  # the same name again replaces that chatbot's content
+            uri = await artifacts.put(key, f"# {title}\n\n{text}".encode(), content_type="text/markdown; charset=utf-8", replace=True)
+            sources.append(DocumentSource(uri=uri, title=title[:500], format="markdown"))
+        dataset_name = dataset or ("kb_" + agent.replace("-", "_"))[:63]
+        spec = UnstructuredDataset(documents=sources, strategy=strategy, top_k=top_k)
+        made = await put_dataset(tenant, dataset_name, DatasetIn(spec=spec, description=f"Content for {name}"))
+        return dataset_name, [t for t, _ in docs], dict(made.get("index") or {})
+
+    @app.post("/v1/tenants/{tenant}/documents", status_code=201)
+    async def add_documents(
+        tenant: TenantId,
+        agent: Annotated[str, Form(pattern=r"^[a-z0-9][a-z0-9-]*$", max_length=63)],
+        urls: Annotated[str, Form(max_length=5_000)] = "",
+        files: Annotated[list[UploadFile] | None, File()] = None,
+        name: Annotated[str, Form(pattern=r"^$|^[a-z][a-z0-9_]{0,62}$")] = "",
+        strategy: Annotated[IndexStrategy, Form()] = "auto",
+        top_k: Annotated[int, Form(ge=1, le=20)] = 5,
+    ) -> dict[str, Any]:
+        """A knowledge base from files (PDF, text, Markdown, CSV, HTML) and/or web pages: `name` (default `kb_<agent>`)
+        replaces a knowledge base of that name. `strategy` "auto" picks the indexing method from the documents
+        (full context, contextual retrieval, RAPTOR or search); the reply says which and why. Any agent can then use it
+        with a `knowledge` step (`dataset: <name>`)."""
+        uploads = files or []
+        if not urls.strip() and not uploads:
+            raise HTTPException(422, "add at least one file or web page")
+        dataset_name, titles, index = await ingest(tenant, agent, agent, urls, uploads, name, strategy, top_k)
+        return {"dataset": dataset_name, "documents": titles, **index}
+
     @app.post("/v1/tenants/{tenant}/assistants", status_code=201)
     async def create_assistant(
         tenant: TenantId,
@@ -1782,43 +1864,20 @@ def create_app(
         With `draft_only` the policy is returned for review with a plain-words summary (publish it with POST
         .../assistants/publish); otherwise it is saved and published, and the response lists every channel to put it
         on (website, Shopify, WordPress, link, WhatsApp, phone)."""
-        from keelchat.datasets.models import DocumentSource, UnstructuredDataset
-        from keelchat.datasets.uploads import MAX_FILE_BYTES, MAX_FILES, MAX_URLS, UploadRejected, fetch_page, file_text, slug
+        from keelchat.datasets.uploads import slug
 
-        store = artifacts
-        if store is None:
-            raise HTTPException(501, "uploads need KEELCHAT_UPLOADS_BUCKET (S3) or KEELCHAT_DATA_ROOT on the server")
         agent = slug(name, 40)
         if not agent[0].isalnum():
             agent = "bot-" + agent
-        links = [u.strip() for u in re.split(r"[\s,]+", urls) if u.strip()]
         uploads = files or []
-        if not links and not uploads and kind in ("answers", "support"):
+        if not urls.strip() and not uploads and kind in ("answers", "support"):
             raise HTTPException(422, "add at least one file or web page")
-        if len(uploads) > MAX_FILES or len(links) > MAX_URLS:
-            raise HTTPException(422, f"at most {MAX_FILES} files and {MAX_URLS} web pages")
-        docs: list[tuple[str, str]] = []
-        try:
-            for f in uploads:
-                data = await f.read(MAX_FILE_BYTES + 1)
-                docs.append((f.filename or "file", await asyncio.to_thread(file_text, f.filename or "file", data)))
-            for u in links:
-                docs.append(await fetch_page(u))
-        except UploadRejected as err:
-            raise HTTPException(422, str(err)) from None
-        sources = []
-        for n, (title, text) in enumerate(docs, 1):
-            key = f"uploads/{tenant}/{agent}/{n:02d}-{slug(title)}.md"  # the same name again replaces that chatbot's content
-            uri = await store.put(key, f"# {title}\n\n{text}".encode(), content_type="text/markdown; charset=utf-8", replace=True)
-            sources.append(DocumentSource(uri=uri, title=title[:500], format="markdown"))
-        dataset_name = ("kb_" + agent.replace("-", "_"))[:63] if docs else ""
-        if docs:
-            await put_dataset(tenant, dataset_name, DatasetIn(spec=UnstructuredDataset(documents=sources), description=f"Content for {name}"))
+        dataset_name, titles, _ = await ingest(tenant, agent, name, urls, uploads)
         langs = languages.split() or ["en"]
         catalog = {d.name: d.kind for d in await rt.datasets.list(tenant)}
-        made = {"agent": agent, "dataset": dataset_name, "documents": [t for t, _ in docs]}
+        made = {"agent": agent, "dataset": dataset_name, "documents": titles}
         if kind == "answers" and not description.strip():
-            policy_yaml, errors = answers_policy(agent, name, dataset_name, [t for t, _ in docs], langs), list[PolicyError]()
+            policy_yaml, errors = answers_policy(agent, name, dataset_name, titles, langs), list[PolicyError]()
         else:
             async with spending(tenant) as models:
                 policy_yaml, errors = await drafted_policy(tenant, agent, name, kind, description, dataset_name, langs, catalog, models)

@@ -67,7 +67,13 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 export type Built = { agent: string; hash: string; mode: string; allowed_tools: string[]; datasets: string[]; models: Record<string, string> };
 export type PolicyVersion = { tenant: string; agent: string; version: number; hash: string; note: string; created_at: string; active: boolean; yaml?: string; created?: boolean };
 export type AgentSummary = { agent: string; active_version: number | null; latest_version: number; updated_at: string };
-export type Dataset = { name: string; kind: "structured" | "unstructured" };
+export type Dataset = {
+  name: string; kind: "structured" | "unstructured"; description?: string;
+  spec?: { kind: "structured" | "unstructured"; strategy?: IndexMethod; top_k?: number; documents?: { title?: string; uri: string }[] };
+};
+/** How a knowledge base is indexed; "auto" picks from its documents. */
+export type IndexMethod = "auto" | "full_context" | "contextual" | "raptor" | "simple";
+export type KnowledgeMade = { dataset: string; documents: string[]; strategy?: IndexMethod; why?: string; chunks?: number };
 export type ReadinessItem = { id: string; area: string; status: "ok" | "warning" | "missing"; title: string; detail: string; blocking: boolean; fix: string | null };
 export type Readiness = { agent: string | null; items: ReadinessItem[]; score: number; ready: boolean };
 export type BotType = { id: string; name: string; description: string; yaml: string; builtin: boolean };
@@ -276,6 +282,13 @@ export const api = {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : `Failed (${r.status})`);
     return data as EmbedRec & { agent: string; documents: string[] };
+  },
+  /** A knowledge base from files and web pages (a name already used is replaced); says how it was indexed and why. */
+  addDocuments: async (form: FormData) => {
+    const r = await send("POST", `/v1/tenants/${T}/documents`, form);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : `Failed (${r.status})`);
+    return data as KnowledgeMade;
   },
   draftAssistant: async (form: FormData) => {
     form.set("draft_only", "true");

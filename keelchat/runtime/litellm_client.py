@@ -36,6 +36,27 @@ def _must_reason(e: LLMError) -> bool:
     return "reasoning is mandatory" in f"{e} {e.__cause__}".lower()
 
 
+def _unstring(value: Any, schema: dict[str, Any], root: dict[str, Any]) -> Any:
+    """Parse JSON strings where the schema expects an object or array: some models (Claude Haiku 5.5 through
+    OpenRouter) send a nested object as a string inside the tool call. Strings the schema allows stay as they are."""
+    while "$ref" in schema:  # pydantic puts nested models under $defs
+        schema = root.get("$defs", {}).get(schema["$ref"].rsplit("/", 1)[-1], {})
+    allowed: set[Any] = set()
+    for t in [schema.get("type"), *(s.get("type") for s in schema.get("anyOf", []))]:
+        allowed |= set(t) if isinstance(t, list) else {t}  # "type" may be a list, e.g. ["string", "null"]
+    if isinstance(value, str) and "string" not in allowed and value.lstrip()[:1] in ("{", "["):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    if isinstance(value, dict):
+        props = schema.get("properties", {})
+        return {k: _unstring(v, props[k], root) if k in props else v for k, v in value.items()}
+    if isinstance(value, list) and isinstance(items := schema.get("items"), dict):
+        return [_unstring(v, items, root) for v in value]
+    return value
+
+
 def _provider_model(req: LLMRequest) -> str:
     """The model litellm is asked for (priced when no gateway names the one it routed to)."""
     from keelchat.runtime.llm_factory import litellm_settings
@@ -122,7 +143,7 @@ class LiteLLMClient(LLMClient):
                 last = LLMError(f"model did not call {name}")
                 continue
             try:
-                return dict(json.loads(calls[0].function.arguments))
+                return dict(_unstring(json.loads(calls[0].function.arguments), schema, schema))
             except json.JSONDecodeError as e:
                 last = LLMError(f"tool arguments were not valid JSON (attempt {attempt + 1})")
                 last.__cause__ = e
@@ -139,7 +160,7 @@ class LiteLLMClient(LLMClient):
         resp = await self._call(json_req, response_format={"type": "json_object"})
         text = str(resp.choices[0].message.content or "").strip()
         try:
-            return dict(json.loads(text[text.find("{") : text.rfind("}") + 1]))
+            return dict(_unstring(json.loads(text[text.find("{") : text.rfind("}") + 1]), schema, schema))
         except (json.JSONDecodeError, ValueError) as e:
             assert last is not None
             raise last from e

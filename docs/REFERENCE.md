@@ -113,7 +113,8 @@ the model provider is required; everything else runs in memory when unset.
 | `KEELCHAT_API_KEY`, `KEELCHAT_JWT_SECRET` | the admin key; signed tenant keys |
 | `REDIS_URL`, `DATABASE_URL` | Redis for sessions; Postgres for memory, versions, datasets, tools, audit, handoffs and rate limits. In-process when unset (`scripts/db.sh up` starts both) |
 | `KEELCHAT_CAPABILITY_PACKAGES`, `KEELCHAT_MCP_SERVERS` | extension packages and MCP servers to load capabilities from |
-| `KNOWLEDGE_URL`, `ANALYTICS_URL`, `KEELCHAT_DATA_ROOT`, `KEELCHAT_DATA_BUCKETS` | the Knowledge and Analytics Services, and where dataset sources may live |
+| `KNOWLEDGE_URL`, `ANALYTICS_URL`, `KEELCHAT_DATA_ROOT`, `KEELCHAT_DATA_BUCKETS` | the Knowledge and Analytics Services, and where dataset sources may live. Without `KNOWLEDGE_URL`, knowledge bases are indexed and searched inside the API. The Docker image sets `KEELCHAT_DATA_ROOT=/data` |
+| `KNOWLEDGE_STRATEGY` | unset: each knowledge base picks its indexing method from its documents; set to use one method for all |
 | `KEELCHAT_SANDBOX` | `local` or `agentcore`: where statistics code runs; unset for SQL-only answers |
 | `KEELCHAT_UPLOADS_BUCKET` | S3 bucket for uploaded content and files; unset, a folder under `KEELCHAT_DATA_ROOT` |
 | `KEELCHAT_EMBED_SECRET`, `KEELCHAT_PUBLIC_URL` | signs widget conversation tokens; the public address links point at |

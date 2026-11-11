@@ -69,3 +69,31 @@ def test_checks_that_cannot_fail_are_not_run_as_code():
     checks = normalize_checks(raw, code=True)
     assert [(c.id, bool(c.code)) for c in checks] == [("c1", True), ("c2", False), ("c3", False)]
     assert all(not c.code for c in normalize_checks(raw, code=False))
+
+
+async def test_an_unreadable_plan_is_asked_for_again_then_kept_as_text():
+    """A model can send the plan as a cut-off JSON string. The plan is asked for once more; if it is still unreadable,
+    its text is kept as the method rather than failing the reply."""
+    from typing import Any
+
+    from keelchat.reasoning import prepare
+    from keelchat.runtime.llm import LLMClient, LLMRequest
+
+    class Broken(LLMClient):
+        def __init__(self, plans: list[Any]):
+            self.plans, self.calls = plans, 0
+
+        async def complete(self, req: LLMRequest) -> str:
+            raise AssertionError("not used")
+
+        async def structured(self, req: LLMRequest, schema: dict[str, Any]) -> dict[str, Any]:
+            self.calls += 1
+            return {"plan": self.plans.pop(0), "checks": [{"id": "c1", "claim": "it answers"}]}
+
+    good = {"method": "read the passages", "rationale": "grounded"}
+    llm = Broken(['{"method": "read the pass', good])
+    plan, checks = await prepare(llm, MODELS, Sum(["4"]))
+    assert (plan.method, llm.calls, [c.claim for c in checks]) == ("read the passages", 2, ["it answers"])
+    llm = Broken(['{"method": "read the pass', '{"method": "still cut'])
+    plan, _ = await prepare(llm, MODELS, Sum(["4"]))
+    assert plan.method.startswith('{"method": "still cut') and llm.calls == 2

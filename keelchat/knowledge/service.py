@@ -39,10 +39,46 @@ def make_indexer(strategy: Strategy, embedder: Embedder, llm: LLMClient | None =
     raise ValueError(f"unknown strategy {strategy!r}")
 
 
+#: a document this long (characters) is better served by RAPTOR's layered summaries than by passages alone
+LONG_DOC_CHARS = 30_000
+
+
+def choose_strategy(texts: list[str], budget_chars: int, can_summarize: bool) -> tuple[Strategy, str]:
+    """The indexing method for a knowledge base, from its documents: the reason is shown to the person who made it."""
+    total, longest, n = sum(map(len, texts)), max(map(len, texts), default=0), len(texts)
+    docs = f"{n} document{'' if n == 1 else 's'}"
+    if total <= budget_chars:
+        whole = "the document fits in one prompt, so the bot reads it" if n == 1 else f"the {docs} fit in one prompt, so the bot reads them"
+        return "full_context", f"Full context: {whole} whole."
+    if not can_summarize:
+        return "simple", f"Search: the {docs} are split into passages and the best ones are found by meaning."
+    if longest > LONG_DOC_CHARS:
+        return "raptor", "RAPTOR: long documents get summaries at several levels, for broad and detailed questions alike."
+    return "contextual", f"Contextual retrieval: the {docs} are split into passages, each with a line of context, so search finds the right one."
+
+
 class KnowledgeService:
-    def __init__(self, docs: DocumentStore, index: VectorIndex, embedder: Embedder, indexer: Indexer, *, full_context_budget_chars: int = 40_000):
+    def __init__(
+        self,
+        docs: DocumentStore,
+        index: VectorIndex,
+        embedder: Embedder,
+        indexer: Indexer,
+        *,
+        full_context_budget_chars: int = 40_000,
+        llm: LLMClient | None = None,
+        models: ModelConfig | None = None,
+        auto: bool = False,
+    ):
         self.docs, self.index, self.embedder, self.indexer = docs, index, embedder, indexer
         self.full_context_budget_chars = full_context_budget_chars
+        #: contextual and raptor summarize with a model; without one, "auto" picks among the others
+        self.llm, self.models = llm, models
+        #: "auto" knowledge bases pick their method; otherwise they use this service's (KNOWLEDGE_STRATEGY)
+        self.auto = auto
+        self._indexers: dict[str, Indexer] = {indexer.name: indexer}
+        #: dataset ref → (method, why), as last indexed by this process
+        self._methods: dict[str, tuple[Strategy, str]] = {}
         #: dataset ref → version indexed by this process; a miss (new version, restart) re-indexes once
         self._indexed: dict[str, str] = {}
         self._locks: dict[str, asyncio.Lock] = {}
@@ -54,8 +90,17 @@ class KnowledgeService:
     def strategy(self) -> Strategy:
         return self.indexer.name
 
-    async def add(self, doc: Document) -> int:
-        n = await self._index(doc)  # vectors first: a stored document always has its vectors (an unchanged one is skipped)
+    def _indexer(self, strategy: Strategy) -> Indexer:
+        if strategy not in self._indexers:
+            self._indexers[strategy] = make_indexer(strategy, self.embedder, self.llm, self.models)
+        return self._indexers[strategy]
+
+    def method(self, ref: str) -> tuple[Strategy, str] | None:
+        """How a dataset was indexed, and why; None until this process has indexed it."""
+        return self._methods.get(ref)
+
+    async def add(self, doc: Document, indexer: Indexer | None = None) -> int:
+        n = await self._index(doc, indexer)  # vectors first: a stored document always has its vectors (an unchanged one is skipped)
         await self.docs.put(doc)
         self._doc_count = None
         return n
@@ -70,13 +115,14 @@ class KnowledgeService:
             log.info("index rebuilt from stored documents", documents=len(docs), chunks=n)
         return n
 
-    async def _index(self, doc: Document) -> int:
-        chunks = [c.model_copy(update={"dataset": doc.dataset}) for c in await self.indexer.chunks(doc)]
+    async def _index(self, doc: Document, indexer: Indexer | None = None) -> int:
+        indexer = indexer or self.indexer
+        chunks = [c.model_copy(update={"dataset": doc.dataset}) for c in await indexer.chunks(doc)]
         if chunks:
             vectors = await self.embedder.embed([c.embed_text for c in chunks])
             await self.index.delete_doc(doc.id)
             await self.index.upsert(chunks, vectors)
-        log.info("document indexed", doc_id=doc.id, strategy=self.strategy, chunks=len(chunks))
+        log.info("document indexed", doc_id=doc.id, strategy=indexer.name, chunks=len(chunks))
         return len(chunks)
 
     async def index_dataset(self, dataset: Dataset, *, register: bool = False) -> int:
@@ -94,15 +140,26 @@ class KnowledgeService:
                 text = (await asyncio.to_thread(read_bytes, src.uri)).decode("utf-8", errors="replace")
                 title = src.title or src.uri.rsplit("/", 1)[-1]
                 docs.append(Document.create(title, text, src.uri, metadata={"dataset_version": dataset.version}, dataset=dataset.ref))
+            spec = dataset.spec
+            if spec.strategy == "auto" and not self.auto:
+                strategy, why = self.strategy, "The Knowledge Service's method (KNOWLEDGE_STRATEGY)."
+            elif spec.strategy == "auto":
+                strategy, why = choose_strategy([d.text for d in docs], self.full_context_budget_chars, self.llm is not None)
+            else:
+                strategy, why = spec.strategy, "Chosen when the knowledge base was made."
             keep = {d.id for d in docs}
             stored = await self.docs.ids(dataset.ref)  # names only: nothing is downloaded
-            for old in stored - keep:
+            prev = self._methods.get(dataset.ref)
+            for old in stored if prev and prev[0] != strategy else stored - keep:  # a new method re-indexes everything
                 await self.remove(old, dataset.ref)
+            stored = await self.docs.ids(dataset.ref)
             # ids come from the content: a document already stored is unchanged, so it is not embedded again (a
             # restart, another replica, or a new version that only changed the description)
-            n = sum([await self.add(d) for d in docs if d.id not in stored])
+            indexer = self._indexer(strategy)
+            n = sum([await (self.add(d) if indexer is self.indexer else self.add(d, indexer)) for d in docs if d.id not in stored])
             self._indexed[dataset.ref] = dataset.version
-            log.info("dataset indexed", dataset=dataset.ref, version=dataset.version, documents=len(docs), chunks=n)
+            self._methods[dataset.ref] = (strategy, why)
+            log.info("dataset indexed", dataset=dataset.ref, version=dataset.version, documents=len(docs), chunks=n, strategy=strategy)
             return n
 
     async def drop_dataset(self, ref: str, version: str | None = None) -> int:
@@ -114,6 +171,7 @@ class KnowledgeService:
             for doc_id in removed:
                 await self.remove(doc_id, ref)
             self._indexed.pop(ref, None)
+            self._methods.pop(ref, None)
             if dropped:
                 self._dropped[ref] = dropped
             log.info("dataset dropped", dataset=ref, documents=len(removed))
@@ -137,11 +195,14 @@ class KnowledgeService:
 
     async def search(self, query: str, k: int = 5, dataset: Dataset | None = None) -> list[Passage]:
         """Search the shared corpus, or one dataset (indexed first if this process has not indexed its version)."""
-        ref = ""
+        ref, strategy = "", self.strategy
         if dataset is not None:
             await self.index_dataset(dataset)
             ref = dataset.ref
-        if self.strategy == "full_context":
+            strategy = self._methods[ref][0] if ref in self._methods else strategy
+            if isinstance(dataset.spec, UnstructuredDataset):
+                k = dataset.spec.top_k
+        if strategy == "full_context":
             return await self._full_context(query, ref)
         [qv] = await self.embedder.embed([query])
         hits: list[Hit] = await self.index.search(qv, k=k, dataset=ref)
@@ -168,10 +229,13 @@ class KnowledgeService:
             out.append(Passage(title=d.title, text=d.text, source=d.source, score=float(len(q & set(d.text.lower().split())))))
         return out
 
-    def tool_impl(self) -> Callable[..., Awaitable[list[dict[str, Any]]]]:
-        """A `knowledge_search` implementation for Runtime(tool_impls=...)."""
+    def tool_impl(self, shared: Callable[..., Awaitable[Any]] | None = None) -> Callable[..., Awaitable[list[dict[str, Any]]]]:
+        """A `knowledge_search` implementation for Runtime(tool_impls=...). `shared` answers searches that name no
+        dataset (e.g. sample data); a named dataset is always searched here."""
 
         async def knowledge_search(query: str, dataset: Dataset | None = None) -> list[dict[str, Any]]:
+            if dataset is None and shared is not None:
+                return list(await shared(query=query))
             return [p.model_dump() for p in await self.search(query, dataset=dataset)]
 
         return knowledge_search
@@ -191,6 +255,7 @@ def index_uri(bucket: str | None, docs_prefix: str) -> str | None:
 def service_from_env(llm: LLMClient | None = None, models: ModelConfig | None = None) -> KnowledgeService:
     """Wire from environment. Fakes when nothing is configured; a configured real adapter with a missing key raises."""
     strategy: Strategy = os.getenv("KNOWLEDGE_STRATEGY") or "simple"  # type: ignore[assignment]  # blank in .env = default
+    auto = not os.getenv("KNOWLEDGE_STRATEGY")  # unset: each knowledge base set to "auto" picks its own method
     docs: DocumentStore = InMemoryDocumentStore()
     bucket, prefix = os.getenv("KNOWLEDGE_S3_BUCKET"), os.getenv("KNOWLEDGE_S3_PREFIX", "knowledge/docs/")
     if bucket:
@@ -209,4 +274,12 @@ def service_from_env(llm: LLMClient | None = None, models: ModelConfig | None = 
 
         index = LanceDBIndex(uri, dim=embedder.dim)
         log.info("knowledge index", index_uri=uri.split("?")[0])
-    return KnowledgeService(docs, index, embedder, make_indexer(strategy, embedder, llm, models))
+    return KnowledgeService(docs, index, embedder, make_indexer(strategy, embedder, llm, models), llm=llm, models=models, auto=auto)
+
+
+def local_service_from_env(llm: LLMClient | None = None, models: ModelConfig | None = None) -> KnowledgeService | None:
+    """The knowledge index inside the API process, when no Knowledge Service is configured (KNOWLEDGE_URL unset), so a
+    single deploy can answer from documents. None when KNOWLEDGE_URL is set."""
+    if os.getenv("KNOWLEDGE_URL"):
+        return None
+    return service_from_env(llm, models)

@@ -114,11 +114,33 @@ transcript, so nobody has to repeat themselves.
 
 ## Answer from documents
 
-Register an unstructured dataset (text or Markdown documents in a folder or under an S3 prefix), then add a
-`knowledge` step or the `knowledge_search` tool. Answers come only from the passages found and are checked against
-them; when the documents don't cover a question, the bot says so. The Knowledge Service (`scripts/knowledge.sh`,
-`KNOWLEDGE_URL`) chunks by meaning and indexes with LanceDB, with four indexing strategies (`simple`, `contextual`,
-`raptor`, `full_context`).
+A **knowledge base** is a named set of documents a bot answers from. Answers come only from the passages found and are
+checked against them; when the documents don't cover a question, the bot says so. Several bots can share one.
+
+**In the console:** Compose → **Knowledge base**. Upload files (PDF, text, Markdown, CSV, HTML) and add web pages,
+press **Create knowledge base**, then apply the change it proposes (a `knowledge` step with `dataset: <name>`). Or pick
+one you've made. Publish → *Create a chatbot from your content* makes a new bot from documents in one go.
+
+**By API:** `POST /v1/tenants/{t}/documents` (form fields `agent`, `name`, `files`, `urls`, `strategy`, `top_k`), or
+`PUT /v1/tenants/{t}/datasets/{name}` with an unstructured spec for documents already in a folder or S3.
+
+**How it's indexed.** With `strategy: auto` (the default), the method is picked from the documents and the reply says
+which and why:
+
+| Documents | Method | What it does |
+|---|---|---|
+| Fit in one prompt (about 40,000 characters) | `full_context` | The bot reads every document whole |
+| Long documents (a manual, a handbook) | `raptor` | Summaries at several levels, for broad and detailed questions |
+| Many shorter documents | `contextual` | Each passage gets a line of context, so search finds the right one |
+| No model to index with | `simple` | Passages found by meaning |
+
+Set `strategy` to one of these to choose, and `top_k` (1–20, default 5) for the passages each answer gets.
+`KNOWLEDGE_STRATEGY` on the server makes every knowledge base use one method.
+
+**Where it runs.** Without `KNOWLEDGE_URL`, the API indexes and searches knowledge bases itself, so a single deploy
+(Render, Fly.io, `scripts/try.sh`) needs nothing else; the index is in memory and rebuilt from the documents after a
+restart. For larger sets or several servers, run the Knowledge Service (`scripts/knowledge.sh`, `KNOWLEDGE_URL`), which
+can keep its index in LanceDB on S3.
 
 ## Answer questions about data
 

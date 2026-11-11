@@ -200,3 +200,61 @@ async def test_a_survey_is_drafted_from_a_type_and_the_owners_words(setup):
     assert any("Has a natural conversation" in line or "Runs a survey" in line for line in d["summary"]) and "Speaks: English, Spanish." in d["summary"]
     pub = await c.post("/v1/tenants/default/assistants/publish", json={"name": "Bloom Bakery", "yaml": d["yaml"]})
     assert pub.status_code == 201, pub.text
+
+
+@pytest.fixture
+async def builtin(monkeypatch, tmp_path):
+    """No Knowledge Service (KNOWLEDGE_URL unset): the API indexes and searches documents itself."""
+    monkeypatch.delenv("KNOWLEDGE_URL", raising=False)
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("KEELCHAT_EMBED_SECRET", "test-secret")
+    monkeypatch.setattr(public, "_SECRET", None)
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.runtime import Runtime
+    from tests.helpers import RecordingLLM
+
+    svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()), auto=True)
+    rt = Runtime(RecordingLLM(), {}, models=ModelConfig.from_env())
+    app = create_app(rt, tool_store=InMemoryTenantToolStore(), embeds=InMemoryEmbedStore(), knowledge=svc)
+    c = httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://chat.example.test")
+    yield c, svc
+    await c.aclose()
+
+
+async def test_without_a_knowledge_service_the_api_answers_from_uploaded_documents(builtin):
+    c, svc = builtin
+    a = (await c.post("/v1/tenants/default/assistants", data={"name": "Bloom Bakery"}, files=[("files", ("faq.md", FAQ, "text/markdown"))])).json()
+    assert await svc.docs.ids("default/kb_bloom_bakery")  # indexed in the API process on registration
+    s = (await c.post(f"/v1/public/embeds/{a['id']}/sessions", json={})).json()
+    auth = {"authorization": f"Bearer {s['token']}"}
+    reply = (await c.post(f"/v1/public/sessions/{s['session_id']}/turns", json={"text": "When does the bakery open?"}, headers=auth)).json()
+    assert "7" in reply["text"], reply
+
+
+async def test_documents_are_added_to_an_existing_agent_and_removed_with_its_dataset(builtin):
+    c, svc = builtin
+    r = await c.post("/v1/tenants/default/documents", data={"agent": "shop-helper"}, files=[("files", ("faq.md", FAQ, "text/markdown"))])
+    assert r.status_code == 201, r.text
+    made = r.json()
+    assert (made["dataset"], made["documents"], made["strategy"]) == ("kb_shop_helper", ["faq.md"], "full_context")
+    assert "fits in one prompt" in made["why"]  # one short FAQ: the bot reads it whole
+    assert (await c.get("/v1/tenants/default/datasets/kb_shop_helper")).json()["kind"] == "unstructured"
+    assert [d["kind"] for d in (await c.get("/v1/tenants/default/datasets")).json()] == ["unstructured"]  # the console reads it
+    hits = await svc.search("gluten-free bread", dataset=None)  # the shared corpus stays empty: documents are the agent's
+    assert hits == []
+    assert await svc.docs.ids("default/kb_shop_helper")
+    assert (await c.post("/v1/tenants/default/documents", data={"agent": "shop-helper"})).status_code == 422
+    assert (await c.delete("/v1/tenants/default/datasets/kb_shop_helper")).status_code == 200
+    assert not await svc.docs.ids("default/kb_shop_helper")  # its documents and vectors go with it
+
+
+async def test_searches_without_a_dataset_keep_the_sample_answers():
+    """KEELCHAT_TOOLS=fake: the shared knowledge base answers with sample data; a named dataset is searched for real."""
+    svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
+
+    async def sample(query: str) -> list[dict[str, str]]:
+        return [{"title": "Sample", "text": f"sample answer to {query}"}]
+
+    search = svc.tool_impl(shared=sample)
+    assert (await search("returns"))[0]["title"] == "Sample"
+    assert await svc.tool_impl()("returns") == []

@@ -167,3 +167,41 @@ async def test_litellm_client_structured(monkeypatch):
     assert await c.complete(req) == "hi"
     assert (await c.structured(req, {"type": "object"}))["verdict"] == "answered"
     assert fake_acompletion.kwargs["tool_choice"]["function"]["name"] == "emit_answer_check"
+
+
+def test_auto_picks_the_indexing_method_from_the_documents():
+    from keelchat.knowledge.service import choose_strategy
+
+    assert choose_strategy(["short faq"] * 3, 40_000, True)[0] == "full_context"
+    assert choose_strategy(["x" * 5_000] * 20, 40_000, True)[0] == "contextual"  # many shorter documents
+    assert choose_strategy(["x" * 50_000, "y" * 2_000], 40_000, True)[0] == "raptor"  # a long manual
+    assert choose_strategy(["x" * 50_000], 40_000, False)[0] == "simple"  # no model to summarize with
+    assert "fits in one prompt" in choose_strategy(["a"], 40_000, True)[1]
+
+
+async def test_each_knowledge_base_keeps_its_own_method_and_passage_count(tmp_path, monkeypatch):
+    from keelchat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
+    from keelchat.knowledge.docstore import InMemoryDocumentStore
+    from keelchat.knowledge.embedder import FakeEmbedder
+    from keelchat.knowledge.service import KnowledgeService, make_indexer
+    from keelchat.knowledge.vectorstore import InMemoryIndex
+
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
+    paras = [f"Topic {i}: the store answers question {i} about returns, delivery and opening hours." for i in range(60)]
+    big = tmp_path / "big.md"
+    big.write_text("\n\n".join(paras * 12))  # over the full-context budget
+    small = tmp_path / "small.md"
+    small.write_text("We open at 7am.")
+    svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()), auto=True)
+
+    def ds(name: str, path, **kw):  # type: ignore[no-untyped-def]
+        return Dataset.create("t", name, DatasetIn(spec=UnstructuredDataset(documents=[DocumentSource(uri=str(path))], **kw)))
+
+    whole, chunked = ds("whole", small), ds("chunked", big, strategy="simple", top_k=2)
+    await svc.index_dataset(whole, register=True)
+    await svc.index_dataset(chunked, register=True)
+    assert svc.method("t/whole")[0] == "full_context" and svc.method("t/chunked")[0] == "simple"
+    assert [p.text for p in await svc.search("when do you open", dataset=whole)] == ["We open at 7am."]
+    assert len(await svc.search("returns question 7", dataset=chunked)) == 2  # its own top_k
+    # an unchanged setting keeps the version a knowledge base had before settings existed
+    assert ds("whole", small).version == ds("whole", small, strategy="auto", top_k=5).version != ds("whole", small, top_k=3).version

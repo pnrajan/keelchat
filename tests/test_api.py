@@ -136,6 +136,26 @@ async def test_claude_without_reasoning_is_made_to_answer_with_the_tool(monkeypa
     assert [c if c == "auto" else "forced" for c in choices] == ["forced", "auto", "forced"]
 
 
+async def test_a_nested_object_sent_as_a_json_string_is_read_as_the_object():
+    """Some models (Claude Haiku 5.5 through OpenRouter) return a nested object as a JSON string inside the tool call;
+    the schema says object, so it is parsed instead of failing validation downstream."""
+    from types import SimpleNamespace
+
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm import LLMRequest
+
+    args = '{"plan": "{\\"method\\": \\"read\\", \\"checks\\": [\\"a\\"]}", "note": "{not json", "tags": "[1, 2]"}'
+
+    class Stringy(LiteLLMClient):
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            call = SimpleNamespace(function=SimpleNamespace(arguments=args))
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[call], content=""))])
+
+    schema = {"type": "object", "properties": {"plan": {"type": "object"}, "note": {"type": ["string", "null"]}, "tags": {"type": "array"}}}
+    out = await Stringy().structured(LLMRequest("t", "openrouter/anthropic/claude-haiku-5.5", "s", []), schema)
+    assert out == {"plan": {"method": "read", "checks": ["a"]}, "note": "{not json", "tags": [1, 2]}
+
+
 async def test_a_model_that_must_reason_is_sent_again_with_the_providers_default(monkeypatch):
     """OpenRouter refuses `reasoning: off` for Claude Sonnet 5.5 and Opus 5.5. The refusal is remembered per model: that
     call is sent again with the provider's default (Claude then picks the tool itself), and later calls go straight there."""

@@ -6,8 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Knowledge bases** in Compose: upload files and web pages, or pick one you've made; the bot change is proposed to
+  apply. `POST /v1/tenants/{t}/documents`.
+- Each knowledge base picks its indexing method from its documents (full context, contextual retrieval, RAPTOR, or
+  search) and says why; `strategy` and `top_k` override.
+- Without `KNOWLEDGE_URL`, the API indexes and searches knowledge bases itself, so Render, Fly.io and `scripts/try.sh`
+  answer from documents with nothing else to run. The Docker image sets `KEELCHAT_DATA_ROOT=/data`.
 - Releases publish to PyPI from GitHub with Trusted Publishing (`.github/workflows/release.yml`); steps in
   CONTRIBUTING.md.
+
+### Fixed
+
+- A nested object sent by the model as a JSON string is read as the object; a plan cut off mid-way is asked for again.
+- The launch checklist no longer calls a bot's knowledge base sample data.
+- Dataset responses include `kind`, which the console's YAML editor reads.
 
 ## [0.2.0] - 2026-11-11
 

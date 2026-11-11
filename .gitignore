@@ -11,4 +11,5 @@ dist/
 .ruff_cache/
 node_modules/
 *.lancedb
+.data/
 .serena/

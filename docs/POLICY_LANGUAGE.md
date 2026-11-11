@@ -4,6 +4,29 @@ Every keelchat bot is one YAML file, the **policy**. This page defines every key
 values it takes and its default. The build rejects anything else, and names the place (`flow[1].form_fill.fields[0].expect`).
 How to choose good values is in [Writing an agent](WRITING_AN_AGENT.md).
 
+## Start here
+
+You don't need to write YAML: in the console's **Compose** or the [demo](https://keelchat-demo.fly.dev), describe the
+bot in plain English and keelchat writes it. When you do write it, two keys make a working bot; everything else has a
+default:
+
+```
+agent: shop-helper
+charter: "Help customers with orders and returns. Out of scope: legal advice."
+```
+
+Most bots add only a few more:
+
+| To | Add |
+|---|---|
+| ask for consent, then collect answers | `flow: [greet_consent, {form_fill: {fields: [...]}}]` |
+| answer from your documents | a `knowledge` step with `dataset: <knowledge base>` ([how](FEATURES.md#answer-from-documents)) |
+| always handle a situation the same way | `rules: [{name, when, then}]`, with `handoff: true` to pass it to a person |
+| let people ask for a person | `handoff: {when: [user_request]}` |
+| speak more languages | `languages: [en, es]` |
+
+The rest of this page is the reference: every key, its values and its default.
+
 ## Where to edit it
 
 | Where | How |
@@ -15,7 +38,7 @@ How to choose good values is in [Writing an agent](WRITING_AN_AGENT.md).
 
 Comments (`# ...`) are kept when the console edits a file.
 
-## A whole policy
+## A fuller policy
 
 ```yaml
 agent: support-assistant                 # required
