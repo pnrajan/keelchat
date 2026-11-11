@@ -1,83 +1,116 @@
-<div align="center">
+# keelchat ── Customer-facing chatbots that follow your rules
 
-# keelchat
+<p align="center">
+  <a href="https://github.com/pnrajan/keelchat/actions/workflows/ci.yml"><img src="https://github.com/pnrajan/keelchat/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/keelchat/"><img src="https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white" alt="Python 3.12+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
+  <a href="#status"><img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha"></a>
+  <br />
+  <br />
+  <a href="https://keelchat-demo.fly.dev">
+    <img src="https://img.shields.io/badge/Try%20it-in%20your%20browser-2ea44f?style=for-the-badge" alt="Try it in your browser" />
+  </a>
+  <br />
+  <a href="#get-started">Get started</a> · <a href="#deploy-to-render">Deploy to Render</a> · <a href="#docs">Docs</a> · <a href="https://pnrajan.github.io/keelchat/">Website</a>
+</p>
 
-### Customer-facing chatbots that follow your rules.
+keelchat is an open-source framework for chatbots that talk to your customers: bookings, support requests, intake
+forms, surveys. A bot is **one YAML policy**. One shared runtime runs every bot and enforces its steps, limits and
+handover to a person **in code**. The model reads and phrases; code decides.
 
-Describe a bot in plain English or write it in YAML.<br>
-The runtime, not the model, enforces its steps, limits and handover to a person.
+## Overview
 
-[![CI](https://github.com/pnrajan/keelchat/actions/workflows/ci.yml/badge.svg)](https://github.com/pnrajan/keelchat/actions/workflows/ci.yml)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![Status: alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
+A bot with a job to finish can't just "try its best". Prompt-only bots drift: they skip questions, loop, or promise a
+person and never hand over. keelchat keeps the model for understanding and wording, and puts every decision where you
+can read and test it.
 
-**[Try it in your browser →](https://keelchat-demo.fly.dev)**
+You don't need to know YAML. Describe the bot in plain English, in the console's **Compose** view or the
+[browser demo](https://keelchat-demo.fly.dev), and keelchat writes the YAML, reads it back to you in plain words, and
+lets you try it.
 
-[Run it locally](#run-it-locally) · [Deploy to Render](#deploy-to-render) · [Docs](#docs) ·
-[Website](https://pnrajan.github.io/keelchat/)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/make-a-bot.gif" width="900" alt="In the keelchat console: a dental clinic's booking bot is described in two sentences, keelchat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" />
+</p>
 
-<br>
-
-<img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/make-a-bot.gif" alt="In the keelchat console: a dental clinic's booking bot is described in two sentences, keelchat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" width="900">
-
-</div>
-
-## Why keelchat
-
-A bot that books appointments or takes support requests has a job to finish. Prompt-only bots drift: they skip
-questions, loop, or promise a person and never hand over. keelchat keeps the model for reading and phrasing, and puts
-every decision in code you can review.
-
-A patient mid-booking writes *"I just knocked a tooth out playing football"*. Replies from the dental example bot,
-before and after [#31](https://github.com/pnrajan/keelchat/pull/31); the model picks the words, code makes the handover:
+Here is the difference it makes. A patient mid-booking writes *"I just knocked a tooth out playing football"*. Replies
+from the dental example bot, before and after [#31](https://github.com/pnrajan/keelchat/pull/31):
 
 | Where the rule lives | What happens |
 |---|---|
-| **Rule in the prompt** | "No problem. Which dental treatment are you looking for? I need to connect you with a staff member right away." Nobody gets the chat. |
-| **Rule in code** (`handoff: true`) | "That sounds urgent, and I'm sorry you've been through that. I've passed this to a person on our team." A person gets the chat. |
+| **In the prompt** | "No problem. Which dental treatment are you looking for? I need to connect you with a staff member right away." Nobody gets the chat. |
+| **In code** (`handoff: true`) | "That sounds urgent, and I'm sorry you've been through that. I've passed this to a person on our team." A person gets the chat. |
+
+## Features
 
 <table>
 <tr>
-<td width="33%" valign="top">
+<td colspan="2" valign="middle">
 
-**Plain English in, a file out**<br>
-Describe the bot, read back what it will do, change it in plain words. The result is one short YAML file you can
-review.
+### Describe it in plain English
 
-</td>
-<td width="33%" valign="top">
+Say what the bot should do in a sentence or two. keelchat drafts the policy, tells you back what it will ask and
+when it hands over, and takes changes in plain words ("also ask for a phone number"). The result is one short YAML
+file you can review and keep in git.
 
-**Code decides, the model phrases**<br>
-Answers are validated, re-asks and budgets are counted, and handover happens in code. A model never ends a
-conversation.
-
-</td>
-<td width="33%" valign="top">
-
-**Safe by default**<br>
-Tools go through one gateway (allow list, timeouts, circuit breaker), with input and output guardrails. Memory
-keeps only listed items, with consent for sensitive ones.
+<img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/compose.jpg" width="900" alt="Compose: a dental clinic's booking bot written from two sentences, read back in plain words (what it asks, when it hands an emergency to a person), with Try it, Save, and a box to ask for changes" />
 
 </td>
 </tr>
 <tr>
-<td valign="top">
+<td width="50%" valign="top">
 
-**Any model, any channel**<br>
+### Code decides, the model phrases
+
+Answers are checked, re-asks and budgets are counted, and handover happens in code. A model never ends a
+conversation or skips a step.
+
+</td>
+<td width="50%" valign="top">
+
+### Safe by default
+
+Tools go through one gateway (allow list, timeouts, circuit breaker). Input and output guardrails are on from the
+start. Memory keeps only the items you list, with consent for sensitive ones.
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="middle">
+
+### Try it and see why
+
+Chat with the bot next to its YAML. The **Inspector** shows why each reply was chosen: the step, the rule that
+fired, and how the reply was planned.
+
+<img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/console-trace.jpg" width="900" alt="The Inspector's Why tab: how the reply was planned (what it needs, the damaged_item rule, three steps), with the stage timings folded below" />
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="middle">
+
+### A stronger model reviews your test chats
+
+**Test → Judge** has a stronger model read a trial chat, list what went wrong on which turn, and propose fixes to
+the policy or the code. Test sets are generated from the YAML.
+
+<img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/console-judge.jpg" width="900" alt="The Judge tab: a summary of the test chat and its problems by turn, each marked by severity, each with the user's message and the agent's reply" />
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### Any model, any channel
+
 Anthropic, or anything litellm reaches (OpenAI, Gemini, Bedrock, OpenRouter, Ollama). Web widget, WhatsApp, SMS,
 Slack, phone.
 
 </td>
-<td valign="top">
+<td width="50%" valign="top">
 
-**Tested from the policy**<br>
-Test sets are generated from the YAML; a stronger model reviews trial chats and proposes fixes.
+### Yours to run and extend
 
-</td>
-<td valign="top">
-
-**Yours to run and extend**<br>
 Apache-2.0, one Docker image. A tool, step, guardrail or channel is one decorated Python function or class, or an
 MCP server.
 
@@ -87,22 +120,36 @@ MCP server.
 
 **A good fit** for support triage, bookings, intake forms and surveys, with many bots on one self-hosted runtime.
 **Not a fit** for a free-form assistant, multi-agent research, or anything that needs stable APIs today
-([comparison](#how-keelchat-compares)).
+([comparison](#how-keelchat-compares)). [Features](docs/FEATURES.md) has the full list.
+
+## How it works
+
+Every message goes through three stages. The model reads and phrases; the decisions in between are code.
+
+```mermaid
+flowchart LR
+  U[User message] --> A["Understand<br>language, intent, input guardrails"]
+  A --> B["Decide<br>the policy's current step, rules,<br>counters, tool gateway"]
+  B --> C["Respond<br>phrase the reply, check it,<br>output guardrails, channel limits"]
+  C --> R[Reply]
+```
+
+- **One policy per bot.** The YAML is compiled and checked before it runs; errors name the YAML path.
+- **One runtime for all bots.** Behaviour comes only from the compiled policy, never from code written for one bot.
+- **Pinned conversations.** Each chat stays on the policy version it started on, so a change never alters a chat in
+  progress.
+
+[Architecture](docs/ARCHITECTURE.md) has the detail.
 
 ## Get started
 
-<table>
-<tr>
-<th width="33%">Try it in your browser</th>
-<th width="33%">Run it locally</th>
-<th width="33%">Deploy to Render</th>
-</tr>
-<tr>
-<td valign="top">1 minute, nothing to install.<br><a href="https://keelchat-demo.fly.dev"><b>Open the demo →</b></a></td>
-<td valign="top">5 minutes. macOS, Linux or WSL 2, and a model key.<br><a href="#run-it-locally"><b>Steps ↓</b></a></td>
-<td valign="top">10 minutes. GitHub and Render accounts, and a model key.<br><a href="#deploy-to-render"><b>Steps ↓</b></a></td>
-</tr>
-</table>
+| Path | Time | You need |
+|---|---|---|
+| [Try it in your browser](#try-it-in-your-browser) | 1 minute | Nothing |
+| [Run it locally](#run-it-locally) | 5 minutes | macOS, Linux or WSL 2, and a model key |
+| [Deploy to Render](#deploy-to-render) | 10 minutes | GitHub and Render accounts, and a model key |
+
+The package is also on PyPI: `pip install keelchat` (Python 3.12+).
 
 ### Try it in your browser
 
@@ -111,7 +158,7 @@ to chat with it (its tools answer with sample data), and see what it needs conne
 link can start a draft:
 [`?describe=Book haircuts and ask for a phone number`](https://keelchat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
 
-<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-make.jpg" alt="The demo: a dental booking bot described in one sentence, its YAML with Try this bot, Copy and Download, and what it needs connecting: a booking calendar (Google Calendar, Calendly, Outlook, Acuity), a patient records system, an SMS sender, a model key, somewhere for handed-over chats, and where people talk to it" width="560"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-make.jpg" width="560" alt="The demo: a dental booking bot described in one sentence, its YAML with Try this bot, Copy and Download, and what it needs connecting: a booking calendar (Google Calendar, Calendly, Outlook, Acuity), a patient records system, an SMS sender, a model key, somewhere for handed-over chats, and where people talk to it" /></p>
 
 ### Run it locally
 
@@ -121,11 +168,12 @@ git clone https://github.com/pnrajan/keelchat && cd keelchat
 scripts/try.sh    # opens the console with a sample bot, everything in memory
 ```
 
-In the console, open **Compose**, describe a bot, press **Create my bot**, then **Try it**. The **Inspector** shows
-why each reply was chosen.
+In the console, open **Compose**, describe a bot, press **Create my bot**, then **Try it**.
+
+<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/console.jpg" width="900" alt="The console after Try it: the drafted YAML, a test chat where a knocked-out tooth is handed to a person by the emergency rule, and the launch checklist" /></p>
 
 - **Whole stack in Docker** (API, console, Redis, Postgres; data kept between restarts): `scripts/local.sh up`
-- **From Claude Code:** the [keelchat plugin](plugins/keelchat) builds and tries bots when you ask in plain words.
+- **From Claude Code:** see [Build bots from Claude Code](#build-bots-from-claude-code).
 
 ### Deploy to Render
 
@@ -151,17 +199,36 @@ Run keelchat in your own Render account, on the free plan.
 
 - **Another model provider:** on the **Environment** page, set `KEELCHAT_LLM=litellm`, `KEELCHAT_MODEL_GENERATE`,
   `KEELCHAT_MODEL_CLASSIFY` and the provider's key (e.g. `OPENROUTER_API_KEY`), as in [`.env.example`](.env.example).
-- **Updates are not automatic.** To redeploy each time CI passes on your fork, set **Auto-Deploy** to "After CI
-  checks pass" in the service's **Settings**, or press **Manual Deploy**.
+- **Updates are not automatic.** Auto-deploy is off in [`render.yaml`](render.yaml). To redeploy each time CI passes
+  on your fork, set **Auto-Deploy** to "After CI checks pass" in the service's **Settings**, or press
+  **Manual Deploy**.
 - **The free plan sleeps** when idle, so the first request after that is slow. A paid plan stays awake.
-- Settings are in [`render.yaml`](render.yaml). For **Fly.io** and other hosts, see
-  [Deploy from GitHub](docs/REFERENCE.md#deploy-from-github).
+- For **Fly.io** and other hosts, see [Deploy from GitHub](docs/REFERENCE.md#deploy-from-github).
 
 </details>
 
 ## Your first bot
 
-Save this as `my_bot.yaml`:
+The smallest bot is two lines. Everything else has a default.
+
+```
+agent: shop-helper
+charter: Help customers with orders and returns.
+```
+
+Save it as `my_bot.yaml` and build it:
+
+```bash
+uv run keelchat build my_bot.yaml   # validate and compile; errors name the YAML path
+```
+
+It chats within its charter, with the default limits and guardrails (prompt injection blocked, personal details
+removed from replies).
+
+### When you want more
+
+Add steps, guardrails, limits and handover as you need them. This bot asks for consent, collects an order number,
+answers side questions from your documents, and hands over to a person when asked or stuck:
 
 ```yaml
 agent: support-assistant
@@ -181,31 +248,33 @@ limits: {reasks: 3, digressions: 3}
 handoff: {when: [user_request, max_reasks]}
 ```
 
-It asks for consent, collects an order number, answers side questions from your documents, blocks prompt
-injection, removes personal details from replies, and hands over to a person when asked or stuck.
+Paste either one into the console's editor and press **Build & try**, or send it to the API with `POST /v1/agents`
+([walkthrough](docs/DEVELOPER_GUIDE.md#one-conversation-end-to-end)). You never have to write this by hand: Compose
+and the demo write it from plain English. [The policy language](docs/POLICY_LANGUAGE.md) lists every key;
+[examples](examples) has bots for bookings, surveys, hiring and data questions.
 
-```bash
-uv run keelchat build my_bot.yaml   # validate and compile; errors name the YAML path
-```
+## Answer from your documents
 
-Paste it into the console's editor and press **Build & try**, or send it to the API with `POST /v1/agents`
-([walkthrough](docs/DEVELOPER_GUIDE.md#one-conversation-end-to-end)). [The policy language](docs/POLICY_LANGUAGE.md)
-lists every key; [examples](examples) has bots for bookings, surveys, hiring and data questions.
+Give a bot a **knowledge base** (your help pages, manuals, FAQs) and it answers only from them. When they don't cover a
+question, it says so instead of guessing. Several bots can share one.
 
-## How it works
+- **In the console:** Compose → **Knowledge base**. Upload files (PDF, text, Markdown, CSV, HTML) and add web pages,
+  press **Create knowledge base**, and apply the change it proposes. Publish → *Create a chatbot from your content*
+  makes a new bot from documents in one go.
+- **Indexing is picked for you** from the documents, and you're told why: small sets are read whole (full context),
+  long manuals get layered summaries (RAPTOR), many pages get passages with context (contextual retrieval). You can
+  choose the method and how many passages each answer gets.
+- **Nothing extra to run:** the server indexes and searches knowledge bases itself, so a Render or Fly.io deploy
+  answers from documents. For large sets, run the separate Knowledge Service.
+- **From the API or YAML:** `POST /v1/tenants/{t}/documents`, or register documents already in a folder or S3 with
+  `PUT /v1/tenants/{t}/datasets/{name}`, then:
 
-Every message goes through three stages. The model reads and phrases; the decisions in between are code.
+  ```yaml
+  flow:
+    - knowledge: {dataset: help_centre}
+  ```
 
-```mermaid
-flowchart LR
-  U[User message] --> A["Understand<br>language, intent, input guardrails"]
-  A --> B["Decide<br>the policy's current step, rules,<br>counters, tool gateway"]
-  B --> C["Respond<br>phrase the reply, check it,<br>output guardrails, channel limits"]
-  C --> R[Reply]
-```
-
-Each conversation is pinned to the compiled policy it started on, so a change never alters a chat in progress.
-[Architecture](docs/ARCHITECTURE.md) has the detail.
+[Answer from documents](docs/FEATURES.md#answer-from-documents) has the detail.
 
 ## Add a tool
 
@@ -221,6 +290,7 @@ async def slot_search(service: str, day: str = "") -> dict[str, list[str]]:
 
 Type hints become the schema; the docstring is what the model reads. Allow it with `tools: [slot_search]`.
 `uv run keelchat new package my_caps` writes a starter package with a tool, a step, a guardrail and a passing test.
+[Adding a capability](docs/ADDING_A_CAPABILITY.md) has the detail.
 
 ## Test it
 
@@ -229,7 +299,8 @@ uv run keelchat evals generate my_bot.yaml           # a test set from the polic
 uv run keelchat evals check evals/support_assistant  # the checks every conversation must pass
 ```
 
-In the console, **Test → Judge** has a stronger model review a chat and propose fixes to the policy or the code.
+In the console, **Test → Judge** has a stronger model review a chat and propose fixes. [Evals](docs/EVALS.md) has the
+detail.
 
 ## Where a stronger model helps
 
@@ -244,8 +315,20 @@ setting:
 | Checking plans before replying | `think: true` steps plan first; a separate model can check the plan | `KEELCHAT_MODEL_VERIFY` |
 | Judging test results | Scores scope and rule-following in evals | `EVALS_JUDGE_MODEL` |
 
-Classification and routine replies stay on `KEELCHAT_MODEL_CLASSIFY`. [Model routing and cost](docs/REFERENCE.md) has
-the detail.
+Classification and routine replies stay on `KEELCHAT_MODEL_CLASSIFY`. [Model routing](docs/REFERENCE.md#model-routing)
+has the detail.
+
+## Build bots from Claude Code
+
+The [keelchat plugin](plugins/keelchat) connects Claude Code to your keelchat server. Ask for a bot in plain words;
+Claude drafts the policy, tries a few conversations and shows you the result before it saves anything.
+
+```text
+/plugin marketplace add pnrajan/keelchat
+/plugin install keelchat@keelchat
+```
+
+[Use with Claude](docs/FEATURES.md#use-with-claude) has the setup.
 
 ## How keelchat compares
 
@@ -271,11 +354,11 @@ the detail.
 | look up the CLI, API, settings, deployment | [Reference](docs/REFERENCE.md) |
 | understand the runtime | [Architecture](docs/ARCHITECTURE.md) |
 
-## Help and contributing
+## Contributing
 
 - **Questions, and bots to show:** [Discussions](https://github.com/pnrajan/keelchat/discussions)
 - **Bugs:** [issues](https://github.com/pnrajan/keelchat/issues/new/choose); vulnerabilities: [SECURITY.md](SECURITY.md)
-- **Contributing:** start with a
+- **Code:** start with a
   [good first issue](https://github.com/pnrajan/keelchat/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22),
   and see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 
@@ -286,12 +369,6 @@ lists every change.
 
 ## License
 
-[Apache-2.0](LICENSE)
+keelchat is licensed under [Apache-2.0](LICENSE).
 
-<div align="center">
-
-<br>
-
-**If keelchat is useful to you, a ⭐ helps others find it.**
-
-</div>
+<p align="center"><b>If keelchat is useful to you, a ⭐ helps others find it.</b></p>
