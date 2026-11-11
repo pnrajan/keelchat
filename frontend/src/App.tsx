@@ -283,7 +283,7 @@ export default function App() {
     <Rain />
     <div className="shell">
       <header className="topbar">
-        <div className="brand"><span className="mark" aria-hidden>y</span><span>keelchat<span className="caret" aria-hidden /></span> <span className="muted">/ test console</span></div>
+        <div className="brand"><span className="mark" aria-hidden>k</span><span>keelchat<span className="caret" aria-hidden /></span> <span className="muted">/ test console</span></div>
         <div className="topbar-right">
           {workspace && <span className="pill" title="The tenant your key belongs to">workspace <code>{workspace}</code></span>}
           <button className={`pill link${view === "compose" ? " on" : ""}`} onClick={() => setView("compose")} title="Build a policy without writing YAML">Compose</button>

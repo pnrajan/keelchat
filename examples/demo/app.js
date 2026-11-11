@@ -19,7 +19,7 @@ function add(where, kind, body) {
   const el = document.createElement("div");
   if (kind === "bot") {
     el.className = "bot";
-    el.innerHTML = '<div class="dot" aria-hidden="true">y</div><div class="msg"></div>';
+    el.innerHTML = '<div class="dot" aria-hidden="true">k</div><div class="msg"></div>';
     el.lastChild.textContent = body;
   } else {
     el.className = kind === "you" ? "msg you" : "note";
