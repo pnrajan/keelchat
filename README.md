@@ -255,13 +255,19 @@ and the demo write it from plain English. [The policy language](docs/POLICY_LANG
 
 ## Answer from your documents
 
-Give a bot your help pages, and it answers only from them. When they don't cover a question, it says so instead of
-guessing.
+Give a bot a **knowledge base** (your help pages, manuals, FAQs) and it answers only from them. When they don't cover a
+question, it says so instead of guessing. Several bots can share one.
 
-- **In the console:** open **Publish**, then **Create a chatbot from your content**. Upload files (PDF, text,
-  Markdown, CSV, HTML), add web page links, or both.
-- **From the API or YAML:** register the documents with `PUT /v1/tenants/{t}/datasets/{name}`, then add the
-  `knowledge` step or the `knowledge_search` tool to the bot:
+- **In the console:** Compose → **Knowledge base**. Upload files (PDF, text, Markdown, CSV, HTML) and add web pages,
+  press **Create knowledge base**, and apply the change it proposes. Publish → *Create a chatbot from your content*
+  makes a new bot from documents in one go.
+- **Indexing is picked for you** from the documents, and you're told why: small sets are read whole (full context),
+  long manuals get layered summaries (RAPTOR), many pages get passages with context (contextual retrieval). You can
+  choose the method and how many passages each answer gets.
+- **Nothing extra to run:** the server indexes and searches knowledge bases itself, so a Render or Fly.io deploy
+  answers from documents. For large sets, run the separate Knowledge Service.
+- **From the API or YAML:** `POST /v1/tenants/{t}/documents`, or register documents already in a folder or S3 with
+  `PUT /v1/tenants/{t}/datasets/{name}`, then:
 
   ```yaml
   flow:
