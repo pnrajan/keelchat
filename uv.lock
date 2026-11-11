@@ -1594,6 +1594,208 @@ wheels = [
 ]
 
 [[package]]
+name = "keelchat"
+version = "0.2.0"
+source = { editable = "." }
+dependencies = [
+    { name = "anthropic" },
+    { name = "duckdb" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "mcp" },
+    { name = "pydantic" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "sentry-sdk", extra = ["fastapi"] },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+agentcore = [
+    { name = "bedrock-agentcore" },
+]
+analytics = [
+    { name = "boto3" },
+    { name = "duckdb" },
+    { name = "litellm" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "smolagents" },
+    { name = "vanna" },
+]
+api = [
+    { name = "asyncpg" },
+    { name = "boto3" },
+    { name = "cryptography" },
+    { name = "duckdb" },
+    { name = "litellm" },
+    { name = "pandas" },
+    { name = "pypdf" },
+    { name = "python-multipart" },
+    { name = "redis" },
+    { name = "vanna" },
+]
+audit = [
+    { name = "pyiceberg", extra = ["pyarrow", "pyiceberg-core", "sql-postgres"] },
+]
+evals = [
+    { name = "deepeval" },
+    { name = "langchain-community" },
+    { name = "litellm" },
+    { name = "ragas" },
+]
+knowledge = [
+    { name = "boto3" },
+    { name = "lancedb" },
+    { name = "litellm" },
+    { name = "mcp" },
+]
+mem0 = [
+    { name = "mem0ai" },
+]
+postgres = [
+    { name = "asyncpg" },
+]
+redis = [
+    { name = "redis" },
+]
+sandbox = [
+    { name = "llm-sandbox", extra = ["docker"] },
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "statsmodels" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "asyncpg" },
+    { name = "bedrock-agentcore" },
+    { name = "boto3" },
+    { name = "contrib-tool" },
+    { name = "cryptography" },
+    { name = "deepeval" },
+    { name = "duckdb" },
+    { name = "fakeredis" },
+    { name = "lancedb" },
+    { name = "langchain-community" },
+    { name = "litellm" },
+    { name = "llm-sandbox", extra = ["docker"] },
+    { name = "mcp" },
+    { name = "mypy" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pandas-stubs" },
+    { name = "pre-commit" },
+    { name = "pyarrow" },
+    { name = "pyiceberg", extra = ["pyarrow", "pyiceberg-core", "sql-postgres", "sql-sqlite"] },
+    { name = "pypdf" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-rerunfailures" },
+    { name = "pytest-xdist" },
+    { name = "python-multipart" },
+    { name = "ragas" },
+    { name = "redis" },
+    { name = "ruff" },
+    { name = "scipy" },
+    { name = "smolagents" },
+    { name = "statsmodels" },
+    { name = "types-pyyaml" },
+    { name = "vanna" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", specifier = ">=0.40" },
+    { name = "asyncpg", marker = "extra == 'api'", specifier = ">=0.29" },
+    { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.29" },
+    { name = "bedrock-agentcore", marker = "extra == 'agentcore'", specifier = ">=1.25" },
+    { name = "boto3", marker = "extra == 'analytics'", specifier = ">=1.34" },
+    { name = "boto3", marker = "extra == 'api'", specifier = ">=1.34" },
+    { name = "boto3", marker = "extra == 'knowledge'", specifier = ">=1.34" },
+    { name = "cryptography", marker = "extra == 'api'", specifier = ">=43" },
+    { name = "deepeval", marker = "extra == 'evals'", specifier = ">=3.0" },
+    { name = "duckdb", specifier = ">=1.1" },
+    { name = "duckdb", marker = "extra == 'analytics'", specifier = ">=1.1" },
+    { name = "duckdb", marker = "extra == 'api'", specifier = ">=1.1" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "lancedb", marker = "extra == 'knowledge'", specifier = ">=0.15" },
+    { name = "langchain-community", marker = "extra == 'evals'", specifier = ">=0.4,<0.4.3" },
+    { name = "litellm", marker = "extra == 'analytics'", specifier = ">=1.50" },
+    { name = "litellm", marker = "extra == 'api'", specifier = ">=1.50" },
+    { name = "litellm", marker = "extra == 'evals'", specifier = ">=1.50" },
+    { name = "litellm", marker = "extra == 'knowledge'", specifier = ">=1.50" },
+    { name = "llm-sandbox", extras = ["docker"], marker = "extra == 'sandbox'", specifier = ">=0.3.46" },
+    { name = "mcp", specifier = ">=1.0" },
+    { name = "mcp", marker = "extra == 'knowledge'", specifier = ">=1.0" },
+    { name = "mem0ai", marker = "extra == 'mem0'", specifier = ">=0.1.100" },
+    { name = "numpy", marker = "extra == 'sandbox'", specifier = ">=2" },
+    { name = "pandas", marker = "extra == 'analytics'", specifier = ">=2.2" },
+    { name = "pandas", marker = "extra == 'api'", specifier = ">=2.2" },
+    { name = "pyarrow", marker = "extra == 'analytics'", specifier = ">=17" },
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "pyiceberg", extras = ["pyarrow", "pyiceberg-core", "sql-postgres"], marker = "extra == 'audit'", specifier = ">=0.9" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.8" },
+    { name = "pypdf", marker = "extra == 'api'", specifier = ">=5.0" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "python-multipart", marker = "extra == 'api'", specifier = ">=0.0.9" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "ragas", marker = "extra == 'evals'", specifier = ">=0.4,<0.5" },
+    { name = "redis", marker = "extra == 'api'", specifier = ">=5.0" },
+    { name = "redis", marker = "extra == 'redis'", specifier = ">=5.0" },
+    { name = "scikit-learn", marker = "extra == 'sandbox'", specifier = ">=1.5" },
+    { name = "scipy", marker = "extra == 'sandbox'", specifier = ">=1.14" },
+    { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.20" },
+    { name = "smolagents", marker = "extra == 'analytics'", specifier = ">=1.26,<2" },
+    { name = "statsmodels", marker = "extra == 'sandbox'", specifier = ">=0.14" },
+    { name = "uvicorn", specifier = ">=0.30" },
+    { name = "vanna", marker = "extra == 'analytics'", specifier = ">=2.0.2,<3" },
+    { name = "vanna", marker = "extra == 'api'", specifier = ">=2.0.2,<3" },
+]
+provides-extras = ["api", "redis", "postgres", "knowledge", "analytics", "sandbox", "agentcore", "audit", "mem0", "evals"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "asyncpg", specifier = ">=0.29" },
+    { name = "bedrock-agentcore", specifier = ">=1.25" },
+    { name = "boto3", specifier = ">=1.34" },
+    { name = "contrib-tool", editable = "examples/contrib_tool" },
+    { name = "cryptography", specifier = ">=43" },
+    { name = "deepeval", specifier = ">=3.0" },
+    { name = "duckdb", specifier = ">=1.1" },
+    { name = "fakeredis", specifier = ">=2.26" },
+    { name = "lancedb", specifier = ">=0.15" },
+    { name = "langchain-community", specifier = ">=0.4,<0.4.3" },
+    { name = "litellm", specifier = ">=1.50" },
+    { name = "llm-sandbox", extras = ["docker"], specifier = ">=0.3.46" },
+    { name = "mcp", specifier = ">=1.0" },
+    { name = "mypy", specifier = ">=1.11" },
+    { name = "numpy", specifier = ">=2" },
+    { name = "pandas", specifier = ">=2.2" },
+    { name = "pandas-stubs" },
+    { name = "pre-commit", specifier = ">=4" },
+    { name = "pyarrow", specifier = ">=17" },
+    { name = "pyiceberg", extras = ["pyarrow", "pyiceberg-core", "sql-postgres", "sql-sqlite"], specifier = ">=0.9" },
+    { name = "pypdf", specifier = ">=5.0" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "pytest-rerunfailures", specifier = ">=14" },
+    { name = "pytest-xdist", specifier = ">=3.5" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "ragas", specifier = ">=0.4,<0.5" },
+    { name = "redis", specifier = ">=5.0" },
+    { name = "ruff", specifier = ">=0.6" },
+    { name = "scipy", specifier = ">=1.14" },
+    { name = "smolagents", specifier = ">=1.26,<2" },
+    { name = "statsmodels", specifier = ">=0.14" },
+    { name = "types-pyyaml" },
+    { name = "vanna", specifier = ">=2.0.2,<3" },
+]
+
+[[package]]
 name = "lance-namespace"
 version = "0.13.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5330,208 +5532,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b9/ff/28666972b4a78dca99a537cbd42abe50dfdeca4d6388984c841cfe1f933f/xxhash-4.0.2-pp312-pypy312_pp80-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7b244e3e1d6eadb5061ce777632a822ed75c2fb6174c65882f5829f31b46e8c1", size = 42584, upload-time = "2026-10-19T05:59:00.064Z" },
     { url = "https://files.pythonhosted.org/packages/0a/30/0b46bb908376d75733ca70cd4124f74abeea0f50732749dafa848f42f385/xxhash-4.0.2-pp312-pypy312_pp80-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:63522739ce94e4e73c1605aa60a52b3863e77e835f6292cc8a5e7e7b626ff00c", size = 39472, upload-time = "2026-10-19T06:01:55.015Z" },
     { url = "https://files.pythonhosted.org/packages/4c/23/6c0aa47774513c1237f7ea198daf36f2d2609f1e233249a9ea97d5b55c38/xxhash-4.0.2-pp312-pypy312_pp80-win_amd64.whl", hash = "sha256:0b96b2694c97084c5e2bff8a6a3dc3c2fb3b9a07178286e8d69869efe76eeb50", size = 84214, upload-time = "2026-10-19T06:00:06.386Z" },
-]
-
-[[package]]
-name = "keelchat"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "duckdb" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "mcp" },
-    { name = "pydantic" },
-    { name = "pyjwt", extra = ["crypto"] },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "sentry-sdk", extra = ["fastapi"] },
-    { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-agentcore = [
-    { name = "bedrock-agentcore" },
-]
-analytics = [
-    { name = "boto3" },
-    { name = "duckdb" },
-    { name = "litellm" },
-    { name = "pandas" },
-    { name = "pyarrow" },
-    { name = "smolagents" },
-    { name = "vanna" },
-]
-api = [
-    { name = "asyncpg" },
-    { name = "boto3" },
-    { name = "cryptography" },
-    { name = "duckdb" },
-    { name = "litellm" },
-    { name = "pandas" },
-    { name = "pypdf" },
-    { name = "python-multipart" },
-    { name = "redis" },
-    { name = "vanna" },
-]
-audit = [
-    { name = "pyiceberg", extra = ["pyarrow", "pyiceberg-core", "sql-postgres"] },
-]
-evals = [
-    { name = "deepeval" },
-    { name = "langchain-community" },
-    { name = "litellm" },
-    { name = "ragas" },
-]
-knowledge = [
-    { name = "boto3" },
-    { name = "lancedb" },
-    { name = "litellm" },
-    { name = "mcp" },
-]
-mem0 = [
-    { name = "mem0ai" },
-]
-postgres = [
-    { name = "asyncpg" },
-]
-redis = [
-    { name = "redis" },
-]
-sandbox = [
-    { name = "llm-sandbox", extra = ["docker"] },
-    { name = "numpy" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "statsmodels" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "asyncpg" },
-    { name = "bedrock-agentcore" },
-    { name = "boto3" },
-    { name = "contrib-tool" },
-    { name = "cryptography" },
-    { name = "deepeval" },
-    { name = "duckdb" },
-    { name = "fakeredis" },
-    { name = "lancedb" },
-    { name = "langchain-community" },
-    { name = "litellm" },
-    { name = "llm-sandbox", extra = ["docker"] },
-    { name = "mcp" },
-    { name = "mypy" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pandas-stubs" },
-    { name = "pre-commit" },
-    { name = "pyarrow" },
-    { name = "pyiceberg", extra = ["pyarrow", "pyiceberg-core", "sql-postgres", "sql-sqlite"] },
-    { name = "pypdf" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-rerunfailures" },
-    { name = "pytest-xdist" },
-    { name = "python-multipart" },
-    { name = "ragas" },
-    { name = "redis" },
-    { name = "ruff" },
-    { name = "scipy" },
-    { name = "smolagents" },
-    { name = "statsmodels" },
-    { name = "types-pyyaml" },
-    { name = "vanna" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", specifier = ">=0.40" },
-    { name = "asyncpg", marker = "extra == 'api'", specifier = ">=0.29" },
-    { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.29" },
-    { name = "bedrock-agentcore", marker = "extra == 'agentcore'", specifier = ">=1.25" },
-    { name = "boto3", marker = "extra == 'analytics'", specifier = ">=1.34" },
-    { name = "boto3", marker = "extra == 'api'", specifier = ">=1.34" },
-    { name = "boto3", marker = "extra == 'knowledge'", specifier = ">=1.34" },
-    { name = "cryptography", marker = "extra == 'api'", specifier = ">=43" },
-    { name = "deepeval", marker = "extra == 'evals'", specifier = ">=3.0" },
-    { name = "duckdb", specifier = ">=1.1" },
-    { name = "duckdb", marker = "extra == 'analytics'", specifier = ">=1.1" },
-    { name = "duckdb", marker = "extra == 'api'", specifier = ">=1.1" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "lancedb", marker = "extra == 'knowledge'", specifier = ">=0.15" },
-    { name = "langchain-community", marker = "extra == 'evals'", specifier = ">=0.4,<0.4.3" },
-    { name = "litellm", marker = "extra == 'analytics'", specifier = ">=1.50" },
-    { name = "litellm", marker = "extra == 'api'", specifier = ">=1.50" },
-    { name = "litellm", marker = "extra == 'evals'", specifier = ">=1.50" },
-    { name = "litellm", marker = "extra == 'knowledge'", specifier = ">=1.50" },
-    { name = "llm-sandbox", extras = ["docker"], marker = "extra == 'sandbox'", specifier = ">=0.3.46" },
-    { name = "mcp", specifier = ">=1.0" },
-    { name = "mcp", marker = "extra == 'knowledge'", specifier = ">=1.0" },
-    { name = "mem0ai", marker = "extra == 'mem0'", specifier = ">=0.1.100" },
-    { name = "numpy", marker = "extra == 'sandbox'", specifier = ">=2" },
-    { name = "pandas", marker = "extra == 'analytics'", specifier = ">=2.2" },
-    { name = "pandas", marker = "extra == 'api'", specifier = ">=2.2" },
-    { name = "pyarrow", marker = "extra == 'analytics'", specifier = ">=17" },
-    { name = "pydantic", specifier = ">=2.9" },
-    { name = "pyiceberg", extras = ["pyarrow", "pyiceberg-core", "sql-postgres"], marker = "extra == 'audit'", specifier = ">=0.9" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.8" },
-    { name = "pypdf", marker = "extra == 'api'", specifier = ">=5.0" },
-    { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "python-multipart", marker = "extra == 'api'", specifier = ">=0.0.9" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "ragas", marker = "extra == 'evals'", specifier = ">=0.4,<0.5" },
-    { name = "redis", marker = "extra == 'api'", specifier = ">=5.0" },
-    { name = "redis", marker = "extra == 'redis'", specifier = ">=5.0" },
-    { name = "scikit-learn", marker = "extra == 'sandbox'", specifier = ">=1.5" },
-    { name = "scipy", marker = "extra == 'sandbox'", specifier = ">=1.14" },
-    { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.20" },
-    { name = "smolagents", marker = "extra == 'analytics'", specifier = ">=1.26,<2" },
-    { name = "statsmodels", marker = "extra == 'sandbox'", specifier = ">=0.14" },
-    { name = "uvicorn", specifier = ">=0.30" },
-    { name = "vanna", marker = "extra == 'analytics'", specifier = ">=2.0.2,<3" },
-    { name = "vanna", marker = "extra == 'api'", specifier = ">=2.0.2,<3" },
-]
-provides-extras = ["api", "redis", "postgres", "knowledge", "analytics", "sandbox", "agentcore", "audit", "mem0", "evals"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "asyncpg", specifier = ">=0.29" },
-    { name = "bedrock-agentcore", specifier = ">=1.25" },
-    { name = "boto3", specifier = ">=1.34" },
-    { name = "contrib-tool", editable = "examples/contrib_tool" },
-    { name = "cryptography", specifier = ">=43" },
-    { name = "deepeval", specifier = ">=3.0" },
-    { name = "duckdb", specifier = ">=1.1" },
-    { name = "fakeredis", specifier = ">=2.26" },
-    { name = "lancedb", specifier = ">=0.15" },
-    { name = "langchain-community", specifier = ">=0.4,<0.4.3" },
-    { name = "litellm", specifier = ">=1.50" },
-    { name = "llm-sandbox", extras = ["docker"], specifier = ">=0.3.46" },
-    { name = "mcp", specifier = ">=1.0" },
-    { name = "mypy", specifier = ">=1.11" },
-    { name = "numpy", specifier = ">=2" },
-    { name = "pandas", specifier = ">=2.2" },
-    { name = "pandas-stubs" },
-    { name = "pre-commit", specifier = ">=4" },
-    { name = "pyarrow", specifier = ">=17" },
-    { name = "pyiceberg", extras = ["pyarrow", "pyiceberg-core", "sql-postgres", "sql-sqlite"], specifier = ">=0.9" },
-    { name = "pypdf", specifier = ">=5.0" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "pytest-rerunfailures", specifier = ">=14" },
-    { name = "pytest-xdist", specifier = ">=3.5" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "ragas", specifier = ">=0.4,<0.5" },
-    { name = "redis", specifier = ">=5.0" },
-    { name = "ruff", specifier = ">=0.6" },
-    { name = "scipy", specifier = ">=1.14" },
-    { name = "smolagents", specifier = ">=1.26,<2" },
-    { name = "statsmodels", specifier = ">=0.14" },
-    { name = "types-pyyaml" },
-    { name = "vanna", specifier = ">=2.0.2,<3" },
 ]
 
 [[package]]
