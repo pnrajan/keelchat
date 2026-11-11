@@ -111,7 +111,7 @@ to chat with it (its tools answer with sample data), and see what it needs conne
 link can start a draft:
 [`?describe=Book haircuts and ask for a phone number`](https://keelchat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
 
-<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-make.jpg" alt="The demo: a dental booking bot described in one sentence, its YAML with Copy and Download, and what it needs connecting: a booking calendar (Open Dental, Dentrix, Calendly), a model key, somewhere for handed-over chats, and where people talk to it" width="560"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-make.jpg" alt="The demo: a dental booking bot described in one sentence, its YAML with Try this bot, Copy and Download, and what it needs connecting: a booking calendar (Google Calendar, Calendly, Outlook, Acuity), a patient records system, an SMS sender, a model key, somewhere for handed-over chats, and where people talk to it" width="560"></p>
 
 ### Run it locally
 

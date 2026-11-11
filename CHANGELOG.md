@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Screenshots, the demo GIF and the logo mark ("k") show the keelchat name.
+
 ## [0.2.0] - 2026-11-11
 
 ### Changed
