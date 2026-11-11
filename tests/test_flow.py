@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from keelchat.policy.compiler import build
+from keelchat.registry.contract import make_context
+from keelchat.runtime.decide.intent_detector import ROUTE_PLANNER
+from keelchat.runtime.decide.planner import VERIFY_SCHEMA, grounded, planner_tools, verify_system
+from keelchat.runtime.llm import LLMRequest, ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
 from tests.conftest import ROOT
 from tests.helpers import fill_form, make_runtime, mutate, reach_form, say
-from yachat.policy.compiler import build
-from yachat.registry.contract import make_context
-from yachat.runtime.decide.intent_detector import ROUTE_PLANNER
-from yachat.runtime.decide.planner import VERIFY_SCHEMA, grounded, planner_tools, verify_system
-from yachat.runtime.llm import LLMRequest, ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
 
 
 async def test_happy_path_every_step_complete(policy_yaml):
@@ -53,8 +53,8 @@ async def test_submit_only_from_candidate_action(policy_yaml):
 
 
 async def test_nodes_and_planner_cannot_trigger_actions(policy_yaml):
-    from yachat.runtime.decide.tool_gateway import ActionRunner, ToolGateway
-    from yachat.testing.fakes import FakeTools
+    from keelchat.runtime.decide.tool_gateway import ActionRunner, ToolGateway
+    from keelchat.testing.fakes import FakeTools
 
     tools = FakeTools()
     gw = ToolGateway({"job_search", "submit_application"}, tools.impls())
@@ -192,8 +192,8 @@ async def test_opening_message_can_carry_consent_and_prefill(policy_yaml):
 
 
 async def test_a_failed_answer_asks_the_open_question_once(policy_yaml, monkeypatch):
-    from yachat.capabilities.nodes.knowledge import Knowledge
-    from yachat.runtime.respond.rewriter import Rewriter
+    from keelchat.capabilities.nodes.knowledge import Knowledge
+    from keelchat.runtime.respond.rewriter import Rewriter
 
     async def down(self, ctx, config):
         raise RuntimeError("knowledge down")

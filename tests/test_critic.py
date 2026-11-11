@@ -8,11 +8,11 @@ from dataclasses import replace
 
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.evals.critic import FIXES_LIMIT, _checked, issue_markdown, policy_request
+from keelchat.runtime.llm import ModelConfig
+from keelchat.state.models import FixTask, ReviewTurn
 from tests.conftest import ROOT
 from tests.helpers import make_runtime
-from yachat.evals.critic import FIXES_LIMIT, _checked, issue_markdown, policy_request
-from yachat.runtime.llm import ModelConfig
-from yachat.state.models import FixTask, ReviewTurn
 
 SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text()
 PATH = "/v1/tenants/default/agents/support-assistant"
@@ -27,14 +27,14 @@ TASK = {
     "problem": "Promised a refund",
     "change": "Check the gateway result before promising",
     "test": "a refund is never promised without a refund tool call",
-    "files": ["yachat/runtime/respond/rewriter.py"],
+    "files": ["keelchat/runtime/respond/rewriter.py"],
     "turns": BAD,
 }
 
 
 async def _client(critic: str = ""):  # type: ignore[no-untyped-def]
-    from yachat.api.app import create_app
-    from yachat.state.store import InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.state.store import InMemoryTenantToolStore
 
     env = ModelConfig.from_env()
     rt, _ = await make_runtime(SUPPORT, models=replace(env, critic=critic and env.generate))
@@ -64,7 +64,7 @@ def test_only_real_turns_are_kept_and_counts_are_capped() -> None:
 
 def test_a_fix_task_reads_as_an_issue() -> None:
     md = issue_markdown(FixTask(tenant="t", agent="support-assistant", **{k: v for k, v in TASK.items() if k != "turns"}, turns=[ReviewTurn(**t) for t in BAD]))
-    parts = ("## Problem", "## Change", "## Test (fails before the fix)", "`yachat/runtime/respond/rewriter.py`", "> **User:** hi", "fix task `fix_")
+    parts = ("## Problem", "## Change", "## Test (fails before the fix)", "`keelchat/runtime/respond/rewriter.py`", "> **User:** hi", "fix task `fix_")
     for part in parts:
         assert part in md, part
 
@@ -77,7 +77,7 @@ async def test_fix_tasks_are_kept_listed_closed_and_linked() -> None:
         assert [f["id"] for f in (await client.get("/v1/tenants/default/fixes?status=open")).json()] == [saved["id"]]
         one = (await client.get(f"/v1/tenants/default/fixes/{saved['id']}")).json()
         assert "## Change" in one["issue_markdown"]
-        url = "https://github.com/acme/yachat/issues/7"
+        url = "https://github.com/acme/keelchat/issues/7"
         done = (await client.patch(f"/v1/tenants/default/fixes/{saved['id']}", json={"status": "done", "note": "PR #8", "issue": url})).json()
         assert done["status"] == "done" and done["issue"] == url and done["title"] == TASK["title"]
         assert (await client.get("/v1/tenants/default/fixes?status=open")).json() == []
@@ -91,7 +91,7 @@ async def test_without_a_critic_model_judging_is_refused() -> None:
     async with client:
         assert (await client.get("/v1/critic")).json() == {"model": None}
         r = await client.post(f"{PATH}/critique", json={"turns": BAD, "yaml": SUPPORT})
-        assert r.status_code == 422 and "YACHAT_MODEL_CRITIC" in r.text
+        assert r.status_code == 422 and "KEELCHAT_MODEL_CRITIC" in r.text
 
 
 async def test_the_critic_names_the_broken_turn_and_proposes_fixes() -> None:

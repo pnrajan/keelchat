@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api.app import create_app
+from keelchat.api.keys import InMemoryApiKeyStore
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.usage import LIMIT_REACHED, Usage, charge_usd
+from keelchat.state.store import InMemoryBudgetStore, InMemoryEmbedStore, InMemoryTenantToolStore, Plan
 from tests.helpers import RecordingLLM, make_runtime, say
-from yachat.api.app import create_app
-from yachat.api.keys import InMemoryApiKeyStore
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.usage import LIMIT_REACHED, Usage, charge_usd
-from yachat.state.store import InMemoryBudgetStore, InMemoryEmbedStore, InMemoryTenantToolStore, Plan
 
 
 async def test_turns_are_counted_and_a_used_up_plan_calls_no_model(policy_yaml):
@@ -52,7 +52,7 @@ def test_a_plan_is_used_up_by_either_limit():
 
 
 def test_a_call_with_no_known_price_is_never_free(monkeypatch):
-    monkeypatch.setenv("YACHAT_UNPRICED_USD_PER_MTOK", "10")
+    monkeypatch.setenv("KEELCHAT_UNPRICED_USD_PER_MTOK", "10")
     calls = [Usage("m", "render", 600_000, 400_000, cost_usd=None), Usage("m", "render", 10, 10, cost_usd=0.5)]
     assert charge_usd(calls) == 10.5
 
@@ -71,7 +71,7 @@ async def test_workspace_model_features_are_refused_once_the_plan_is_used_up(pol
 
 async def test_usage_starts_again_each_month(monkeypatch):
     """The free plan is 100 replies (and its spend cap) every month: a new month starts from zero."""
-    from yachat.state import store
+    from keelchat.state import store
 
     budgets = InMemoryBudgetStore()
     monkeypatch.setattr(store, "usage_period", lambda: "2026-11")

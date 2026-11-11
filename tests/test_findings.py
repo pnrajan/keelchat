@@ -9,13 +9,13 @@ from pathlib import Path
 
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api.app import create_app
+from keelchat.capabilities.nodes.survey import SurveyConfig
+from keelchat.policy.compiler import build
+from keelchat.runtime.findings import tabulate, themes
+from keelchat.state.models import SurveyResponse
+from keelchat.state.store import InMemoryTenantToolStore
 from tests.helpers import RecordingLLM, make_runtime
-from yachat.api.app import create_app
-from yachat.capabilities.nodes.survey import SurveyConfig
-from yachat.policy.compiler import build
-from yachat.runtime.findings import tabulate, themes
-from yachat.state.models import SurveyResponse
-from yachat.state.store import InMemoryTenantToolStore
 
 SURVEY = (Path(__file__).parents[1] / "examples" / "nps_survey.yaml").read_text()
 QUESTIONS = {q.key: q for s in build(SURVEY).steps if s.node == "survey" for q in SurveyConfig.model_validate(dict(s.settings)).questions}
@@ -88,7 +88,7 @@ async def test_findings_and_export_over_the_api_with_the_real_model():
 
 def test_nps_is_only_for_the_recommend_question():
     """A 0-10 satisfaction question gets an average, not an NPS label; the recommend question gets NPS whatever its key."""
-    from yachat.capabilities.nodes.survey_answers import SurveyQuestion
+    from keelchat.capabilities.nodes.survey_answers import SurveyQuestion
 
     sat = SurveyQuestion.model_validate({"key": "satisfaction", "kind": "scale", "prompt": "How satisfied were you?", "scale_min": 0, "scale_max": 10})
     rec = SurveyQuestion.model_validate({"key": "likely", "kind": "scale", "prompt": "How likely are you to recommend us?", "scale_min": 0, "scale_max": 10})
@@ -101,7 +101,7 @@ def test_nps_is_only_for_the_recommend_question():
 async def test_the_newest_responses_are_kept_when_there_are_too_many():
     from datetime import UTC, datetime, timedelta
 
-    from yachat.state.store import InMemoryResponseStore
+    from keelchat.state.store import InMemoryResponseStore
 
     store, t0 = InMemoryResponseStore(), datetime(2026, 1, 1, tzinfo=UTC)
     for n in range(5):
@@ -111,7 +111,7 @@ async def test_the_newest_responses_are_kept_when_there_are_too_many():
 
 
 async def test_open_answers_lose_personal_details_before_themes_and_quotes(monkeypatch):
-    from yachat.runtime import findings as f
+    from keelchat.runtime import findings as f
 
     seen: list[tuple[str, str]] = []
 
@@ -130,7 +130,7 @@ def test_aggregates_trend_and_segments_are_counted_in_code():
     and small groups flagged."""
     from datetime import UTC, datetime, timedelta
 
-    from yachat.runtime.findings import aggregates
+    from keelchat.runtime.findings import aggregates
 
     monday = datetime(2026, 9, 7, 10, tzinfo=UTC)
 
@@ -159,8 +159,8 @@ def test_aggregates_trend_and_segments_are_counted_in_code():
 async def test_what_to_fix_first_is_ranked_in_code_from_unhappy_customers():
     """Themes become recommendations: ranked by how many detractors raise them (counted in code), each with the NPS of
     the people in it and their own words; the model only words the action, and an action with a number is dropped."""
+    from keelchat.runtime.findings import Findings, QuestionFindings, Quote, Theme, recommendations
     from tests.helpers import RecordingLLM
-    from yachat.runtime.findings import Findings, QuestionFindings, Quote, Theme, recommendations
 
     rs = [resp(n, nps=s) for n, s in enumerate([2, 3, 4, 10, 9, 9, 5, 10])]
     ids = [r.id for r in rs]
@@ -176,7 +176,7 @@ async def test_what_to_fix_first_is_ranked_in_code_from_unhappy_customers():
         questions=[QuestionFindings(key="what_went_wrong", prompt="What could we do better?", kind="open", n_asked=8, themes=[box, late, taste])],
     )  # fmt: skip
     recs = await recommendations(
-        found, list(QUESTIONS.values()), rs, RecordingLLM(), __import__("yachat.runtime.llm", fromlist=["ModelConfig"]).ModelConfig.from_env().generate
+        found, list(QUESTIONS.values()), rs, RecordingLLM(), __import__("keelchat.runtime.llm", fromlist=["ModelConfig"]).ModelConfig.from_env().generate
     )
     fix = [r for r in recs.fix]
     assert [r.theme for r in fix] == ["Late delivery", "Packaging"]  # 4 detractors before 1

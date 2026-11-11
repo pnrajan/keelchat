@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from keelchat.capabilities.nodes.common import is_no, is_yes, rule_affirm
+from keelchat.runtime.llm import LLMError
+from keelchat.state.models import MemoryRecord
 from tests.helpers import RecordingLLM, make_runtime, reach_form, say
-from yachat.capabilities.nodes.common import is_no, is_yes, rule_affirm
-from yachat.runtime.llm import LLMError
-from yachat.state.models import MemoryRecord
 
 
 @pytest.mark.parametrize(
@@ -115,7 +115,7 @@ async def test_a_reply_to_the_stop_check_passes_the_safety_checks_first(policy_y
 
 
 async def test_compliance_replies_are_sent_exactly_as_written(policy_yaml):
-    from yachat.capabilities.preprocessors.opt_out import REPLY
+    from keelchat.capabilities.preprocessors.opt_out import REPLY
 
     llm = RecordingLLM()
     rt, _ = await make_runtime(policy_yaml, llm=llm)
@@ -134,11 +134,11 @@ async def test_a_model_reason_cannot_pose_as_a_model_failure(policy_yaml):
                 return {"answer": "unclear", "reason": "model error"}
             return await super().structured(req, schema)
 
-    from yachat.capabilities.nodes.common import affirm, affirm_failed
-    from yachat.policy.compiler import build
-    from yachat.runtime.context import InboundMessage, Services, TurnContext
-    from yachat.runtime.llm import ModelConfig
-    from yachat.state.models import SessionState
+    from keelchat.capabilities.nodes.common import affirm, affirm_failed
+    from keelchat.policy.compiler import build
+    from keelchat.runtime.context import InboundMessage, Services, TurnContext
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.state.models import SessionState
 
     p = build(policy_yaml)
     ctx = TurnContext(
@@ -163,11 +163,11 @@ async def test_an_open_dialog_agent_also_confirms_a_quiet_stop():
 
 
 async def test_a_failed_read_of_a_mentioned_location_asks_again_and_keeps_it():
-    from yachat.capabilities.nodes.job_search import CONFIRM_LOCATION, JobSearch
-    from yachat.registry.contract import make_context
-    from yachat.registry.core import EmptyConfig
-    from yachat.runtime.context import AnswerVerdict
-    from yachat.state.models import OpenQuestion
+    from keelchat.capabilities.nodes.job_search import CONFIRM_LOCATION, JobSearch
+    from keelchat.registry.contract import make_context
+    from keelchat.registry.core import EmptyConfig
+    from keelchat.runtime.context import AnswerVerdict
+    from keelchat.state.models import OpenQuestion
 
     q = OpenQuestion(step="job_search", field=CONFIRM_LOCATION, ask="You mentioned Austin. Search there? (yes/no)", expect="yes or no")
     ctx = make_context("no idea", open_question=q, llm=AffirmDown())

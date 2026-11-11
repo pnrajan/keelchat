@@ -9,11 +9,11 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from keelchat.evals.calibrate import LABELS, Label, LabelSet, Turn, calibrate, group
+from keelchat.evals.calibrate import _validate as validate_labels
+from keelchat.evals.run import EvalReport, evaluate
+from keelchat.policy.compiler import build
 from tests.conftest import ROOT
-from yachat.evals.calibrate import LABELS, Label, LabelSet, Turn, calibrate, group
-from yachat.evals.calibrate import _validate as validate_labels
-from yachat.evals.run import EvalReport, evaluate
-from yachat.policy.compiler import build
 
 SUPPORT = ROOT / "examples" / "support_assistant.yaml"
 #: read at import: conftest clears it for every test

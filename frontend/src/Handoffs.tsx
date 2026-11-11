@@ -17,7 +17,7 @@ export default function Handoffs({ focus, onChange }: { focus?: string | null; o
   const [status, setStatus] = useState<HandoffStatus | "">("open");
   const [rows, setRows] = useState<Handoff[] | null>(null);
   const [open, setOpen] = useState<string | null>(focus ?? null);
-  const [me, setMe] = useState(() => { try { return localStorage.getItem("yachat.assignee") ?? ""; } catch { return ""; } });
+  const [me, setMe] = useState(() => { try { return localStorage.getItem("keelchat.assignee") ?? ""; } catch { return ""; } });
   const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
@@ -33,7 +33,7 @@ export default function Handoffs({ focus, onChange }: { focus?: string | null; o
   async function act(h: Handoff, change: { status?: HandoffStatus; assignee?: string; note?: string; resume?: boolean }) {
     try {
       await api.updateHandoff(h.id, change);
-      try { if (change.assignee) localStorage.setItem("yachat.assignee", change.assignee); } catch { /* per-browser convenience only */ }
+      try { if (change.assignee) localStorage.setItem("keelchat.assignee", change.assignee); } catch { /* per-browser convenience only */ }
       setNote(""); load(); onChange?.();
     } catch (e) { setErr((e as Error).message); }
   }

@@ -20,9 +20,9 @@ export class ApiError extends Error {
   }
 }
 
-const KEY = "yachat.apiKey";
+const KEY = "keelchat.apiKey";
 
-// When the server sets YACHAT_API_KEY, every route needs it as a bearer token. The console asks once on a 401
+// When the server sets KEELCHAT_API_KEY, every route needs it as a bearer token. The console asks once on a 401
 // and keeps it in this browser only.
 // /console/#key: enter a key by hand (the server admin) instead of signing in; read at load, before the app rewrites the hash
 const KEY_BY_HAND = typeof window !== "undefined" && window.location.hash === "#key";
@@ -45,7 +45,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
       window.location.href = "/signup/#signin";
       return new Promise<T>(() => {});
     }
-    const key = window.prompt("This server requires an API key (YACHAT_API_KEY):");
+    const key = window.prompt("This server requires an API key (KEELCHAT_API_KEY):");
     if (key) {
       localStorage.setItem(KEY, key.trim());
       r = await send(method, path, body);

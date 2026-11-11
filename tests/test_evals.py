@@ -9,14 +9,14 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from keelchat.evals.metrics import CATALOGUE, MetricScore, Thresholds, gate, online_metrics
+from keelchat.evals.online import OutcomeSplit, export_replay, redact, redact_session
+from keelchat.evals.replay import Expect, Outcome, ReplayCase, ReplayResult, load_cases, load_set, run_set
+from keelchat.evals.run import evaluate, score
+from keelchat.policy.compiler import build
+from keelchat.sim.harness import TurnLog
+from keelchat.state.models import SessionState, Turn
 from tests.conftest import ROOT
-from yachat.evals.metrics import CATALOGUE, MetricScore, Thresholds, gate, online_metrics
-from yachat.evals.online import OutcomeSplit, export_replay, redact, redact_session
-from yachat.evals.replay import Expect, Outcome, ReplayCase, ReplayResult, load_cases, load_set, run_set
-from yachat.evals.run import evaluate, score
-from yachat.policy.compiler import build
-from yachat.sim.harness import TurnLog
-from yachat.state.models import SessionState, Turn
 
 EVALS = ROOT / "evals"
 #: read at import: conftest clears it for every test so only this file's judged test calls a judge
@@ -24,7 +24,7 @@ JUDGE = os.getenv("EVALS_JUDGE_MODEL")
 
 
 async def _set(name: str) -> list[ReplayResult]:
-    """The set's scripted cases. Persona cases vary run to run: `yachat evals run` covers them, not the unit suite."""
+    """The set's scripted cases. Persona cases vary run to run: `keelchat evals run` covers them, not the unit suite."""
     th = Thresholds.load(EVALS / name / "thresholds.yaml")
     replay = load_set(EVALS / name / "replay.yaml")
     replay.cases = [c for c in replay.cases if not c.persona]
@@ -115,7 +115,7 @@ async def test_evaluate_without_judge_checks_expectations_only() -> None:
 
 
 def test_ragas_context_is_the_listed_tools_output() -> None:
-    from yachat.evals.run import _context
+    from keelchat.evals.run import _context
 
     t = TurnLog("q", "a", ["job_search", "knowledge_search"], ["[jobs]", "[passages]"])
     assert _context(t, ["knowledge_search"]) == ["[passages]"] and _context(t, None) == ["[jobs]", "[passages]"]

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from yachat.capabilities.nodes.common import answers_for
-from yachat.registry.core import CapabilityConfig, Node, NodeResult, node
-from yachat.runtime.context import TurnContext
+from keelchat.capabilities.nodes.common import answers_for
+from keelchat.registry.core import CapabilityConfig, Node, NodeResult, node
+from keelchat.runtime.context import TurnContext
 
 ASK = ("slot", "Which of these times suits you? Reply with its number.", "the number or time of one listed slot")
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from yachat.registry.core import tool
+from keelchat.registry.core import tool
 
 
 @tool("salary_lookup", timeout_s=3.0)

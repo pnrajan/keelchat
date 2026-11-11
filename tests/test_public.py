@@ -6,18 +6,18 @@ import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api import public
+from keelchat.api.app import create_app
+from keelchat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
 from tests.helpers import make_runtime
-from yachat.api import public
-from yachat.api.app import create_app
-from yachat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
 
 ADMIN = {"authorization": "Bearer admin-secret"}
 
 
 @pytest.fixture
 async def client(policy_yaml, monkeypatch):
-    monkeypatch.setenv("YACHAT_API_KEY", "admin-secret")  # every other route needs a key
-    monkeypatch.setenv("YACHAT_EMBED_SECRET", "test-signing-secret")
+    monkeypatch.setenv("KEELCHAT_API_KEY", "admin-secret")  # every other route needs a key
+    monkeypatch.setenv("KEELCHAT_EMBED_SECRET", "test-signing-secret")
     monkeypatch.setattr(public, "_SECRET", None)
     rt, _ = await make_runtime(policy_yaml)
     app = create_app(rt, tool_store=InMemoryTenantToolStore(), embeds=InMemoryEmbedStore())
@@ -89,7 +89,7 @@ async def test_new_conversations_are_limited_per_visitor_address_and_per_day(cli
 
 
 async def test_the_daily_limit_is_a_sliding_window():
-    from yachat.state.store import InMemoryRateLimiter
+    from keelchat.state.store import InMemoryRateLimiter
 
     lim = InMemoryRateLimiter()
     assert [await lim.take("k", 2, 60, now=t) for t in (1.0, 2.0)] == [True, True] and not await lim.take("k", 2, 60, now=3.0)
@@ -126,9 +126,9 @@ def test_the_visitor_address_comes_from_the_proxy_header_when_configured(monkeyp
         raw = [(k.lower().encode(), v.encode()) for k, v in headers.items()]
         return Request({"type": "http", "headers": raw, "client": ("172.16.8.138", 40144)})
 
-    monkeypatch.delenv("YACHAT_CLIENT_IP_HEADER", raising=False)
+    monkeypatch.delenv("KEELCHAT_CLIENT_IP_HEADER", raising=False)
     assert public.client_ip(req({"Fly-Client-IP": "203.0.113.9"})) == "172.16.8.138"  # not trusted unless configured
-    monkeypatch.setenv("YACHAT_CLIENT_IP_HEADER", "Fly-Client-IP")
+    monkeypatch.setenv("KEELCHAT_CLIENT_IP_HEADER", "Fly-Client-IP")
     assert public.client_ip(req({"Fly-Client-IP": "203.0.113.9"})) == "203.0.113.9"
     assert public.client_ip(req({})) == "172.16.8.138"  # header missing: the connection's address
 

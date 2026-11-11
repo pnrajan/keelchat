@@ -4,11 +4,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from keelchat.runtime import usage
+from keelchat.runtime.audit import UsageReport, audit_db, usage_report
+from keelchat.state.models import AuditEvent
+from keelchat.state.store import InMemoryAuditStore
 from tests.helpers import make_runtime, say
-from yachat.runtime import usage
-from yachat.runtime.audit import UsageReport, audit_db, usage_report
-from yachat.state.models import AuditEvent
-from yachat.state.store import InMemoryAuditStore
 
 
 async def report(events: list[AuditEvent], since: datetime, until: datetime) -> UsageReport:
@@ -22,7 +22,7 @@ async def report(events: list[AuditEvent], since: datetime, until: datetime) -> 
 
 
 def test_config_prices_win_and_unknown_models_have_no_cost(monkeypatch):
-    monkeypatch.setenv("YACHAT_MODEL_PRICES", '{"house-model": [2, 10]}')
+    monkeypatch.setenv("KEELCHAT_MODEL_PRICES", '{"house-model": [2, 10]}')
     usage.price_overrides.cache_clear()
     try:
         assert usage.price("house-model", 1_000_000, 100_000) == (3.0, "config")
@@ -81,12 +81,12 @@ async def test_every_model_call_of_a_turn_is_recorded(policy_yaml):
 async def test_usage_over_the_api_is_per_tenant(monkeypatch):
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.store import InMemoryTenantToolStore
-    from yachat.testing.fakes import FakeTools
+    from keelchat.api.app import create_app
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryTenantToolStore
+    from keelchat.testing.fakes import FakeTools
 
     rt = Runtime(llm_from_env(), FakeTools().impls(), models=ModelConfig.from_env())
     now = datetime.now(UTC)
@@ -107,7 +107,7 @@ async def test_usage_over_the_api_is_per_tenant(monkeypatch):
         )
 
     await rt.audit.append([mk("acme", 0.5), mk("other", 9.0)])
-    monkeypatch.setenv("YACHAT_TENANT_KEYS", "acme:k-acme")
+    monkeypatch.setenv("KEELCHAT_TENANT_KEYS", "acme:k-acme")
     app = create_app(rt, tool_store=InMemoryTenantToolStore())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t", headers={"authorization": "Bearer k-acme"}) as c:
         u = (await c.get("/v1/tenants/acme/usage", params={"days": 7})).json()
@@ -144,13 +144,13 @@ async def test_openrouter_prices_are_fetched_live():
 async def test_prices_can_be_refreshed_from_settings_at_most_once_a_minute(monkeypatch):
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.store import InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryTenantToolStore
 
-    monkeypatch.setenv("YACHAT_OPENROUTER_PRICES", "off")  # only the button fetches here
+    monkeypatch.setenv("KEELCHAT_OPENROUTER_PRICES", "off")  # only the button fetches here
     app = create_app(Runtime(llm_from_env(), models=ModelConfig.from_env()), tool_store=InMemoryTenantToolStore())
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
@@ -163,7 +163,7 @@ async def test_prices_can_be_refreshed_from_settings_at_most_once_a_minute(monke
 
 
 async def test_cheaper_models_are_suggested_from_the_live_catalog_and_priced_on_real_use():
-    from yachat.runtime import usage
+    from keelchat.runtime import usage
 
     if not await usage.refresh_openrouter():
         pytest.skip("OpenRouter unreachable")
@@ -195,7 +195,7 @@ def test_proxy_headers_name_the_routed_model_its_cost_and_the_tokens_saved():
 
 async def test_metered_records_any_clients_calls_with_the_gateways_cost(monkeypatch):
     """`@metered` on a client's provider call is all a custom LLMClient needs for the cost page."""
-    from yachat.runtime.llm import LLMRequest
+    from keelchat.runtime.llm import LLMRequest
 
     class MyClient:
         @usage.metered()
@@ -207,7 +207,7 @@ async def test_metered_records_any_clients_calls_with_the_gateways_cost(monkeypa
         await MyClient()._send(
             req, headers={"x-litellm-model-name": "openai/Qwen/Qwen3.5-35B-A3B", "x-litellm-response-cost": "0.002", "x-headroom-tokens-saved": "120"}
         )
-        monkeypatch.setenv("YACHAT_MODEL_PRICES", '{"large": [1, 1]}')  # a configured price beats the gateway's
+        monkeypatch.setenv("KEELCHAT_MODEL_PRICES", '{"large": [1, 1]}')  # a configured price beats the gateway's
         usage.price_overrides.cache_clear()
         await MyClient()._send(req, headers={"x-litellm-response-cost": "0.002"})
     usage.price_overrides.cache_clear()
@@ -230,8 +230,8 @@ async def test_the_report_counts_tokens_saved_by_headroom():
 @pytest.mark.skipif(not __import__("os").getenv("LITELLM_PROXY_URL"), reason="needs a running LiteLLM gateway (docker compose --profile gateway)")
 async def test_calls_through_a_live_gateway_are_priced_by_the_model_it_routed_to():
     """The gateway's aliases (small, large) have no price of their own: the model it routed each call to is priced."""
-    from yachat.runtime.llm import LLMRequest, ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
+    from keelchat.runtime.llm import LLMRequest, ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
 
     await usage.refresh_openrouter()
     try:

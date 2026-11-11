@@ -8,8 +8,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
-from yachat.api.app import create_app
-from yachat.datasets.models import (
+from keelchat.api.app import create_app
+from keelchat.datasets.models import (
     Dataset,
     DatasetIn,
     StructuredDataset,
@@ -17,14 +17,14 @@ from yachat.datasets.models import (
     TableSource,
     UnstructuredDataset,
 )
-from yachat.datasets.sources import SourceRejected, check_uri
-from yachat.policy.compiler import build
-from yachat.registry.core import REGISTRY, CapabilityConfig, Node, NodeResult, NodeSpec, ToolSpec, _input_model_from_signature
-from yachat.runtime.decide.tool_gateway import ToolGateway
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
-from yachat.runtime.runtime import Runtime
-from yachat.state.store import InMemoryTenantToolStore
+from keelchat.datasets.sources import SourceRejected, check_uri
+from keelchat.policy.compiler import build
+from keelchat.registry.core import REGISTRY, CapabilityConfig, Node, NodeResult, NodeSpec, ToolSpec, _input_model_from_signature
+from keelchat.runtime.decide.tool_gateway import ToolGateway
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
+from keelchat.runtime.runtime import Runtime
+from keelchat.state.store import InMemoryTenantToolStore
 
 received: list[Dataset] = []
 
@@ -87,24 +87,24 @@ def test_sources_must_stay_under_the_data_root(tmp_path, monkeypatch):
     (root / "ok.csv").write_text("a\n1\n")
     (tmp_path / "secret.csv").write_text("x\n")
     (root / "link.csv").symlink_to(tmp_path / "secret.csv")
-    monkeypatch.delenv("YACHAT_DATA_ROOT", raising=False)
-    with pytest.raises(SourceRejected, match="YACHAT_DATA_ROOT"):
+    monkeypatch.delenv("KEELCHAT_DATA_ROOT", raising=False)
+    with pytest.raises(SourceRejected, match="KEELCHAT_DATA_ROOT"):
         check_uri(str(root / "ok.csv"))
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(root))
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(root))
     check_uri(str(root / "ok.csv"))
     check_uri(f"file://{root}/ok.csv")
     for bad in (f"{root}/../secret.csv", str(root / "link.csv"), str(root / "missing.csv"), "https://example.com/a.csv"):
         with pytest.raises(SourceRejected):
             check_uri(bad)
-    monkeypatch.setenv("YACHAT_DATA_BUCKETS", "data, other")
+    monkeypatch.setenv("KEELCHAT_DATA_BUCKETS", "data, other")
     check_uri("s3://data/orders.csv")
-    with pytest.raises(SourceRejected, match="not in YACHAT_DATA_BUCKETS"):
+    with pytest.raises(SourceRejected, match="not in KEELCHAT_DATA_BUCKETS"):
         check_uri("s3://someone-else/orders.csv")
 
 
 @pytest.fixture
 async def client(monkeypatch):
-    monkeypatch.setenv("YACHAT_DATA_BUCKETS", "data")
+    monkeypatch.setenv("KEELCHAT_DATA_BUCKETS", "data")
     app = create_app(Runtime(llm_from_env(), models=ModelConfig.from_env()), tool_store=InMemoryTenantToolStore())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         yield c, app.state.runtime
@@ -178,7 +178,7 @@ async def test_runtime_resolves_the_tenants_dataset_each_turn(peek_capability):
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_dataset_store():
-    from yachat.state.postgres_store import PostgresDatasetStore
+    from keelchat.state.postgres_store import PostgresDatasetStore
 
     store = PostgresDatasetStore(url=os.environ["DATABASE_URL"])
     tenant = f"t{os.getpid()}"
@@ -191,13 +191,13 @@ async def test_postgres_dataset_store():
 
 
 async def test_registration_is_checked_by_the_data_service_when_one_is_configured(client, monkeypatch, tmp_path):
-    from yachat.analytics.analyst import Analyst
-    from yachat.analytics.api import create_app as analytics_app
-    from yachat.analytics.service import AnalyticsService
+    from keelchat.analytics.analyst import Analyst
+    from keelchat.analytics.api import create_app as analytics_app
+    from keelchat.analytics.service import AnalyticsService
 
     c, _ = client
     (tmp_path / "orders.csv").write_text("region,amount\nEU,1\n")
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
     service = analytics_app(AnalyticsService(Analyst(llm_from_env(), ModelConfig.from_env())))
     real = httpx.AsyncClient
 
@@ -210,7 +210,7 @@ async def test_registration_is_checked_by_the_data_service_when_one_is_configure
     assert (await c.put("/v1/tenants/acme/datasets/sales", json=ok)).status_code == 200
     outside = {"spec": {"kind": "structured", "tables": [{"name": "t", "uri": "/etc/hosts", "format": "csv"}]}}
     r = await c.put("/v1/tenants/acme/datasets/broken", json=outside)
-    assert r.status_code == 422 and "outside YACHAT_DATA_ROOT" in r.json()["detail"]  # the service's reason
+    assert r.status_code == 422 and "outside KEELCHAT_DATA_ROOT" in r.json()["detail"]  # the service's reason
     (tmp_path / "bad.parquet").write_bytes(b"not parquet")
     bad = {"spec": {"kind": "structured", "tables": [{"name": "t", "uri": str(tmp_path / "bad.parquet")}]}}
     r = await c.put("/v1/tenants/acme/datasets/broken", json=bad)
@@ -219,15 +219,15 @@ async def test_registration_is_checked_by_the_data_service_when_one_is_configure
 
 
 async def test_deleting_an_unstructured_dataset_purges_its_documents(client, monkeypatch, tmp_path):
-    from yachat.knowledge.api import create_app as knowledge_app
-    from yachat.knowledge.docstore import InMemoryDocumentStore
-    from yachat.knowledge.embedder import FakeEmbedder
-    from yachat.knowledge.service import KnowledgeService, make_indexer
-    from yachat.knowledge.vectorstore import InMemoryIndex
+    from keelchat.knowledge.api import create_app as knowledge_app
+    from keelchat.knowledge.docstore import InMemoryDocumentStore
+    from keelchat.knowledge.embedder import FakeEmbedder
+    from keelchat.knowledge.service import KnowledgeService, make_indexer
+    from keelchat.knowledge.vectorstore import InMemoryIndex
 
     c, _ = client
     (tmp_path / "faq.md").write_text("Refunds take five days.")
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
     svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
     service = knowledge_app(svc)
     real = httpx.AsyncClient
@@ -248,8 +248,8 @@ async def test_deleting_an_unstructured_dataset_purges_its_documents(client, mon
 async def test_a_dataset_whose_data_cannot_be_purged_is_kept(client, monkeypatch, tmp_path):
     c, rt = client
     (tmp_path / "faq.md").write_text("Refunds take five days.")
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(tmp_path))
-    from yachat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
+    from keelchat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
 
     await rt.datasets.put(Dataset.create("acme", "faq", DatasetIn(spec=UnstructuredDataset(documents=[DocumentSource(uri=str(tmp_path / "faq.md"))]))))
     monkeypatch.setenv("KNOWLEDGE_URL", "http://127.0.0.1:9")  # nothing listens: the purge fails

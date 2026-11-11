@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from keelchat.capabilities.nodes.survey import SurveyConfig
+from keelchat.capabilities.nodes.survey_answers import AskIf, SurveyQuestion, condition_met, describe, parse
 from tests.helpers import make_runtime, say
-from yachat.capabilities.nodes.survey import SurveyConfig
-from yachat.capabilities.nodes.survey_answers import AskIf, SurveyQuestion, condition_met, describe, parse
 
 SURVEY = Path(__file__).parents[1] / "examples" / "nps_survey.yaml"
 

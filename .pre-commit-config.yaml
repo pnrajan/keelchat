@@ -12,7 +12,7 @@ repos:
         entry: uv run mypy
         language: system
         pass_filenames: false
-        files: ^yachat/
+        files: ^keelchat/
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:

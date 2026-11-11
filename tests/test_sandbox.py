@@ -10,24 +10,24 @@ import pytest
 from smolagents.monitoring import AgentLogger, LogLevel
 from smolagents.utils import AgentError
 
+from keelchat.analytics.analyst import Analyst, Limits
+from keelchat.analytics.code_agent import SandboxExecutor, data_files, final_answer_code
+from keelchat.analytics.models import AnalyzeIn
+from keelchat.analytics.sandbox import MARK, FakeSandbox, LocalSandbox, RunOutput, parse, parse_agentcore, sandbox_from_env, wrap
+from keelchat.analytics.service import AnalyticsService
+from keelchat.reasoning import Check
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
 from tests.test_analytics import root, sales  # noqa: F401  (fixture)
-from yachat.analytics.analyst import Analyst, Limits
-from yachat.analytics.code_agent import SandboxExecutor, data_files, final_answer_code
-from yachat.analytics.models import AnalyzeIn
-from yachat.analytics.sandbox import MARK, FakeSandbox, LocalSandbox, RunOutput, parse, parse_agentcore, sandbox_from_env, wrap
-from yachat.analytics.service import AnalyticsService
-from yachat.reasoning import Check
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
 
 
 def _docker_sandbox() -> bool:
     if not shutil.which("docker"):
         return False
-    return subprocess.run(["docker", "image", "inspect", "yachat-sandbox:latest"], capture_output=True).returncode == 0
+    return subprocess.run(["docker", "image", "inspect", "keelchat-sandbox:latest"], capture_output=True).returncode == 0
 
 
-docker = pytest.mark.skipif(not _docker_sandbox(), reason="docker with the yachat-sandbox image (deploy/sandbox) not available")
+docker = pytest.mark.skipif(not _docker_sandbox(), reason="docker with the keelchat-sandbox image (deploy/sandbox) not available")
 
 
 def result_line(status: str, value: object = None, logs: str = "") -> RunOutput:
@@ -43,11 +43,11 @@ def test_run_protocol_and_backends_from_env(monkeypatch):
         "stream": [{"result": {"structuredContent": {"stdout": "a\n", "stderr": "", "exitCode": 0}}}, {"result": {"content": [{"type": "text", "text": "b"}]}}]
     }
     assert parse_agentcore(stream) == RunOutput("a\nb", "", 0)
-    monkeypatch.delenv("YACHAT_SANDBOX", raising=False)
+    monkeypatch.delenv("KEELCHAT_SANDBOX", raising=False)
     assert sandbox_from_env() is None
-    monkeypatch.setenv("YACHAT_SANDBOX", "agentcore")
+    monkeypatch.setenv("KEELCHAT_SANDBOX", "agentcore")
     assert sandbox_from_env().name == "agentcore"
-    monkeypatch.setenv("YACHAT_SANDBOX", "lambda")
+    monkeypatch.setenv("KEELCHAT_SANDBOX", "lambda")
     with pytest.raises(ValueError, match="expected local or agentcore"):
         sandbox_from_env()
 
@@ -99,7 +99,7 @@ def test_docker_sandbox_isolation():
     assert run("x = b'1' * (600 * 1024 * 1024)")["status"] == "error"  # memory limit (pages written; a zeroed bytearray is never committed)
     with pytest.raises(Exception, match="timed out"):
         sb.run(wrap([], "while True: pass"), {}, 2)
-    left = subprocess.run(["docker", "ps", "-aq", "--filter", "ancestor=yachat-sandbox:latest"], capture_output=True, text=True).stdout
+    left = subprocess.run(["docker", "ps", "-aq", "--filter", "ancestor=keelchat-sandbox:latest"], capture_output=True, text=True).stdout
     assert left.strip() == ""  # every run's container is gone
 
 

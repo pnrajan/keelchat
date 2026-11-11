@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>yachat: describe a chatbot, chat with it, run it yourself</title>
-<meta name="description" content="Describe a chatbot in plain words, get the YAML file that runs it and chat with it right away. Open source: clone yachat and run it on your own machine.">
+<title>keelchat: describe a chatbot, chat with it, run it yourself</title>
+<meta name="description" content="Describe a chatbot in plain words, get the YAML file that runs it and chat with it right away. Open source: clone keelchat and run it on your own machine.">
 <style>
   :root { --bg: #ffffff; --fg: #1f1f1d; --muted: #6e6e69; --line: #e6e5e0; --soft: #f4f4f1; --you: #efeee9; --accent: #2f6f4f; --warn: #9a5b13; color-scheme: light }
   @media (prefers-color-scheme: dark) {
@@ -99,15 +99,15 @@
 </head>
 <body data-embed="__EMBED_ID__">
 <header>
-  <b>yachat</b>
+  <b>keelchat</b>
   <div class="tabs" role="tablist">
     <button role="tab" id="tab-make" aria-selected="true" type="button">Make a bot</button>
     <button role="tab" id="tab-try" aria-selected="false" type="button">Try a bot</button>
   </div>
   <nav>
-    <a class="ghost hide-sm" href="https://github.com/pnrajan/yachat/tree/main/docs">Docs</a>
-    <a class="ghost" href="https://github.com/pnrajan/yachat">★ Star</a>
-    <a class="solid" href="https://github.com/pnrajan/yachat/fork">Fork on GitHub</a>
+    <a class="ghost hide-sm" href="https://github.com/pnrajan/keelchat/tree/main/docs">Docs</a>
+    <a class="ghost" href="https://github.com/pnrajan/keelchat">★ Star</a>
+    <a class="solid" href="https://github.com/pnrajan/keelchat/fork">Fork on GitHub</a>
   </nav>
 </header>
 
@@ -116,8 +116,8 @@
   <section id="make">
     <div class="col empty" id="make-empty">
       <h1>Describe a chatbot. Chat with it. Run it yourself.</h1>
-      <p>In yachat, a bot is one short YAML file: what it is for, what it asks, its rules and limits, and when it hands over to
-        a person. Say what yours should do in a sentence or two; a model writes the file and yachat checks that it builds.</p>
+      <p>In keelchat, a bot is one short YAML file: what it is for, what it asks, its rules and limits, and when it hands over to
+        a person. Say what yours should do in a sentence or two; a model writes the file and keelchat checks that it builds.</p>
       <p>Press <b>Try this bot</b> to talk to it here, ask for changes in plain words, then clone the repo and run it on your
         own machine. It's open source (Apache-2.0).</p>
       <div class="cards">
@@ -177,15 +177,15 @@
       <b>Build &amp; try</b>.</p>
     <div class="file">
       <div class="bar"><b>terminal</b><button class="ghost" type="button" data-copy-steps>Copy</button></div>
-      <pre>git clone https://github.com/pnrajan/yachat &amp;&amp; cd yachat
+      <pre>git clone https://github.com/pnrajan/keelchat &amp;&amp; cd keelchat
 ./setup.sh                # installs what's missing, asks for your model key
-uv run yachat build my_bot.yaml   # check your file
+uv run keelchat build my_bot.yaml   # check your file
 scripts/try.sh            # the console, with chat, tests and the judge</pre>
     </div>
     <div class="row">
-      <a class="solid" href="https://github.com/pnrajan/yachat/fork">Fork on GitHub</a>
-      <a class="ghost" href="https://github.com/pnrajan/yachat/blob/main/docs/POLICY_LANGUAGE.md">Every YAML key</a>
-      <a class="ghost" href="https://github.com/pnrajan/yachat/blob/main/docs/ADDING_A_CAPABILITY.md">Add your own tools</a>
+      <a class="solid" href="https://github.com/pnrajan/keelchat/fork">Fork on GitHub</a>
+      <a class="ghost" href="https://github.com/pnrajan/keelchat/blob/main/docs/POLICY_LANGUAGE.md">Every YAML key</a>
+      <a class="ghost" href="https://github.com/pnrajan/keelchat/blob/main/docs/ADDING_A_CAPABILITY.md">Add your own tools</a>
     </div>
   </div>
   <p class="hint">Want a change? Ask below, e.g. "also ask for an email" or "answer in Spanish too", then try it again.</p>
@@ -193,7 +193,7 @@ scripts/try.sh            # the console, with chat, tests and the judge</pre>
 
 <dialog id="yaml">
   <div class="bar"><b>support_assistant.yaml</b><button class="ghost" type="button" id="close-yaml">Close</button></div>
-  <p>This file is the whole bot. yachat's runtime runs it: the steps, the rule, the limits and the handoff.</p>
+  <p>This file is the whole bot. keelchat's runtime runs it: the steps, the rule, the limits and the handoff.</p>
   <pre>__POLICY__</pre>
 </dialog>
 

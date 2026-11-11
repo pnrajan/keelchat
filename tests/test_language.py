@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from keelchat.runtime.understand.language_rules import evidence, explicit_request, scores
 from tests.helpers import make_runtime, reach_form, say
-from yachat.runtime.understand.language_rules import evidence, explicit_request, scores
 
 
 async def test_spanish_in_spanish_out_french_unsupported(policy_yaml):

@@ -15,13 +15,13 @@ acknowledgement within three working days.
   the model sees a message; output guardrails (`pii` always on) run before a reply leaves.
 - **Memory**: only policy-listed fields are extracted; sensitive fields need consent and must be volunteered;
   flagged turns are never used; values decay by half-life; `DELETE /v1/users/{id}/memory` removes everything.
-- **Datasets and analytics**: dataset sources must sit under `YACHAT_DATA_ROOT` or an allowed bucket (checked
+- **Datasets and analytics**: dataset sources must sit under `KEELCHAT_DATA_ROOT` or an allowed bucket (checked
   with symlinks resolved); a policy reaches only the datasets its steps name, in its own tenant. SQL runs on an
   in-memory DuckDB copy with file, network and extension access disabled and settings locked: one SELECT, row cap,
   timeout. Model-written Python runs only in a sandbox (never in the service process), a fresh one per run, with no
   network, CPU, memory and file limits, and read-only system paths; query results are untrusted data in prompts.
 - **Logs**: structured JSON with ids, never secrets; user text is PII-redacted before logging.
-- **API auth**: `YACHAT_API_KEY` gates every route of both services when set. Without it the APIs accept any
+- **API auth**: `KEELCHAT_API_KEY` gates every route of both services when set. Without it the APIs accept any
   caller; do not expose them publicly without it and a reverse proxy.
 
 ## Known limitations

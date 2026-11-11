@@ -1,7 +1,7 @@
 # A salon's booking assistant built on an extension package (examples/extensions/booking_caps): a custom tool
 # (slot_search), a custom step that offers and books slots (pick_slot) and a custom output guardrail
 # (no_price_promises). Run it with
-#   PYTHONPATH=examples/extensions YACHAT_CAPABILITY_PACKAGES=booking_caps uv run yachat build examples/booking_assistant.yaml
+#   PYTHONPATH=examples/extensions KEELCHAT_CAPABILITY_PACKAGES=booking_caps uv run keelchat build examples/booking_assistant.yaml
 agent: booking-assistant
 charter: >
   Help clients of Luma Salon find an appointment slot. Warm and brief. Prices are confirmed in the salon.

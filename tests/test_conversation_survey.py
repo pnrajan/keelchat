@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
+from keelchat.capabilities.nodes.conversation_survey import ConversationSurveyConfig, Objective
+from keelchat.capabilities.nodes.survey_answers import QuestionKind, survey_questions_of
+from keelchat.policy.compiler import build
 from tests.helpers import make_runtime, say
-from yachat.capabilities.nodes.conversation_survey import ConversationSurveyConfig, Objective
-from yachat.capabilities.nodes.survey_answers import QuestionKind, survey_questions_of
-from yachat.policy.compiler import build
 
 FEEDBACK = (Path(__file__).parents[1] / "examples" / "customer_feedback.yaml").read_text()
 
@@ -70,11 +70,11 @@ async def test_pretend_customers_test_the_survey_and_give_a_confidence_score():
 
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.state.store import InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.state.store import InMemoryTenantToolStore
 
     rt, _ = await make_runtime(FEEDBACK)
-    from yachat.state.store import InMemoryJobStore
+    from keelchat.state.store import InMemoryJobStore
 
     app = create_app(rt, tool_store=InMemoryTenantToolStore(), jobs=InMemoryJobStore())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t", timeout=60) as c:
@@ -96,8 +96,8 @@ async def test_pretend_customers_test_the_survey_and_give_a_confidence_score():
 def test_two_sentences_in_a_free_text_answer_are_one_answer_not_a_conflict():
     """'Which one is right?' is for a field that holds one value (an address); a survey's free-text answer given in two
     sentences is joined instead."""
-    from yachat.runtime.decide.intent_detector import IntentItem, join_free_text, summarize
-    from yachat.state.models import OpenQuestion
+    from keelchat.runtime.decide.intent_detector import IntentItem, join_free_text, summarize
+    from keelchat.state.models import OpenQuestion
 
     items = [
         IntentItem(intent="new_answer", text="get your shipping act together", fields={"improve": "get your shipping act together"}),

@@ -8,8 +8,8 @@ import pytest
 
 sentry_sdk = pytest.importorskip("sentry_sdk")
 
+from keelchat import tracing  # noqa: E402
 from tests.helpers import make_runtime, say  # noqa: E402
-from yachat import tracing  # noqa: E402
 
 SECRET = "my card is 4111 1111 1111 1111 and I live at 12 Elm St"
 
@@ -58,6 +58,6 @@ async def test_a_turn_is_traced_by_stage_and_model_call_without_its_text(policy_
         monkeypatch.setattr(tracing, "_on", False)
     tx = next(e for e in sent if e.get("type") == "transaction")
     ops = {sp["op"] for sp in tx["spans"]}
-    assert {"yachat.stage", "yachat.step", "yachat.model"} <= ops, sorted(ops)
+    assert {"keelchat.stage", "keelchat.step", "keelchat.model"} <= ops, sorted(ops)
     assert tx["tags"]["agent"] == "hiring-agent" and tx["contexts"]["turn"]["session_id"] == s.id
     assert "4111" not in json.dumps(sent) and "Elm St" not in json.dumps(sent)

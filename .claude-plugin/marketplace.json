@@ -1,11 +1,11 @@
 {
-  "name": "yachat",
-  "owner": { "name": "yachat" },
+  "name": "keelchat",
+  "owner": { "name": "keelchat" },
   "plugins": [
     {
-      "name": "yachat",
-      "source": "./plugins/yachat",
-      "description": "Build, check, try and launch goal-oriented chat agents on your yachat server, scoped to your tenant; fix what its judge model finds in trial conversations."
+      "name": "keelchat",
+      "source": "./plugins/keelchat",
+      "description": "Build, check, try and launch goal-oriented chat agents on your keelchat server, scoped to your tenant; fix what its judge model finds in trial conversations."
     }
   ]
 }

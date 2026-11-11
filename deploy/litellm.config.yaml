@@ -1,5 +1,5 @@
 # LiteLLM gateway config for `docker compose --profile gateway`. Aliases `small` and `large` are what the app uses
-# (YACHAT_MODEL_CLASSIFY=small, YACHAT_MODEL_GENERATE=large); routing, fallbacks and cost live here.
+# (KEELCHAT_MODEL_CLASSIFY=small, KEELCHAT_MODEL_GENERATE=large); routing, fallbacks and cost live here.
 model_list:
   - model_name: small
     litellm_params:

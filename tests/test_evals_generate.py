@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 import yaml
 
+from keelchat.evals.checks import code_checks
+from keelchat.evals.generate import covered, generate, shrink, targets, write
+from keelchat.evals.metrics import Thresholds
+from keelchat.evals.replay import Expect, Outcome, ReplayCase, ReplayResult, load_agent_set
+from keelchat.policy.compiler import build
+from keelchat.sim.harness import TurnLog
 from tests.conftest import ROOT
-from yachat.evals.checks import code_checks
-from yachat.evals.generate import covered, generate, shrink, targets, write
-from yachat.evals.metrics import Thresholds
-from yachat.evals.replay import Expect, Outcome, ReplayCase, ReplayResult, load_agent_set
-from yachat.policy.compiler import build
-from yachat.sim.harness import TurnLog
 
 SUPPORT = ROOT / "examples" / "support_assistant.yaml"
 #: read at import: conftest clears it for every test
@@ -76,14 +76,14 @@ async def test_shrink_keeps_the_shortest_script_that_still_fails() -> None:
 
 
 def test_written_set_loads_with_the_hand_written_one(tmp_path: Path) -> None:
-    from yachat.evals.generate import GenerateReport
+    from keelchat.evals.generate import GenerateReport
 
     hand = {"fixtures": {"passages": [{"title": "T", "text": "x", "source": "s"}]}, "cases": [{"name": "mine", "messages": ["hi"]}]}
     (tmp_path / "replay.yaml").write_text(yaml.safe_dump(hand))
     case = ReplayCase(name="gen_handed_off", messages=["hi", "a person please"], expect=Expect(exit_reason="handed_off"), note="covers handed_off")
     report = GenerateReport("support-assistant", ["handed_off"], cases=[case])
     out = write(tmp_path, SUPPORT, report)
-    assert out.read_text().startswith("# yachat evals generate: support-assistant: 1 cases")
+    assert out.read_text().startswith("# keelchat evals generate: support-assistant: 1 cases")
     merged = load_agent_set(tmp_path)
     assert [c.name for c in merged.cases] == ["mine", "gen_handed_off"] and merged.fixtures.passages
     assert merged.cases[1].expect.exit_reason == "handed_off"
@@ -100,7 +100,7 @@ def test_written_set_loads_with_the_hand_written_one(tmp_path: Path) -> None:
 
 
 def test_a_quote_counts_despite_case_spacing_and_curly_punctuation() -> None:
-    from yachat.evals.checks import _quoted
+    from keelchat.evals.checks import _quoted
 
     reply = "We’ll send a free replacement — what’s your   order number?"
     assert _quoted("we'll send a free replacement - what's your order number?", reply)
@@ -125,7 +125,7 @@ async def test_generate_plays_a_target_and_keeps_or_reports_it() -> None:
 @pytest.mark.skipif(not JUDGE, reason="EVALS_JUDGE_MODEL not set")
 async def test_in_scope_passes_a_consent_question_and_fails_out_of_scope_work() -> None:
     """The judge grades scope only: asking for consent first is in scope; writing legal advice is not."""
-    from yachat.evals.checks import judged_checks
+    from keelchat.evals.checks import judged_checks
 
     policy = build(SUPPORT.read_text())
     ok = _result([TurnLog("my order is late", "Sorry about that! Before we start: may I use your answers to help with this?")])
@@ -137,7 +137,7 @@ async def test_in_scope_passes_a_consent_question_and_fails_out_of_scope_work() 
 @pytest.mark.skipif(not JUDGE, reason="EVALS_JUDGE_MODEL not set")
 async def test_rule_followed_counts_what_the_user_already_gave() -> None:
     """`damaged_item` asks for the order number only when it is not known: an earlier turn that gave it counts."""
-    from yachat.evals.checks import judged_checks
+    from keelchat.evals.checks import judged_checks
 
     policy = build(SUPPORT.read_text())
     turns = [
@@ -150,7 +150,7 @@ async def test_rule_followed_counts_what_the_user_already_gave() -> None:
 @pytest.mark.skipif(not JUDGE, reason="EVALS_JUDGE_MODEL not set")
 async def test_rule_followed_ignores_what_the_rule_does_not_ask() -> None:
     """Offering the replacement and asking for the order number follows `damaged_item`; never offering it does not."""
-    from yachat.evals.checks import judged_checks
+    from keelchat.evals.checks import judged_checks
 
     policy = build(SUPPORT.read_text())
     msg = "my blender arrived broken, the jug is cracked"

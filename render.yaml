@@ -1,11 +1,11 @@
-# Render Blueprint: yachat's API with the console on one web service in your Render account. Deploy: https://render.com/deploy?repo=<your fork's URL>; docs/REFERENCE.md#deploy-from-github
-# Render asks for ANTHROPIC_API_KEY once. YACHAT_API_KEY is generated: copy it from the service's Environment page to
-# sign in to the console. Another provider: in Environment, set YACHAT_LLM=litellm, YACHAT_MODEL_GENERATE,
-# YACHAT_MODEL_CLASSIFY and its key (e.g. OPENROUTER_API_KEY), as in .env.example.
+# Render Blueprint: keelchat's API with the console on one web service in your Render account. Deploy: https://render.com/deploy?repo=<your fork's URL>; docs/REFERENCE.md#deploy-from-github
+# Render asks for ANTHROPIC_API_KEY once. KEELCHAT_API_KEY is generated: copy it from the service's Environment page to
+# sign in to the console. Another provider: in Environment, set KEELCHAT_LLM=litellm, KEELCHAT_MODEL_GENERATE,
+# KEELCHAT_MODEL_CLASSIFY and its key (e.g. OPENROUTER_API_KEY), as in .env.example.
 # State is in memory unless you add DATABASE_URL (and REDIS_URL): saved bots go on restart without them.
 services:
   - type: web
-    name: yachat
+    name: keelchat
     runtime: docker
     plan: free # sleeps when idle; a paid plan keeps it awake
     dockerfilePath: ./Dockerfile
@@ -16,7 +16,7 @@ services:
     envVars:
       - key: PORT # the port the image listens on
         value: "8080"
-      - key: YACHAT_API_KEY
+      - key: KEELCHAT_API_KEY
         generateValue: true
       - key: ANTHROPIC_API_KEY
         sync: false

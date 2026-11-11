@@ -4,10 +4,10 @@ import os
 
 import pytest
 
+from keelchat.state.models import SessionState
+from keelchat.state.redis_store import RedisSessionStore
+from keelchat.state.store import VersionConflict
 from tests.helpers import make_runtime, say
-from yachat.state.models import SessionState
-from yachat.state.redis_store import RedisSessionStore
-from yachat.state.store import VersionConflict
 
 
 @pytest.fixture
@@ -41,8 +41,8 @@ async def test_runtime_on_redis(redis_client, policy_yaml):
 async def test_postgres_memory_store():
     import asyncpg
 
-    from yachat.state.models import MemoryRecord
-    from yachat.state.postgres_store import PostgresMemoryStore, ensure_schema
+    from keelchat.state.models import MemoryRecord
+    from keelchat.state.postgres_store import PostgresMemoryStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
@@ -60,8 +60,8 @@ async def test_postgres_memory_store():
 async def test_postgres_memory_is_isolated_per_tenant():
     import asyncpg
 
-    from yachat.state.models import MemoryRecord
-    from yachat.state.postgres_store import PostgresMemoryStore, ensure_schema
+    from keelchat.state.models import MemoryRecord
+    from keelchat.state.postgres_store import PostgresMemoryStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
@@ -85,7 +85,7 @@ async def test_postgres_tenant_tool_store():
 
     import asyncpg
 
-    from yachat.state.postgres_store import PostgresTenantToolStore, ensure_schema
+    from keelchat.state.postgres_store import PostgresTenantToolStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
@@ -110,8 +110,8 @@ async def test_postgres_audit_between_reads_every_tenant_oldest_first():
 
     import asyncpg
 
-    from yachat.state.models import AuditEvent
-    from yachat.state.postgres_store import PostgresAuditStore, ensure_schema
+    from keelchat.state.models import AuditEvent
+    from keelchat.state.postgres_store import PostgresAuditStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
@@ -136,9 +136,9 @@ async def test_postgres_audit_copies_a_tenants_window_into_duckdb():
 
     import asyncpg
 
-    from yachat.runtime.audit import audit_db
-    from yachat.state.models import AuditEvent
-    from yachat.state.postgres_store import PostgresAuditStore, ensure_schema
+    from keelchat.runtime.audit import audit_db
+    from keelchat.state.models import AuditEvent
+    from keelchat.state.postgres_store import PostgresAuditStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
@@ -170,7 +170,7 @@ async def test_postgres_audit_copies_a_tenants_window_into_duckdb():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_every_postgres_store_shares_one_pool():
-    from yachat.api.app import embed_store_from_env, key_store_from_env, stores_from_env, tool_store_from_env
+    from keelchat.api.app import embed_store_from_env, key_store_from_env, stores_from_env, tool_store_from_env
 
     try:
         stores = [*stores_from_env().values(), embed_store_from_env(), key_store_from_env(), tool_store_from_env()]
@@ -182,7 +182,7 @@ async def test_every_postgres_store_shares_one_pool():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_session_store_versions_dedupes_and_survives_a_restart(policy_yaml):
-    from yachat.state.postgres_store import PostgresSessionStore
+    from keelchat.state.postgres_store import PostgresSessionStore
 
     url = os.environ["DATABASE_URL"]
     store = PostgresSessionStore(url=url)
@@ -207,8 +207,8 @@ async def test_postgres_session_store_versions_dedupes_and_survives_a_restart(po
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_job_store_round_trips_and_is_tenant_scoped():
-    from yachat.state.postgres_store import PostgresJobStore
-    from yachat.state.store import InsightJob
+    from keelchat.state.postgres_store import PostgresJobStore
+    from keelchat.state.store import InsightJob
 
     store = PostgresJobStore(url=os.environ["DATABASE_URL"])
     job = InsightJob(tenant=f"t{os.urandom(3).hex()}", request={"days": 7})
@@ -222,7 +222,7 @@ async def test_postgres_job_store_round_trips_and_is_tenant_scoped():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_rate_limits_are_shared_by_every_server():
-    from yachat.state.postgres_store import PostgresRateLimiter
+    from keelchat.state.postgres_store import PostgresRateLimiter
 
     url, key = os.environ["DATABASE_URL"], f"k{os.urandom(3).hex()}"
     a, b = PostgresRateLimiter(url=url), PostgresRateLimiter(url=url)  # two servers, one database
@@ -235,7 +235,7 @@ async def test_postgres_rate_limits_are_shared_by_every_server():
 async def test_postgres_turn_locks_let_one_server_at_a_time_hold_a_chat():
     import asyncio
 
-    from yachat.state.postgres_store import PostgresTurnLocks
+    from keelchat.state.postgres_store import PostgresTurnLocks
 
     url, key = os.environ["DATABASE_URL"], f"s{os.urandom(3).hex()}"
     a, b = PostgresTurnLocks(url=url), PostgresTurnLocks(url=url)
@@ -253,7 +253,7 @@ async def test_postgres_turn_locks_let_one_server_at_a_time_hold_a_chat():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_a_lock_left_by_a_crashed_server_expires():
-    from yachat.state.postgres_store import PostgresTurnLocks
+    from keelchat.state.postgres_store import PostgresTurnLocks
 
     url, key = os.environ["DATABASE_URL"], f"s{os.urandom(3).hex()}"
     crashed = PostgresTurnLocks(url=url, lease_s=1)
@@ -264,8 +264,8 @@ async def test_a_lock_left_by_a_crashed_server_expires():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_usage_starts_again_each_month(monkeypatch):
-    from yachat.state import store
-    from yachat.state.postgres_store import PostgresBudgetStore
+    from keelchat.state import store
+    from keelchat.state.postgres_store import PostgresBudgetStore
 
     budgets, tenant = PostgresBudgetStore(url=os.environ["DATABASE_URL"]), f"t{os.urandom(3).hex()}"
     monkeypatch.setattr(store, "usage_period", lambda: "2026-11")
@@ -284,8 +284,8 @@ async def test_postgres_usage_starts_again_each_month(monkeypatch):
 async def test_postgres_review_store() -> None:
     import asyncpg
 
-    from yachat.state.models import Review, ReviewTurn
-    from yachat.state.postgres_store import PostgresReviewStore, ensure_schema
+    from keelchat.state.models import Review, ReviewTurn
+    from keelchat.state.postgres_store import PostgresReviewStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
@@ -308,9 +308,9 @@ async def test_postgres_review_store() -> None:
 async def test_postgres_agent_test_store() -> None:
     import asyncpg
 
-    from yachat.evals.case import Expect, ReplayCase
-    from yachat.state.models import AgentTest
-    from yachat.state.postgres_store import PostgresAgentTestStore, ensure_schema
+    from keelchat.evals.case import Expect, ReplayCase
+    from keelchat.state.models import AgentTest
+    from keelchat.state.postgres_store import PostgresAgentTestStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)
@@ -333,8 +333,8 @@ async def test_postgres_agent_test_store() -> None:
 async def test_postgres_fix_task_store() -> None:
     import asyncpg
 
-    from yachat.state.models import FixTask, ReviewTurn
-    from yachat.state.postgres_store import PostgresFixTaskStore, ensure_schema
+    from keelchat.state.models import FixTask, ReviewTurn
+    from keelchat.state.postgres_store import PostgresFixTaskStore, ensure_schema
 
     try:
         pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], timeout=3)

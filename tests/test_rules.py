@@ -9,15 +9,15 @@ from typing import Any
 import pytest
 import yaml
 
+from keelchat.policy.compiler import build, compile_policy
+from keelchat.policy.errors import PolicyValidationError
+from keelchat.policy.loader import load_policy
+from keelchat.policy.models import Rule
+from keelchat.runtime.decide.rules import grounded, resolve, tier
+from keelchat.runtime.llm import LLMClient, LLMRequest, ModelConfig
+from keelchat.runtime.runtime import Runtime
+from keelchat.testing.fakes import FakeTools
 from tests.helpers import RecordingLLM, say
-from yachat.policy.compiler import build, compile_policy
-from yachat.policy.errors import PolicyValidationError
-from yachat.policy.loader import load_policy
-from yachat.policy.models import Rule
-from yachat.runtime.decide.rules import grounded, resolve, tier
-from yachat.runtime.llm import LLMClient, LLMRequest, ModelConfig
-from yachat.runtime.runtime import Runtime
-from yachat.testing.fakes import FakeTools
 
 SUPPORT = (Path(__file__).parent.parent / "examples" / "support_assistant.yaml").read_text()
 

@@ -24,7 +24,7 @@ index() {  # $1 = base url
   local files=()
   while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$INDEX" -type f \( -name '*.md' -o -name '*.txt' \) -print0 | sort -z)
   [ ${#files[@]} -gt 0 ] || { echo "no .md/.txt files under $INDEX" >&2; return 1; }
-  uv run yachat knowledge add "${files[@]}" --url "$1"
+  uv run keelchat knowledge add "${files[@]}" --url "$1"
 }
 
 if [ -n "$URL" ]; then          # remote service only
@@ -32,8 +32,8 @@ if [ -n "$URL" ]; then          # remote service only
   index "$URL"; exit 0
 fi
 
-[ -n "${YACHAT_SYNCED:-}" ] || uv sync -q
-uv run yachat knowledge serve --host 127.0.0.1 --port "$PORT" &
+[ -n "${KEELCHAT_SYNCED:-}" ] || uv sync -q
+uv run keelchat knowledge serve --host 127.0.0.1 --port "$PORT" &
 PID=$!
 trap 'kill $PID 2>/dev/null || true' EXIT INT TERM
 for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$PORT/health" >/dev/null && break; sleep 0.5; done

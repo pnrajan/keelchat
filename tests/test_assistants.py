@@ -10,16 +10,16 @@ import httpx
 import pytest
 from httpx import ASGITransport
 
-from yachat.api import public
-from yachat.api.app import create_app
-from yachat.channels.whatsapp_cloud import FakeWhatsAppSender, text_messages
-from yachat.datasets.uploads import UploadRejected, file_text, html_text
-from yachat.knowledge.api import create_app as knowledge_app
-from yachat.knowledge.docstore import InMemoryDocumentStore
-from yachat.knowledge.embedder import FakeEmbedder
-from yachat.knowledge.service import KnowledgeService, make_indexer
-from yachat.knowledge.vectorstore import InMemoryIndex
-from yachat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
+from keelchat.api import public
+from keelchat.api.app import create_app
+from keelchat.channels.whatsapp_cloud import FakeWhatsAppSender, text_messages
+from keelchat.datasets.uploads import UploadRejected, file_text, html_text
+from keelchat.knowledge.api import create_app as knowledge_app
+from keelchat.knowledge.docstore import InMemoryDocumentStore
+from keelchat.knowledge.embedder import FakeEmbedder
+from keelchat.knowledge.service import KnowledgeService, make_indexer
+from keelchat.knowledge.vectorstore import InMemoryIndex
+from keelchat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
 
 FAQ = b"Bloom Bakery FAQ\n\nWe open at 7am every day except Monday. Gluten-free bread is baked on Fridays."
 
@@ -36,8 +36,8 @@ def test_content_is_turned_into_text():
 
 @pytest.fixture
 async def setup(monkeypatch, tmp_path):
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(tmp_path))
-    monkeypatch.setenv("YACHAT_EMBED_SECRET", "test-secret")
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("KEELCHAT_EMBED_SECRET", "test-secret")
     monkeypatch.setattr(public, "_SECRET", None)
     svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
     service, real = knowledge_app(svc), httpx.AsyncClient
@@ -49,9 +49,9 @@ async def setup(monkeypatch, tmp_path):
 
     monkeypatch.setattr(httpx, "AsyncClient", Routed)
     monkeypatch.setenv("KNOWLEDGE_URL", "http://knowledge.internal")
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.runtime import Runtime
     from tests.helpers import RecordingLLM
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.runtime import Runtime
 
     rt = Runtime(RecordingLLM(), {}, models=ModelConfig.from_env())
     wa = FakeWhatsAppSender()
@@ -134,14 +134,14 @@ def test_status_updates_and_media_are_ignored():
 
 async def test_snippets_use_the_public_address(setup, monkeypatch):
     c, *_ = setup  # behind a TLS-terminating proxy the request arrives as http; pasted snippets must use the public https address
-    monkeypatch.setenv("YACHAT_PUBLIC_URL", "https://chat.example.com")
+    monkeypatch.setenv("KEELCHAT_PUBLIC_URL", "https://chat.example.com")
     a = (await c.post("/v1/tenants/default/assistants", data={"name": "Bloom Bakery"}, files=[("files", ("faq.md", FAQ, "text/markdown"))])).json()
     assert a["snippet"].startswith('<script src="https://chat.example.com/widget.js"') and a["app_url"].startswith("https://chat.example.com/a/")
     assert all("chat.example.test" not in ch["value"] for ch in a["channels"])
 
 
 async def test_the_install_check_finds_the_chatbot_on_the_page(setup, monkeypatch):
-    from yachat.datasets import uploads
+    from keelchat.datasets import uploads
 
     c, *_ = setup
     a = (

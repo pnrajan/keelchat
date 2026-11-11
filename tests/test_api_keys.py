@@ -5,8 +5,8 @@ import os
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api.keys import ApiKeyStore, InMemoryApiKeyStore, new_key, parse_key
 from tests.test_versions import SUPPORT, app_with
-from yachat.api.keys import ApiKeyStore, InMemoryApiKeyStore, new_key, parse_key
 
 ADMIN = {"Authorization": "Bearer admin-key"}
 
@@ -39,7 +39,7 @@ async def test_in_memory_key_store():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_key_store():
-    from yachat.state.postgres_store import PostgresApiKeyStore
+    from keelchat.state.postgres_store import PostgresApiKeyStore
 
     store, tenant = PostgresApiKeyStore(url=os.environ["DATABASE_URL"]), f"t{os.getpid()}-{os.urandom(3).hex()}"
     try:
@@ -50,10 +50,10 @@ async def test_postgres_key_store():
 
 
 def keyed_app(monkeypatch):
-    from yachat.state.store import InMemoryAgentVersionStore
+    from keelchat.state.store import InMemoryAgentVersionStore
 
-    monkeypatch.setenv("YACHAT_API_KEY", "admin-key")
-    monkeypatch.delenv("YACHAT_TENANT_KEYS", raising=False)
+    monkeypatch.setenv("KEELCHAT_API_KEY", "admin-key")
+    monkeypatch.delenv("KEELCHAT_TENANT_KEYS", raising=False)
     monkeypatch.setenv("DATABASE_URL", "")  # in-memory keys (the test edits them); empty so .env cannot refill it
     return app_with(InMemoryAgentVersionStore())
 
@@ -108,12 +108,12 @@ async def test_expired_keys_stop_working(monkeypatch):
 async def test_workspace_keys_must_expire_within_a_year(monkeypatch):
     from httpx import ASGITransport, AsyncClient
 
+    from keelchat.api.app import create_app
+    from keelchat.api.keys import InMemoryApiKeyStore
+    from keelchat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
     from tests.helpers import make_runtime
-    from yachat.api.app import create_app
-    from yachat.api.keys import InMemoryApiKeyStore
-    from yachat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
 
-    monkeypatch.setenv("YACHAT_API_KEY", "admin-key")
+    monkeypatch.setenv("KEELCHAT_API_KEY", "admin-key")
     from tests.conftest import ROOT
 
     rt, _ = await make_runtime((ROOT / "examples" / "support_assistant.yaml").read_text())
@@ -139,10 +139,10 @@ async def test_jwt_keys_carry_server_set_scope_and_are_still_revocable(monkeypat
 
     import jwt
 
-    from yachat.api.keys import KEY_AUDIENCE, KEY_ISSUER, resolve
+    from keelchat.api.keys import KEY_AUDIENCE, KEY_ISSUER, resolve
 
-    monkeypatch.setenv("YACHAT_API_KEY", "admin-key")
-    monkeypatch.setenv("YACHAT_JWT_SECRET", SECRET)
+    monkeypatch.setenv("KEELCHAT_API_KEY", "admin-key")
+    monkeypatch.setenv("KEELCHAT_JWT_SECRET", SECRET)
     store = InMemoryApiKeyStore()
     raw, rec = new_key("acme", "shop", ["runtime"], 30)
     await store.add(rec)
@@ -165,15 +165,15 @@ async def test_jwt_keys_carry_server_set_scope_and_are_still_revocable(monkeypat
 
     _, never = new_key("acme", "ops", ["build"])  # a JWT always expires (a year by default)
     assert never.expires_at is not None
-    monkeypatch.delenv("YACHAT_JWT_SECRET")
+    monkeypatch.delenv("KEELCHAT_JWT_SECRET")
     opaque, orec = new_key("acme", "old", ["read"])
     await store.add(orec)
     assert opaque.startswith("chk_") and (await resolve(f"Bearer {opaque}", store)) is not None  # opaque keys still work
 
 
 def test_a_short_jwt_secret_is_refused(monkeypatch):
-    from yachat.api.keys import KeyConfigError
+    from keelchat.api.keys import KeyConfigError
 
-    monkeypatch.setenv("YACHAT_JWT_SECRET", "short")
+    monkeypatch.setenv("KEELCHAT_JWT_SECRET", "short")
     with pytest.raises(KeyConfigError, match="32"):
         new_key("acme", "x", ["read"], 1)

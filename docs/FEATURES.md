@@ -19,7 +19,7 @@ The features behind a policy, with the YAML that turns each one on. Start with t
 
 <p align="center"><img src="assets/compose.jpg" alt="Compose: a dental clinic's booking bot written from two sentences, read back in plain words (what it asks, when it hands an emergency to a person), with Try it, Save, and a box to ask for changes" width="900"></p>
 
-Drafting a bot from a description is the job where a stronger model shows most: set `YACHAT_MODEL_GENERATE` to one for
+Drafting a bot from a description is the job where a stronger model shows most: set `KEELCHAT_MODEL_GENERATE` to one for
 cleaner YAML on the first try. The README lists [where else it helps](../README.md#where-a-stronger-model-helps).
 
 <p align="center"><img src="assets/console.jpg" alt="The console after Try it: the drafted YAML, a test chat where a knocked-out tooth is handed to a person by the emergency rule, and the launch checklist" width="900"></p>
@@ -32,7 +32,7 @@ cleaner YAML on the first try. The README lists [where else it helps](../README.
 | **Simulate** | Model-played personas and scripted replays against the policy, on fake tools. |
 | **Tests** | Tests kept with the agent: save a conversation as one, draft them from the policy, run them all on the current build, download them as a replay set. |
 | **Rate** | Rate the test chat or a simulated conversation: each reply in scope or not, each matched rule followed or not, an overall score from 1 to 5. Download the ratings as judge labels and the failed conversations as replay cases, or let the model suggest policy changes that answer them. |
-| **Judge** | A stronger model (`YACHAT_MODEL_CRITIC`) reviews the test chat or a simulation: what went wrong on which turn, policy fixes you apply in the editor, and code fixes sent to Claude Code. See [below](#judge-a-trial-conversation-with-a-stronger-model). |
+| **Judge** | A stronger model (`KEELCHAT_MODEL_CRITIC`) reviews the test chat or a simulation: what went wrong on which turn, policy fixes you apply in the editor, and code fixes sent to Claude Code. See [below](#judge-a-trial-conversation-with-a-stronger-model). |
 | **Versions** | Save a build as a version, compare versions line by line, roll back, copy an agent. |
 | **Channels** | What to paste or configure for the website widget, a link, WordPress, WhatsApp, SMS, Slack and phone. |
 | **Publish · results** | Publish an agent as a widget and app. For surveys: scores over time, splits and themes. |
@@ -123,15 +123,15 @@ them; when the documents don't cover a question, the bot says so. The Knowledge 
 ## Answer questions about data
 
 Register a structured dataset (CSV or Parquet files) and add an `analytics` step. Questions become SQL on a locked,
-in-memory DuckDB, and statistics code runs in a sandbox with no network (`YACHAT_SANDBOX=local` or `agentcore`). Each
+in-memory DuckDB, and statistics code runs in a sandbox with no network (`KEELCHAT_SANDBOX=local` or `agentcore`). Each
 answer is planned, checked and verified before it is shown; one that fails is marked partial. See
 [`examples/sales_analyst.yaml`](../examples/sales_analyst.yaml).
 
 ## Test a bot
 
 ```bash
-uv run yachat simulate examples/hiring_agent.yaml examples/sim_script.yaml   # scripted conversations
-uv run yachat evals run evals/support_assistant                               # scripts, played personas, rule and Ragas scores
+uv run keelchat simulate examples/hiring_agent.yaml examples/sim_script.yaml   # scripted conversations
+uv run keelchat evals run evals/support_assistant                               # scripts, played personas, rule and Ragas scores
 ```
 
 The console's **Simulate** tab plays model-driven personas against a policy on fake tools. For surveys,
@@ -143,18 +143,18 @@ Tests call the configured model: there is no fake LLM, so what passes is what ru
 
 ### Build bots from Claude Code: the plugin
 
-The [`yachat` plugin](../plugins/yachat) connects Claude to your server's `/mcp` endpoint with a tenant key, and adds a
+The [`keelchat` plugin](../plugins/keelchat) connects Claude to your server's `/mcp` endpoint with a tenant key, and adds a
 **build-agent** skill: Claude asks what the bot must do, drafts the policy, checks readiness, tries a few
 conversations and shows you the result before it saves anything.
 
 ```bash
-export YACHAT_URL=http://localhost:8000 YACHAT_KEY=<tenant key>   # a key with the build scope
+export KEELCHAT_URL=http://localhost:8000 KEELCHAT_KEY=<tenant key>   # a key with the build scope
 claude
 ```
 
 ```text
-/plugin marketplace add pnrajan/yachat
-/plugin install yachat@yachat
+/plugin marketplace add pnrajan/keelchat
+/plugin install keelchat@keelchat
 ```
 
 Then ask in plain words:
@@ -166,14 +166,14 @@ Claude uses the same tools the console does (`whoami`, `get_schema`, `list_bot_t
 `create_agent`, `get_policy`, `check_readiness`, `try_conversation`, `save_version`, `activate_version`). It acts only
 in the key's tenant, and only builds that pass are saved.
 
-The **fix-findings** skill works through what the judge found (below): `/yachat:fix-findings` lists the open fix
+The **fix-findings** skill works through what the judge found (below): `/keelchat:fix-findings` lists the open fix
 tasks (`list_fix_tasks`, `get_fix_task`), files each as a GitHub issue with `gh` once you say yes, and hands each to a
 subagent in its own worktree that writes the failing test, makes the fix and runs the checks. It closes each task
 with `update_fix_task` and a note. Nothing is pushed without your yes.
 
 ### Judge a trial conversation with a stronger model
 
-Set `YACHAT_MODEL_CRITIC` to a stronger model than the agent runs on. In the console, **Test → Judge** sends a test
+Set `KEELCHAT_MODEL_CRITIC` to a stronger model than the agent runs on. In the console, **Test → Judge** sends a test
 chat or a simulation, with the policy in the editor, to that model. It returns what went wrong on which turn, and
 fixes of two kinds:
 
@@ -189,7 +189,7 @@ counts are capped.
 <p align="center"><img src="assets/console-judge.jpg" alt="The Judge tab: a summary of the test chat and its problems by turn, marked high or medium, each with the user's message and the agent's reply" width="900"></p>
 
 ```bash
-YACHAT_MODEL_CRITIC=claude-opus-5-5     # or any litellm id, e.g. openrouter/anthropic/claude-opus-5.5
+KEELCHAT_MODEL_CRITIC=claude-opus-5-5     # or any litellm id, e.g. openrouter/anthropic/claude-opus-5.5
 ```
 
 Step by step:
@@ -199,7 +199,7 @@ Step by step:
    answered as if it were in scope, a rule that matched but wasn't followed, a promise the bot can't keep.
 3. Tick the policy fixes and **Apply to the policy**. Try the change, then save a version.
 4. **Send to Claude Code** for each code fix.
-5. In your yachat checkout, run `/yachat:fix-findings` (the [plugin](../plugins/yachat)). Claude files each task as a
+5. In your keelchat checkout, run `/keelchat:fix-findings` (the [plugin](../plugins/keelchat)). Claude files each task as a
    GitHub issue when you say yes, and gives each to its own subagent on its own branch: failing test, fix, checks.
 6. Save the chat as a test (**Test → Tests**) so every later build replays it.
 
@@ -210,14 +210,14 @@ your checkout, on a branch.
 
 ### Any MCP client
 
-Point it at `$YACHAT_URL/mcp` (streamable HTTP) with `Authorization: Bearer <key>`. For Claude Code without the
+Point it at `$KEELCHAT_URL/mcp` (streamable HTTP) with `Authorization: Bearer <key>`. For Claude Code without the
 plugin:
 
 ```bash
-claude mcp add --transport http yachat "$YACHAT_URL/mcp" --header "Authorization: Bearer $YACHAT_KEY"
+claude mcp add --transport http keelchat "$KEELCHAT_URL/mcp" --header "Authorization: Bearer $KEELCHAT_KEY"
 ```
 
-### Work on yachat itself with Claude Code
+### Work on keelchat itself with Claude Code
 
 [`CLAUDE.md`](../CLAUDE.md) gives Claude the project's rules (the architectural laws, how a change is verified, where
 code lives), and [`.claude/skills/verify`](../.claude/skills/verify/SKILL.md) tells it how to run the services and drive

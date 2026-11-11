@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from yachat.state.mem0_store import InMemoryMem0, Mem0MemoryStore, mem0_from_env, scoped_user
-from yachat.state.models import MemoryRecord
+from keelchat.state.mem0_store import InMemoryMem0, Mem0MemoryStore, mem0_from_env, scoped_user
+from keelchat.state.models import MemoryRecord
 
 
 @pytest.fixture(params=["fake", "mem0"])
@@ -68,10 +68,10 @@ def test_a_workspace_name_cannot_reach_into_another_scope():
 async def test_the_memory_writer_stores_only_policy_items_in_mem0(store, policy_yaml):
     if not os.getenv("SILICONFLOW_API_KEY"):
         pytest.skip("the memory writer calls the configured model")
-    from yachat.policy.compiler import build
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.state.memory_writer import MemorySnapshot, MemoryWriter
+    from keelchat.policy.compiler import build
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.state.memory_writer import MemorySnapshot, MemoryWriter
 
     policy = build(policy_yaml)
     writer = MemoryWriter(store, llm_from_env(), ModelConfig.from_env())

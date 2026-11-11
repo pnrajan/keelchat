@@ -182,7 +182,7 @@ export default function Compose(p: Props) {
         </details>
 
         <details className="compose-more" onToggle={(e) => setShowYaml((e.target as HTMLDetailsElement).open)}>
-          <summary><b>Show YAML</b><span className="muted small">the file behind your bot, for developers · <a href="https://github.com/pnrajan/yachat/blob/main/docs/POLICY_LANGUAGE.md" target="_blank" rel="noreferrer">what each key means</a></span></summary>
+          <summary><b>Show YAML</b><span className="muted small">the file behind your bot, for developers · <a href="https://github.com/pnrajan/keelchat/blob/main/docs/POLICY_LANGUAGE.md" target="_blank" rel="noreferrer">what each key means</a></span></summary>
           {showYaml && (  // loaded and checked only when open; the summary above does the checking otherwise
             <Suspense fallback={<pre className="code">{p.policy}</pre>}>
               <PolicyEditor value={p.policy} onChange={p.onChange} schema={p.schema} datasets={p.datasets} onIssues={p.onIssues} />

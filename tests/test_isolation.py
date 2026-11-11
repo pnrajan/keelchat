@@ -8,12 +8,12 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api import public
+from keelchat.api.app import create_app
+from keelchat.policy.compiler import build
+from keelchat.state.models import SurveyResponse
+from keelchat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
 from tests.helpers import make_runtime
-from yachat.api import public
-from yachat.api.app import create_app
-from yachat.policy.compiler import build
-from yachat.state.models import SurveyResponse
-from yachat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
 
 SURVEY = (Path(__file__).parents[1] / "examples" / "nps_survey.yaml").read_text()
 ACME, GLOBEX = {"authorization": "Bearer acme-key"}, {"authorization": "Bearer globex-key"}
@@ -21,9 +21,9 @@ ACME, GLOBEX = {"authorization": "Bearer acme-key"}, {"authorization": "Bearer g
 
 @pytest.fixture
 async def c(monkeypatch):
-    monkeypatch.setenv("YACHAT_TENANT_KEYS", "acme:acme-key,globex:globex-key")
-    monkeypatch.setenv("YACHAT_API_KEY", "admin-key")
-    monkeypatch.setenv("YACHAT_EMBED_SECRET", "s")
+    monkeypatch.setenv("KEELCHAT_TENANT_KEYS", "acme:acme-key,globex:globex-key")
+    monkeypatch.setenv("KEELCHAT_API_KEY", "admin-key")
+    monkeypatch.setenv("KEELCHAT_EMBED_SECRET", "s")
     monkeypatch.setattr(public, "_SECRET", None)
     rt, _ = await make_runtime(SURVEY)
     for tenant in ("acme", "globex"):  # the same agent name in both workspaces

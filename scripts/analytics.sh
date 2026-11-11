@@ -18,11 +18,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-export YACHAT_DATA_ROOT="${YACHAT_DATA_ROOT:-$DATA_ROOT}"
+export KEELCHAT_DATA_ROOT="${KEELCHAT_DATA_ROOT:-$DATA_ROOT}"
 if [ -n "$SANDBOX" ]; then
   command -v docker >/dev/null || { echo "--sandbox needs docker" >&2; exit 1; }
-  docker image inspect yachat-sandbox:latest >/dev/null 2>&1 || docker build -q -t yachat-sandbox:latest deploy/sandbox
-  export YACHAT_SANDBOX=local YACHAT_SANDBOX_BACKEND=docker
+  docker image inspect keelchat-sandbox:latest >/dev/null 2>&1 || docker build -q -t keelchat-sandbox:latest deploy/sandbox
+  export KEELCHAT_SANDBOX=local KEELCHAT_SANDBOX_BACKEND=docker
 fi
-[ -n "${YACHAT_SYNCED:-}" ] || uv sync -q
-exec uv run yachat analytics serve --host 127.0.0.1 --port "$PORT"
+[ -n "${KEELCHAT_SYNCED:-}" ] || uv sync -q
+exec uv run keelchat analytics serve --host 127.0.0.1 --port "$PORT"

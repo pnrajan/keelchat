@@ -8,12 +8,12 @@ import pytest
 
 pytest.importorskip("duckdb")
 
+from keelchat.analytics.duck import AnalyticsError, DatasetDB  # noqa: E402
+from keelchat.analytics.workspace_metrics import ask, key_metrics, metrics_db  # noqa: E402
+from keelchat.runtime.llm import ModelConfig  # noqa: E402
+from keelchat.runtime.llm_factory import llm_from_env  # noqa: E402
+from keelchat.state.models import AuditEvent  # noqa: E402
 from tests.helpers import audit_window  # noqa: E402
-from yachat.analytics.duck import AnalyticsError, DatasetDB  # noqa: E402
-from yachat.analytics.workspace_metrics import ask, key_metrics, metrics_db  # noqa: E402
-from yachat.runtime.llm import ModelConfig  # noqa: E402
-from yachat.runtime.llm_factory import llm_from_env  # noqa: E402
-from yachat.state.models import AuditEvent  # noqa: E402
 
 T0 = datetime.now(UTC).replace(microsecond=0) - timedelta(days=1)
 
@@ -83,9 +83,9 @@ async def test_a_question_in_plain_english_is_answered_with_sql():
 async def test_each_workspace_queries_only_its_own_records():
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.store import InMemoryAuditStore, InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryAuditStore, InMemoryTenantToolStore
 
     audit = InMemoryAuditStore()
     await audit.append(workspace())

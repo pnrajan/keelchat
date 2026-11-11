@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from examples.demo.needs import from_policy
+from keelchat.policy.compiler import build
 from tests.conftest import ROOT
-from yachat.policy.compiler import build
 
 
 def test_the_list_names_what_the_yaml_uses_and_how_to_connect_it() -> None:

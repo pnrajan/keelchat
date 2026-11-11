@@ -6,7 +6,7 @@ order up in your own system, answers policy questions from your help-centre docu
 remembers how each customer likes to be contacted, and hands back a clear answer. Along the way it uses every part of
 the builder: bot types, the editor, knowledge, a custom tool, safety checks, readiness, tests, versions and launch.
 
-You can do each step in the console, over the API, or by asking Claude with the yachat plugin. All three call the
+You can do each step in the console, over the API, or by asking Claude with the keelchat plugin. All three call the
 same API and the same checks. The console path is shown first; the API call follows.
 
 | Step | What you end with |
@@ -42,11 +42,11 @@ goes in the charter and the safety checks.
 ## 2. Set up a workspace
 
 ```bash
-cp .env.example .env                 # YACHAT_LLM and the provider key
+cp .env.example .env                 # KEELCHAT_LLM and the provider key
 scripts/db.sh up                     # Postgres + Redis in Docker: versions, bot types, memory and sessions persist
 # in .env:
-#   DATABASE_URL=postgresql://yachat:yachat@127.0.0.1:5432/yachat
-#   YACHAT_API_KEY=<admin key>                 # every route needs a key
+#   DATABASE_URL=postgresql://keelchat:keelchat@127.0.0.1:5432/keelchat
+#   KEELCHAT_API_KEY=<admin key>                 # every route needs a key
 ./run.sh                             # console :5173, API :8000, Knowledge :8001, Analytics :8002
 # issue a key for tenant "acme" (shown once; stored only as a hash):
 curl -s -H "Authorization: Bearer <admin key>" -H 'content-type: application/json' \
@@ -57,9 +57,9 @@ Open the console and enter the `acme` key when asked. The top bar shows **worksp
 from now on belongs to that tenant, and the key cannot see any other. Check it from a terminal:
 
 ```bash
-export YACHAT_URL=http://127.0.0.1:8000 YACHAT_KEY=<acme key>
-H="Authorization: Bearer $YACHAT_KEY"
-curl -s -H "$H" $YACHAT_URL/v1/whoami            # {"tenant": "acme", "admin": false}
+export KEELCHAT_URL=http://127.0.0.1:8000 KEELCHAT_KEY=<acme key>
+H="Authorization: Bearer $KEELCHAT_KEY"
+curl -s -H "$H" $KEELCHAT_URL/v1/whoami            # {"tenant": "acme", "admin": false}
 ```
 
 ## 3. Add what it knows
@@ -68,7 +68,7 @@ Put the help-centre pages in a folder as Markdown, one topic per file (`returns.
 Short, factual pages answer best; the agent only says what the pages say.
 
 ```bash
-uv run yachat knowledge add help-centre/*.md      # chunked semantically and indexed by the Knowledge Service
+uv run keelchat knowledge add help-centre/*.md      # chunked semantically and indexed by the Knowledge Service
 curl -s localhost:8001/search -H 'content-type: application/json' -d '{"query": "how long do refunds take?"}'
 ```
 
@@ -83,10 +83,10 @@ for its input, and a description the agent reads to decide when to call it. Regi
 checks as built-in tools and refuses private addresses.
 
 ```bash
-curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/tenants/acme/tools -d '{
+curl -s -H "$H" -H 'content-type: application/json' $KEELCHAT_URL/v1/tenants/acme/tools -d '{
   "name": "order_lookup",
   "description": "Look up an order by its number: status, items, delivery date.",
-  "url": "https://orders.example.com/yachat/lookup",
+  "url": "https://orders.example.com/keelchat/lookup",
   "input_schema": {"type": "object", "properties": {"order_number": {"type": "string"}}, "required": ["order_number"]},
   "timeout_s": 5,
   "headers": {"Authorization": "Bearer <service token>"}
@@ -103,7 +103,7 @@ changes something (`"write"`) is never called without the customer's explicit ac
 open in the editor.
 
 ```bash
-curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/tenants/acme/agents/from-template \
+curl -s -H "$H" -H 'content-type: application/json' $KEELCHAT_URL/v1/tenants/acme/agents/from-template \
   -d '{"template": "support", "agent": "returns-desk"}'
 ```
 
@@ -187,7 +187,7 @@ Policy, Connections, Safety and Launch; a button next to it jumps to the fix.
 | ✕ *No test conversations* | step 9 |
 
 ```bash
-curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/tenants/acme/agents/readiness \
+curl -s -H "$H" -H 'content-type: application/json' $KEELCHAT_URL/v1/tenants/acme/agents/readiness \
   -d "$(jq -n --rawfile y returns-desk.yaml '{yaml: $y}')" | jq '{score, ready, items: [.items[] | select(.status != "ok") | .title]}'
 ```
 
@@ -243,7 +243,7 @@ calibration: {}
 ```
 
 ```bash
-uv run yachat evals run evals/returns_desk          # expectations always; judged metrics when EVALS_JUDGE_MODEL is set
+uv run keelchat evals run evals/returns_desk          # expectations always; judged metrics when EVALS_JUDGE_MODEL is set
 ```
 
 Replay sets run in-process with the platform's tools and their sample data; a tenant tool such as `order_lookup` is not
@@ -259,7 +259,7 @@ Readiness now shows ✓ *Has test conversations*. Run the set on every change, i
 active. Only builds that pass are saved; saving an unchanged policy keeps its version.
 
 ```bash
-curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/tenants/acme/agents \
+curl -s -H "$H" -H 'content-type: application/json' $KEELCHAT_URL/v1/tenants/acme/agents \
   -d "$(jq -n --rawfile y examples/returns_desk.yaml '{yaml: $y, note: "charter + order lookup"}')"
 ```
 
@@ -267,9 +267,9 @@ curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/tenants/acme/
 the channel (`web`, `slack`, `sms`, `whatsapp`):
 
 ```bash
-SID=$(curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/sessions \
+SID=$(curl -s -H "$H" -H 'content-type: application/json' $KEELCHAT_URL/v1/sessions \
   -d '{"agent": "returns-desk", "user_id": "customer-123", "channel": "web"}' | jq -r .id)
-curl -s -H "$H" -H 'content-type: application/json' $YACHAT_URL/v1/sessions/$SID/turns -d '{"text": "hi"}' | jq .outbound.text
+curl -s -H "$H" -H 'content-type: application/json' $KEELCHAT_URL/v1/sessions/$SID/turns -d '{"text": "hi"}' | jq .outbound.text
 ```
 
 Deploy the server with the Docker image, with `DATABASE_URL`, `REDIS_URL`, the keys and the service URLs set; saved
@@ -281,7 +281,7 @@ and **Roll back to this** makes an older version active. Conversations already r
 on.
 
 ```bash
-curl -s -H "$H" -X POST $YACHAT_URL/v1/tenants/acme/agents/returns-desk/versions/1/activate
+curl -s -H "$H" -X POST $KEELCHAT_URL/v1/tenants/acme/agents/returns-desk/versions/1/activate
 ```
 
 **Reuse it.** **Save as bot type** offers this agent as a starting point under **New agent** for the whole tenant;
@@ -296,22 +296,22 @@ curl -s -H "$H" -X POST $YACHAT_URL/v1/tenants/acme/agents/returns-desk/versions
 - **A bad conversation becomes a test:**
 
   ```bash
-  curl -s -H "$H" $YACHAT_URL/v1/sessions/$SID/state > session.json
-  uv run yachat evals export $SID --state-file session.json --out evals/returns_desk/replay.yaml
+  curl -s -H "$H" $KEELCHAT_URL/v1/sessions/$SID/state > session.json
+  uv run keelchat evals export $SID --state-file session.json --out evals/returns_desk/replay.yaml
   ```
 
   Fix the policy until the new case passes, save a version, and the mistake cannot come back unnoticed.
 
 ## 12. Do it all with Claude
 
-The yachat plugin connects Claude to this server's `/mcp` endpoint with your tenant key and adds a **build-agent**
+The keelchat plugin connects Claude to this server's `/mcp` endpoint with your tenant key and adds a **build-agent**
 skill that follows this guide.
 
 ```bash
-export YACHAT_URL=https://yachat.example.com YACHAT_KEY=<acme key>
+export KEELCHAT_URL=https://keelchat.example.com KEELCHAT_KEY=<acme key>
 claude
-/plugin marketplace add pnrajan/yachat
-/plugin install yachat@yachat
+/plugin marketplace add pnrajan/keelchat
+/plugin install keelchat@keelchat
 ```
 
 Then ask in plain words:
@@ -322,7 +322,7 @@ Then ask in plain words:
 
 Claude works through the same tools the console uses (`whoami`, `list_bot_types`, `create_agent`, `get_policy`,
 `check_readiness`, `try_conversation`, `save_version`, `activate_version`), acts only as `acme`, and can save only
-builds that pass. Without the plugin, any MCP client can connect to `$YACHAT_URL/mcp` with
+builds that pass. Without the plugin, any MCP client can connect to `$KEELCHAT_URL/mcp` with
 `Authorization: Bearer <key>`.
 
 ## Where to go next

@@ -117,7 +117,7 @@ curl -X POST "$CALLBACK_URL" -H 'content-type: application/json' \
    `resolved` gives the conversation back to the assistant by default; `"resume": false` ends it. `fields` are answers
    the person collected: the assistant offers each back for the user to confirm instead of asking from scratch.
    `claimed` (with an `assignee`) only marks the ticket. `resolved` is final: later reports change nothing. Set
-   `YACHAT_PUBLIC_URL` so the `callback_url` is a full address an outside helpdesk can call.
+   `KEELCHAT_PUBLIC_URL` so the `callback_url` is a full address an outside helpdesk can call.
 5. **Resumed.** At the user's next message the assistant says they are back with it and carries on from the next open
    question. The counts that led to the handoff (re-asks, digressions) start over, so it does not hand straight off
    again. With `timeout`, the same happens when nobody reported back in time; the ticket stays open for the team.
@@ -189,7 +189,7 @@ flow:
 ### Which model each step uses
 
 A step's work (reading the message, checking answers, writing the reply) runs on the tiers you configure
-(`YACHAT_MODEL_CLASSIFY`, `YACHAT_MODEL_GENERATE`). Change it per step by how much the step needs:
+(`KEELCHAT_MODEL_CLASSIFY`, `KEELCHAT_MODEL_GENERATE`). Change it per step by how much the step needs:
 
 ```yaml
 flow:
@@ -222,7 +222,7 @@ flow:
 - `curious: true` (form steps) checks each valid answer for the detail a person handling it would need. When one is
   missing ("it's broken": broken how?), the answer is kept and one short follow-up asks for it; what they add is
   appended. Code allows one follow-up per field and never asks about ids, numbers, names, dates or yes/no answers.
-  Drafted tests (`yachat evals generate`, the console's Tests tab) cover each such field.
+  Drafted tests (`keelchat evals generate`, the console's Tests tab) cover each such field.
 
 ### Small talk
 
@@ -252,9 +252,9 @@ language, confirms before switching, keeps names and job text as written, and an
 - Score what matters with a judge: `rule_followed` for rules, `ragas.Faithfulness` for answers from documents.
 - Simulate before you ship: the console's **Simulate** tab (or `POST /v1/tenants/{t}/agents/{agent}/simulate`) runs
   scripted users or personas the model plays against the agent you built, on fake tools and stores of their own, and
-  shows each conversation's outcome, transcript and decisions. `yachat simulate` scripts take `persona:` entries too.
+  shows each conversation's outcome, transcript and decisions. `keelchat simulate` scripts take `persona:` entries too.
 - Set thresholds only for metrics you have calibrated against human labels (`docs/EVALS.md`).
-- After launch, export failed live conversations as replay cases (`yachat evals export`) and watch the
+- After launch, export failed live conversations as replay cases (`keelchat evals export`) and watch the
   outcome split: failed answers per field and drop-off after a failed answer tell you which `ask`/`expect` to fix.
 
 ## 8. Checklist
@@ -265,4 +265,4 @@ language, confirms before switching, keeps names and job text as written, and an
 - [ ] memory fields typed, with half-life, sensitive ones marked
 - [ ] committing operations are actions, not tools
 - [ ] replay set covers happy path, exits, edit, multi-intent, off-scope, each language
-- [ ] `uv run yachat build` and `uv run yachat evals run <dir>` are green
+- [ ] `uv run keelchat build` and `uv run keelchat evals run <dir>` are green

@@ -1,4 +1,4 @@
-# CLAUDE.md: yachat
+# CLAUDE.md: keelchat
 
 Agents are defined by one YAML policy and run on one shared runtime. Capabilities live in an
 auto-discovered registry. If a change conflicts with a rule here, stop and flag it.
@@ -21,12 +21,12 @@ auto-discovered registry. If a change conflicts with a rule here, stop and flag 
 
 | Adding | Goes in |
 |---|---|
-| Policy key, model or default | `yachat/policy/` |
-| Tool, action, node, guardrail, preprocessor | `yachat/capabilities/`, as a decorated function or class |
-| Pipeline step | `yachat/runtime/understand/`, `decide/` or `respond/` |
-| Channel | `yachat/channels/` |
-| Store or other external dependency | a port plus an in-memory fake (store fakes: `yachat/state/store.py`; tool fakes: `yachat/testing/fakes.py`); adapters in `yachat/state/` |
-| Wiring | `yachat/runtime/runtime.py` or a `service_from_env` function only |
+| Policy key, model or default | `keelchat/policy/` |
+| Tool, action, node, guardrail, preprocessor | `keelchat/capabilities/`, as a decorated function or class |
+| Pipeline step | `keelchat/runtime/understand/`, `decide/` or `respond/` |
+| Channel | `keelchat/channels/` |
+| Store or other external dependency | a port plus an in-memory fake (store fakes: `keelchat/state/store.py`; tool fakes: `keelchat/testing/fakes.py`); adapters in `keelchat/state/` |
+| Wiring | `keelchat/runtime/runtime.py` or a `service_from_env` function only |
 | Tests | `tests/test_<area>.py`, one file per area; shared helpers in `tests/helpers.py` |
 | Eval sets | `evals/<agent>/`: personas, rubrics and policy paths are data there, not Python |
 | Example policy | `examples/` |

@@ -4,16 +4,16 @@ import sys
 
 import pytest
 
+from keelchat.capabilities.tools import ToolError
+from keelchat.policy.compiler import build
+from keelchat.registry.contract import ContractViolation, all_registered, check_capability, check_tool
+from keelchat.registry.core import REGISTRY, ToolSpec, tool
+from keelchat.registry.discovery import discover_packages, packages_from_env
+from keelchat.registry.mcp import register_mcp_servers, servers_from_env
+from keelchat.runtime.decide.tool_gateway import ToolGateway
+from keelchat.testing.fakes import FakeTools
 from tests.conftest import ROOT
 from tests.helpers import make_runtime, mutate
-from yachat.capabilities.tools import ToolError
-from yachat.policy.compiler import build
-from yachat.registry.contract import ContractViolation, all_registered, check_capability, check_tool
-from yachat.registry.core import REGISTRY, ToolSpec, tool
-from yachat.registry.discovery import discover_packages, packages_from_env
-from yachat.registry.mcp import register_mcp_servers, servers_from_env
-from yachat.runtime.decide.tool_gateway import ToolGateway
-from yachat.testing.fakes import FakeTools
 
 
 @pytest.mark.parametrize("kind,name", all_registered(), ids=lambda x: str(x))
@@ -78,10 +78,10 @@ def test_capability_packages_from_env(tmp_path, monkeypatch):
     pkg = tmp_path / "acme_caps"
     pkg.mkdir()
     (pkg / "__init__.py").write_text(
-        "from yachat.registry.core import tool\n\n@tool('acme_ping')\nasync def acme_ping(x: str) -> str:\n    'Ping.'\n    return x\n"
+        "from keelchat.registry.core import tool\n\n@tool('acme_ping')\nasync def acme_ping(x: str) -> str:\n    'Ping.'\n    return x\n"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    monkeypatch.setenv("YACHAT_CAPABILITY_PACKAGES", "acme_caps, nope_missing")
+    monkeypatch.setenv("KEELCHAT_CAPABILITY_PACKAGES", "acme_caps, nope_missing")
     assert packages_from_env() == ["acme_caps", "nope_missing"]
     assert discover_packages(packages_from_env()) == ["acme_caps"]  # the missing one is logged, not fatal
     assert REGISTRY.has_tool("acme_ping")
@@ -89,7 +89,7 @@ def test_capability_packages_from_env(tmp_path, monkeypatch):
 
 async def test_mcp_server_tools_are_registered_namespaced_and_run_through_the_gateway(monkeypatch):
     target = f"{sys.executable} {ROOT / 'tests' / 'mcp_server.py'}"
-    monkeypatch.setenv("YACHAT_MCP_SERVERS", f"tm={target}, down=python -c 'import sys; sys.exit(1)'")
+    monkeypatch.setenv("KEELCHAT_MCP_SERVERS", f"tm={target}, down=python -c 'import sys; sys.exit(1)'")
     assert servers_from_env() == {"tm": target, "down": "python -c 'import sys; sys.exit(1)'"}
     registered = register_mcp_servers(REGISTRY)
     assert registered == ["tm.lookup_plan"]  # the unreachable server is skipped, not fatal
@@ -100,7 +100,7 @@ async def test_mcp_server_tools_are_registered_namespaced_and_run_through_the_ga
         r.ok and r.data["plan"] == "Data Analyst track" and r.data["region"] == "us" and 'trusted="false"' in r.as_prompt_data()
     )  # omitted optional arg: server default, not null
     assert (await ToolGateway({"tm.lookup_plan"}).call("tm.lookup_plan", {"nope": 1})).error_kind == "invalid_args"
-    monkeypatch.setenv("YACHAT_MCP_SERVERS", "missing-equals-sign")
+    monkeypatch.setenv("KEELCHAT_MCP_SERVERS", "missing-equals-sign")
     assert register_mcp_servers(REGISTRY) == []  # bad configuration is logged, never fatal
     assert build(MINIMAL_MCP).allowed_tools == ["tm.lookup_plan"]
 

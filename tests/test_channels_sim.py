@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import yaml
 
+from keelchat.channels import CHANNELS
+from keelchat.channels.base import split_text
+from keelchat.runtime.context import OutboundMessage
+from keelchat.sim.harness import run_script
 from tests.conftest import ROOT
-from yachat.channels import CHANNELS
-from yachat.channels.base import split_text
-from yachat.runtime.context import OutboundMessage
-from yachat.sim.harness import run_script
 
 LONG = " ".join(f"word{i}" for i in range(120))
 ITEMS = [{"id": "j1", "title": "Backend Engineer", "location": "Austin"}, {"type": "resume_token", "token": "x"}]
@@ -42,11 +42,11 @@ async def test_sim_harness(policy_yaml):
 
 
 async def test_a_model_played_persona_reaches_a_person(policy_yaml):
+    from keelchat.policy.compiler import build
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.sim.harness import sim_runtime, simulate
     from tests.helpers import mutate
-    from yachat.policy.compiler import build
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.sim.harness import sim_runtime, simulate
 
     policy = build(mutate(policy_yaml, lambda d: d.update(handoff={})))
     rt = sim_runtime(llm_from_env(), ModelConfig.from_env())
@@ -62,12 +62,12 @@ async def test_a_model_played_persona_reaches_a_person(policy_yaml):
 async def test_simulations_over_the_api_leave_no_trace_in_the_real_log(policy_yaml):
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.store import InMemoryTenantToolStore
-    from yachat.testing.fakes import FakeTools
+    from keelchat.api.app import create_app
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryTenantToolStore
+    from keelchat.testing.fakes import FakeTools
 
     tools = FakeTools()
     app = create_app(Runtime(llm_from_env(), tools.impls(), models=ModelConfig.from_env()), tool_store=InMemoryTenantToolStore())

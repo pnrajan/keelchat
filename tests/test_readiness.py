@@ -3,13 +3,13 @@ from __future__ import annotations
 import yaml
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api.app import create_app
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
+from keelchat.runtime.runtime import Runtime
+from keelchat.state.store import InMemoryAgentVersionStore, InMemoryTenantToolStore
+from keelchat.testing.fakes import FakeTools
 from tests.conftest import ROOT
-from yachat.api.app import create_app
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
-from yachat.runtime.runtime import Runtime
-from yachat.state.store import InMemoryAgentVersionStore, InMemoryTenantToolStore
-from yachat.testing.fakes import FakeTools
 
 #: renamed so it has no eval set under evals/: a new agent
 SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text().replace("agent: support-assistant", "agent: new-support", 1)
@@ -75,7 +75,7 @@ async def test_saved_and_active_versions_count(monkeypatch):
 
 
 async def test_the_blank_types_placeholder_charter_is_flagged():
-    from yachat.policy.templates import BLANK
+    from keelchat.policy.templates import BLANK
 
     async with client() as c:
         items = by_id((await c.post("/v1/tenants/default/agents/readiness", json={"yaml": BLANK})).json())
