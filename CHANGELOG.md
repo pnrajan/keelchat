@@ -4,6 +4,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Releases publish to PyPI from GitHub (`.github/workflows/release.yml`, Trusted Publishing, no stored token): publish a
+  GitHub release tagged `v<version>`. Steps in CONTRIBUTING.md.
+
 ### Changed
 
 - Screenshots, the demo GIF and the logo mark ("k") show the keelchat name.
