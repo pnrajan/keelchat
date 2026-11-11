@@ -44,14 +44,20 @@ api = [
     "pypdf>=5.0",
     "python-multipart>=0.0.9",
     "cryptography>=43",
+    "chonkie[semantic]>=1.7",
 ]
 redis = ["redis>=5.0"]
 postgres = ["asyncpg>=0.29"]
+#: chonkie's chunkers and small local embedding models (no PyTorch)
+chonkie = ["chonkie[semantic]>=1.7"]
+qdrant = ["qdrant-client>=1.12"]
+chroma = ["chromadb>=0.5"]
 knowledge = [
     "boto3>=1.34",
     "lancedb>=0.15",
     "litellm>=1.50",
     "mcp>=1.0",
+    "chonkie[semantic]>=1.7",
 ]
 analytics = [
     "duckdb>=1.1",
@@ -112,6 +118,8 @@ dev = [
     "deepeval>=3.0",
     "pytest-xdist>=3.5",
     "pytest-rerunfailures>=14",
+    "chonkie[semantic]>=1.7",
+    "qdrant-client>=1.12",
     "pre-commit>=4",
     "mcp>=1.0",
     "duckdb>=1.1",

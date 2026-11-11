@@ -155,6 +155,8 @@ class KnowledgeService:
             for old in stored if prev and prev[0] != strategy else stored - keep:  # a new method re-indexes everything
                 await self.remove(old, dataset.ref)
             stored = await self.docs.ids(dataset.ref)
+            if stored and indexer.retrieval == "vectors" and await self.index.count(dataset.ref) == 0:
+                stored = set()  # documents kept but no vectors (a new vector store or embedder table): embed them again
             # ids come from the content: a document already stored is unchanged, so it is not embedded again (a
             # restart, another replica, or a new version that only changed the description)
             n = sum([await (self.add(d) if indexer is self.indexer else self.add(d, indexer)) for d in docs if d.id not in stored])

@@ -102,5 +102,18 @@ class SentenceWindowChunker(Chunker):
 
 
 def chunker_from_env(embedder: Embedder) -> Chunker:
-    """KNOWLEDGE_CHUNKER: `semantic` (default), `sentences`, a registered name or `package.module:Name`."""
-    return chunkers.make(os.getenv("KNOWLEDGE_CHUNKER") or "semantic", embedder)
+    """KNOWLEDGE_CHUNKER: `chonkie` (the default when chonkie is installed), `semantic` (built in: the embedder
+    finds the breaks), `sentences`, a registered name or `package.module:Name`. For chonkie, KNOWLEDGE_CHONKIE picks
+    its chunker (semantic, recursive, sentence, token) and KNOWLEDGE_CHUNK_SIZE caps a passage in tokens."""
+    import importlib.util
+
+    choice = os.getenv("KNOWLEDGE_CHUNKER") or ("chonkie" if importlib.util.find_spec("chonkie") else "semantic")
+    if choice == "chonkie":
+        return chunkers.make(
+            "chonkie",
+            embedder,
+            kind=os.getenv("KNOWLEDGE_CHONKIE") or "semantic",
+            chunk_size=int(os.getenv("KNOWLEDGE_CHUNK_SIZE") or 512),
+            **({"model": m} if (m := os.getenv("KNOWLEDGE_CHONKIE_MODEL")) else {}),
+        )
+    return chunkers.make(choice, embedder)

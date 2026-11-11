@@ -11,6 +11,18 @@ import importlib
 from collections.abc import Callable
 from typing import Any
 
+#: modules with optional built-in parts (they import their libraries only when a part is built)
+BUILTIN_MODULES = ("keelchat.knowledge.chonkie_parts", "keelchat.knowledge.stores")
+_builtins_loaded = False
+
+
+def load_builtins() -> None:
+    global _builtins_loaded
+    if not _builtins_loaded:
+        _builtins_loaded = True
+        for name in BUILTIN_MODULES:
+            importlib.import_module(name)
+
 
 class Plugins[T]:
     """Factories for one kind of part, by name. `base` is the class every factory must return an instance of."""
@@ -34,6 +46,7 @@ class Plugins[T]:
         return add
 
     def names(self) -> list[str]:
+        load_builtins()
         return sorted(self.factories)
 
     def has(self, choice: str) -> bool:
@@ -41,6 +54,7 @@ class Plugins[T]:
         return ":" in choice or self._find(choice) is not None
 
     def _find(self, name: str) -> Callable[..., T] | None:
+        load_builtins()
         if name not in self.factories:
             from keelchat.registry.core import REGISTRY
 
