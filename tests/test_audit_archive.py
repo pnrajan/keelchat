@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from yachat.state.iceberg_store import FIELDS, IcebergAuditArchive, sql_catalog
-from yachat.state.models import AuditEvent
-from yachat.state.store import ArchiveConflict, ArchivedAuditStore, InMemoryAuditArchive, InMemoryAuditStore
+from keelchat.state.iceberg_store import FIELDS, IcebergAuditArchive, sql_catalog
+from keelchat.state.models import AuditEvent
+from keelchat.state.store import ArchiveConflict, ArchivedAuditStore, InMemoryAuditArchive, InMemoryAuditStore
 
 
 def ev(tenant: str, hours_ago: float, **kw: object) -> AuditEvent:
@@ -51,7 +51,7 @@ async def test_export_moves_settled_records_and_reads_span_both(make: str, tmp_p
 @pytest.mark.parametrize("make", ["memory", "iceberg"])
 async def test_dashboards_read_each_record_once_across_hot_store_and_archive(make: str, tmp_path: Path) -> None:
     """The archive answers before its cursor, the hot store after it; the hot store's archived copies are not counted."""
-    from yachat.runtime.audit import audit_db
+    from keelchat.runtime.audit import audit_db
 
     hot = InMemoryAuditStore()
     archive = InMemoryAuditArchive() if make == "memory" else iceberg(tmp_path)
@@ -102,7 +102,7 @@ async def test_retention_deletes_archived_records_and_their_files(tmp_path: Path
 
 
 async def test_the_server_archives_when_a_warehouse_is_configured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from yachat.api.app import stores_from_env
+    from keelchat.api.app import stores_from_env
 
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("AUDIT_ARCHIVE_WAREHOUSE", f"file://{tmp_path}/warehouse")

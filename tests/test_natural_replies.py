@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from keelchat.capabilities.nodes.form_fill import says_submit
+from keelchat.runtime.respond.response_generator import strip_fences
+from keelchat.runtime.respond.rewriter import kept
+from keelchat.testing.fakes import FakeTools
 from tests.conftest import ROOT
 from tests.helpers import RecordingLLM, make_runtime, reach_form, say
-from yachat.capabilities.nodes.form_fill import says_submit
-from yachat.runtime.respond.response_generator import strip_fences
-from yachat.runtime.respond.rewriter import kept
-from yachat.testing.fakes import FakeTools
 
 SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text()
 COACH = (ROOT / "examples" / "career_coach.yaml").read_text()
@@ -91,7 +91,7 @@ async def test_the_planner_remembers_what_the_user_said():
 
 
 def test_each_step_verifies_its_replies_unless_it_passes_them_through():
-    from yachat.policy.compiler import build
+    from keelchat.policy.compiler import build
 
     on = build(SUPPORT)
     assert all(s.verify for s in on.steps)  # every node has a reply verifier by default

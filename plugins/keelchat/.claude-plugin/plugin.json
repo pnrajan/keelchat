@@ -1,0 +1,7 @@
+{
+  "name": "keelchat",
+  "version": "0.2.0",
+  "description": "Build, check, try and launch goal-oriented chat agents on your keelchat server, scoped to the tenant your key belongs to; fix what its judge model finds in trial conversations.",
+  "author": { "name": "keelchat" },
+  "license": "Apache-2.0"
+}

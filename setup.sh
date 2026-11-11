@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Set up yachat on this machine: checks for what it needs (git, curl, uv, Node 20+; Docker with --docker), offers to
+# Set up keelchat on this machine: checks for what it needs (git, curl, uv, Node 20+; Docker with --docker), offers to
 # install what's missing with this system's package manager, writes .env with your model key, and installs the Python
 # and console dependencies. macOS (Homebrew), Debian/Ubuntu (apt), Fedora/RHEL (dnf), Arch (pacman) and WSL.
 #
@@ -45,7 +45,7 @@ case "$OS" in
     esac ;;
   MINGW*|MSYS*|CYGWIN*) fail "On Windows, run this inside WSL 2 (https://learn.microsoft.com/windows/wsl/install)." ;;
 esac
-bold "yachat setup: $OS${WSL:+ (WSL)}${PM:+, packages with $PM}"
+bold "keelchat setup: $OS${WSL:+ (WSL)}${PM:+, packages with $PM}"
 
 # ---- installing, always with a yes first (unless --yes)
 confirm() {  # confirm "what" "command"
@@ -160,10 +160,10 @@ MENU
   if [ -n "$var" ]; then
     printf '  Paste your %s (input hidden): ' "$var"; read -rs key; echo
     [ -n "$key" ] || fail "no key entered; rerun ./setup.sh when you have one"
-    set_env "$var" "$key"; set_env YACHAT_LLM "$llm"; set_env YACHAT_MODEL_GENERATE "$gen"; set_env YACHAT_MODEL_CLASSIFY "$cls"
+    set_env "$var" "$key"; set_env KEELCHAT_LLM "$llm"; set_env KEELCHAT_MODEL_GENERATE "$gen"; set_env KEELCHAT_MODEL_CLASSIFY "$cls"
     ok "saved $var and the model settings in .env"
   else
-    miss "edit .env: set YACHAT_LLM, your provider's *_API_KEY and YACHAT_MODEL_GENERATE / YACHAT_MODEL_CLASSIFY"
+    miss "edit .env: set KEELCHAT_LLM, your provider's *_API_KEY and KEELCHAT_MODEL_GENERATE / KEELCHAT_MODEL_CLASSIFY"
   fi
 else
   miss "no model key in .env yet: edit it, or rerun ./setup.sh in a terminal to be asked"
@@ -174,13 +174,13 @@ bold "Dependencies"
 uv sync --all-extras --quiet && ok "Python packages (uv sync)"
 (cd frontend && npm ci --silent --no-audit --no-fund && npm run build --silent >/dev/null) && ok "console built (frontend/dist)"
 if [ -n "$DOCKER" ] && docker info >/dev/null 2>&1; then
-  docker compose --profile app build --quiet && ok "Docker image yachat:local"
+  docker compose --profile app build --quiet && ok "Docker image keelchat:local"
 fi
 
 bold "Ready."
 cat <<'NEXT'
   scripts/try.sh            the console with a sample bot, everything in memory
   scripts/local.sh up       the whole stack in Docker (API, console, Redis, Postgres)
-  ./run.sh                  the console with live reload, for working on yachat itself
+  ./run.sh                  the console with live reload, for working on keelchat itself
 NEXT
 has_key || echo "  (add a model key to .env first)"

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from yachat.channels import CHANNELS
-from yachat.channels.base import Channel, items_as_text, split_text
-from yachat.runtime.context import ChannelMessage, InboundMessage, OutboundMessage
+from keelchat.channels import CHANNELS
+from keelchat.channels.base import Channel, items_as_text, split_text
+from keelchat.runtime.context import ChannelMessage, InboundMessage, OutboundMessage
 
 
 class Telegram(Channel):

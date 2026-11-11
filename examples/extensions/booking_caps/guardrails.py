@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from yachat.registry.core import GuardContext, Guardrail, GuardResult, guardrail
+from keelchat.registry.core import GuardContext, Guardrail, GuardResult, guardrail
 
 PRICE = re.compile(r"[$€£]\s?\d+(?:[.,]\d{2})?")
 

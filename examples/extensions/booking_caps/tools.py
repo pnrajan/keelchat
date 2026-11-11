@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from yachat.registry.core import tool
+from keelchat.registry.core import tool
 
 #: sample data; a real tool would call your booking system here (the Tool Gateway applies the timeout and retries)
 SLOTS = {

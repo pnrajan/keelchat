@@ -14,11 +14,11 @@ case "${1:-up}" in
     cat <<'MSG'
 databases ready. Add to .env:
   REDIS_URL=redis://127.0.0.1:6379/0
-  DATABASE_URL=postgresql://yachat:yachat@127.0.0.1:5432/yachat
+  DATABASE_URL=postgresql://keelchat:keelchat@127.0.0.1:5432/keelchat
 MSG
     ;;
   down) docker compose down ;;
   reset) docker compose down -v ;;
-  psql) docker compose exec postgres psql -U yachat yachat ;;
+  psql) docker compose exec postgres psql -U keelchat keelchat ;;
   *) sed -n 2,7p "$0"; exit 2 ;;
 esac

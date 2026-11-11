@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 CONFIG=deploy/demo/fly.toml
 KEYS=${DEMO_KEYS:-OPENROUTER_API_KEY}  # only these provider keys go to Fly, not every key in .env
-URL=https://yachat-demo.fly.dev
+URL=https://keelchat-demo.fly.dev
 
 command -v fly >/dev/null || { echo "missing: fly (https://fly.io/docs/flyctl/install/)" >&2; exit 1; }
 if [ "${1:-}" = "--secrets" ]; then
@@ -19,7 +19,7 @@ if [ "${1:-}" = "--secrets" ]; then
   fly secrets list -c "$CONFIG" --json | python3 -c 'import json,sys; print("secrets:", ", ".join(s["name"] for s in json.load(sys.stdin)))'
 fi
 # the console and API stay locked: set a random key once, never print it
-fly secrets list -c "$CONFIG" --json | grep -q '"YACHAT_API_KEY"' || fly secrets set -c "$CONFIG" --stage YACHAT_API_KEY="$(openssl rand -hex 24)" >/dev/null
+fly secrets list -c "$CONFIG" --json | grep -q '"KEELCHAT_API_KEY"' || fly secrets set -c "$CONFIG" --stage KEELCHAT_API_KEY="$(openssl rand -hex 24)" >/dev/null
 
 fly deploy -c "$CONFIG" --ha=false .
 

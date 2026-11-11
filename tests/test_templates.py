@@ -5,10 +5,10 @@ import os
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.policy.compiler import build
+from keelchat.policy.templates import builtin_templates, renamed
+from keelchat.state.store import InMemoryTemplateStore, TemplateStore
 from tests.test_versions import SUPPORT, app_with
-from yachat.policy.compiler import build
-from yachat.policy.templates import builtin_templates, renamed
-from yachat.state.store import InMemoryTemplateStore, TemplateStore
 
 
 def test_builtin_bot_types_build_and_rename_keeps_comments():
@@ -39,7 +39,7 @@ async def test_in_memory_template_store():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_template_store():
-    from yachat.state.postgres_store import PostgresTemplateStore
+    from keelchat.state.postgres_store import PostgresTemplateStore
 
     store, tenant = PostgresTemplateStore(url=os.environ["DATABASE_URL"]), f"t{os.getpid()}-{os.urandom(3).hex()}"
     try:
@@ -50,7 +50,7 @@ async def test_postgres_template_store():
 
 
 async def test_create_from_a_template_copy_an_agent_and_save_a_template():
-    from yachat.state.store import InMemoryAgentVersionStore
+    from keelchat.state.store import InMemoryAgentVersionStore
 
     async with AsyncClient(transport=ASGITransport(app=app_with(InMemoryAgentVersionStore())), base_url="http://t") as c:
         types = (await c.get("/v1/tenants/default/templates")).json()

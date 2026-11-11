@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "keelchat": {
+      "type": "http",
+      "url": "${KEELCHAT_URL}/mcp",
+      "headers": { "Authorization": "Bearer ${KEELCHAT_KEY}" }
+    }
+  }
+}

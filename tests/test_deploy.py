@@ -24,7 +24,7 @@ def test_the_workflow_deploys_the_default_config_only_with_its_api_key_set() -> 
     flow = (ROOT / ".github" / "workflows" / "deploy.yml").read_text()
     default = re.search(r"vars\.FLY_CONFIG \|\| '([^']+)'", flow)
     assert default and (ROOT / default.group(1)).is_file()
-    assert "YACHAT_API_KEY" in flow.split("flyctl deploy")[0]  # checked before deploying: the console stays locked
+    assert "KEELCHAT_API_KEY" in flow.split("flyctl deploy")[0]  # checked before deploying: the console stays locked
     assert yaml.safe_load(flow)[True]["workflow_run"]["workflows"] == ["CI"]  # `on:` reads as True; deploys after CI
 
 
@@ -33,6 +33,6 @@ def test_render_builds_the_image_on_its_port_with_a_generated_api_key() -> None:
     env = {v["key"]: v for v in web["envVars"]}
     assert web["runtime"] == "docker" and (ROOT / web["dockerfilePath"]).is_file()
     assert web["healthCheckPath"] == "/health" and env["PORT"]["value"] == str(PORT)
-    assert env["YACHAT_API_KEY"].get("generateValue") is True
+    assert env["KEELCHAT_API_KEY"].get("generateValue") is True
     assert web["autoDeployTrigger"] == "off"  # a push here must not redeploy every copy made with the button
     assert all("value" not in v for k, v in env.items() if k.endswith("_API_KEY"))  # keys are never in the file

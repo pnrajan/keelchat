@@ -1,5 +1,5 @@
 [project]
-name = "yachat"
+name = "keelchat"
 version = "0.1.0"
 description = "Open-source framework for chatbots written in YAML and extended in Python"
 readme = "README.md"
@@ -26,7 +26,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "sentry-sdk[fastapi]>=2.20",
     "mcp>=1.0", # the API serves /mcp, so the server cannot start without it
-    "pyjwt[crypto]>=2.8", # scoped API tokens (yachat/api/keys)
+    "pyjwt[crypto]>=2.8", # scoped API tokens (keelchat/api/keys)
     "duckdb>=1.1", # the dashboards add up audit records in DuckDB (runtime/audit.py:audit_db)
 ]
 
@@ -78,7 +78,7 @@ audit = [
 mem0 = [
     "mem0ai>=0.1.100",
 ]
-#: `yachat evals run`: DeepEval and Ragas metrics scored by a judge model over litellm
+#: `keelchat evals run`: DeepEval and Ragas metrics scored by a judge model over litellm
 evals = [
     "deepeval>=3.0",
     "langchain-community>=0.4,<0.4.3",  # ragas 0.4.3 imports chat_models.vertexai, removed in 0.4.2
@@ -87,13 +87,13 @@ evals = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pnrajan/yachat"
-Documentation = "https://github.com/pnrajan/yachat/tree/main/docs"
-Issues = "https://github.com/pnrajan/yachat/issues"
-Changelog = "https://github.com/pnrajan/yachat/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/pnrajan/keelchat"
+Documentation = "https://github.com/pnrajan/keelchat/tree/main/docs"
+Issues = "https://github.com/pnrajan/keelchat/issues"
+Changelog = "https://github.com/pnrajan/keelchat/blob/main/CHANGELOG.md"
 
 [project.scripts]
-yachat = "yachat.cli:main"
+keelchat = "keelchat.cli:main"
 
 [dependency-groups]
 dev = [
@@ -138,7 +138,7 @@ requires = ["hatchling>=1.27"]  # PEP 639 license-files
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["yachat"]
+packages = ["keelchat"]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["frontend/node_modules", "frontend/dist", "frontend/screens", "**/__pycache__", ".claude", ".serena", ".github", "docs/assets", "*.lancedb", ".lancedb"]
@@ -159,7 +159,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["yachat"]
+packages = ["keelchat"]
 ignore_missing_imports = true
 
 [tool.uv.workspace]

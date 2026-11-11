@@ -1,4 +1,4 @@
-# yachat architecture
+# keelchat architecture
 
 What the system is made of, how a message moves through it, and how it is deployed; it stays at the level of
 components and contracts.
@@ -34,16 +34,16 @@ components and contracts.
 
 | Component | Package | Responsibility |
 |---|---|---|
-| Policy (AgentBuild) | `yachat/policy/` | YAML → `CompiledPolicy`: the policy's keys, resolved defaults, step graph, allow list, typed memory, content hash |
-| Registry | `yachat/registry/` | one registry of capabilities (`@tool`, `@action`, `@node`, `@guardrail`, `@preprocessor`), auto-discovery (`capabilities/` + entry points), manifest, contract suite |
-| Runtime | `yachat/runtime/` | the three stages, `TurnContext`, pipeline timing and short-circuit, LLM clients, Tool Gateway, composition (`runtime.py`) |
-| Capabilities | `yachat/capabilities/` | the shipped tools, nodes, guardrails, pre-processors and the `submit_application` action |
-| State | `yachat/state/` | `SessionState` (versioned), `MemoryRecord`, step graph, memory writer, Redis and Postgres adapters |
-| Channels | `yachat/channels/` | payload normalisation, compliance (SMS STOP), rendering limits per channel |
-| Registry extras | `yachat/registry/mcp.py`, `tenant_tools.py` | MCP servers' tools (`<alias>.<tool>`) and tenant-registered HTTP tools, both behind the Tool Gateway |
-| Knowledge | `yachat/knowledge/` | document store, embedder, vector index, indexing strategies, `KnowledgeService`, and its HTTP API |
-| API | `yachat/api/app.py` | FastAPI surface over the runtime; serves the built console |
-| Evals | `yachat/evals/`, sets in `evals/<agent>/` | replay sets (scripts and played personas) on the simulator's engine, DeepEval and Ragas metrics, rule checks, thresholds gate, online outcome split |
+| Policy (AgentBuild) | `keelchat/policy/` | YAML → `CompiledPolicy`: the policy's keys, resolved defaults, step graph, allow list, typed memory, content hash |
+| Registry | `keelchat/registry/` | one registry of capabilities (`@tool`, `@action`, `@node`, `@guardrail`, `@preprocessor`), auto-discovery (`capabilities/` + entry points), manifest, contract suite |
+| Runtime | `keelchat/runtime/` | the three stages, `TurnContext`, pipeline timing and short-circuit, LLM clients, Tool Gateway, composition (`runtime.py`) |
+| Capabilities | `keelchat/capabilities/` | the shipped tools, nodes, guardrails, pre-processors and the `submit_application` action |
+| State | `keelchat/state/` | `SessionState` (versioned), `MemoryRecord`, step graph, memory writer, Redis and Postgres adapters |
+| Channels | `keelchat/channels/` | payload normalisation, compliance (SMS STOP), rendering limits per channel |
+| Registry extras | `keelchat/registry/mcp.py`, `tenant_tools.py` | MCP servers' tools (`<alias>.<tool>`) and tenant-registered HTTP tools, both behind the Tool Gateway |
+| Knowledge | `keelchat/knowledge/` | document store, embedder, vector index, indexing strategies, `KnowledgeService`, and its HTTP API |
+| API | `keelchat/api/app.py` | FastAPI surface over the runtime; serves the built console |
+| Evals | `keelchat/evals/`, sets in `evals/<agent>/` | replay sets (scripts and played personas) on the simulator's engine, DeepEval and Ragas metrics, rule checks, thresholds gate, online outcome split |
 | Console | `frontend/` | React test console: policy editor, chat, trace and state inspector |
 
 ## 2. The policy is the only product surface
@@ -92,12 +92,12 @@ charter text, which every prompt receives.
 
 `runtime/llm.py` defines `LLMClient` (`complete`, `structured`) and `LLMRequest{purpose, model, system, messages,
 metadata}`. Two clients: the Anthropic SDK (`AnthropicLLMClient`) and `LiteLLMClient` for SiliconFlow, OpenRouter and
-anything else litellm routes. `runtime/llm_factory.py:llm_from_env` chooses from `YACHAT_LLM`; a selected
+anything else litellm routes. `runtime/llm_factory.py:llm_from_env` chooses from `KEELCHAT_LLM`; a selected
 provider with a missing key raises. Routing is layered by environment: direct provider, a LiteLLM gateway
 (`LITELLM_PROXY_URL`, owns fallbacks, retries, cost logging), or a Headroom proxy in front of it (`HEADROOM_PROXY_URL`,
 context compression). Model tiers are pinned per build in `CompiledPolicy.models` and honoured per session. Three model roles: `classify` (intent, validation, planning steps, the planner's grounding check),
 `generate` (replies, knowledge answers, planner drafts) and `verify` (reply and reasoning checks; the generate model
-when `YACHAT_MODEL_VERIFY` is unset). There is no fake model anywhere: tests, simulations and
+when `KEELCHAT_MODEL_VERIFY` is unset). There is no fake model anywhere: tests, simulations and
 evals call the configured provider.
 
 Usage and cost: each client's provider call is decorated with `runtime/usage.py:metered`. It records model, purpose,
@@ -116,7 +116,7 @@ it in SQL, `audit` is dropped and the database is locked before the model's quer
 
 ## 5. Knowledge Service
 
-Runs as its own process (`yachat knowledge serve`) and owns its sources. The runtime's
+Runs as its own process (`keelchat knowledge serve`) and owns its sources. The runtime's
 `knowledge_search` tool is a thin HTTP client (`POST /search`). Inside: `DocumentStore` (S3 or memory),
 `VectorIndex` (LanceDB or memory; with an S3 bucket the index sits beside the documents at
 `s3://<bucket>/knowledge/index`, one copy every server shares, committed with S3 conditional writes), `Embedder` (SiliconFlow via litellm, or a hashed fake), a `SemanticChunker`
@@ -126,18 +126,18 @@ configuration as the runtime when those strategies are selected.
 
 ### Datasets and the Analytics Service
 
-A dataset (`yachat/datasets/`) is a tenant-scoped description of sources: `structured` tables (CSV, Parquet, a
+A dataset (`keelchat/datasets/`) is a tenant-scoped description of sources: `structured` tables (CSV, Parquet, a
 Parquet folder or S3 prefix) or `unstructured` documents. The runtime keeps the catalog (`DatasetStore`: memory or
 Postgres); the service that reads a kind (Knowledge for unstructured, Analytics for structured) checks the sources at
 registration and loads them on first use, keyed by the dataset's content version. Node configs name datasets with
 `StructuredRef` / `UnstructuredRef`; the compiler checks them against the catalog and pins the names; the Tool Gateway
 resolves a tool's `dataset` argument only to the policy's datasets for that tenant.
 
-The Analytics Service (`yachat/analytics/`, `yachat analytics serve`) answers `POST /analyze` with an
+The Analytics Service (`keelchat/analytics/`, `keelchat analytics serve`) answers `POST /analyze` with an
 `AnalysisResult`:
 
 1. Resolve a follow-up into a standalone question (session history: last questions and their SQL, no rows).
-2. Decide whether statistics are needed (small model), then plan before any work (`yachat/reasoning`): the
+2. Decide whether statistics are needed (small model), then plan before any work (`keelchat/reasoning`): the
    method, why it fits, what it assumes, and 2-5 checks the result must pass. With statistics, checks that can be
    computed are Python assertions over the answer.
 3. SQL with Vanna's one-shot generator on our `LLMClient`; DuckDB runs it on a locked in-memory copy (one SELECT, row
@@ -149,7 +149,7 @@ The Analytics Service (`yachat/analytics/`, `yachat analytics serve`) answers `P
 5. Interpret (one structured call), then checks in code: every number grounded in the result, its subtotals and
    statistics or the code output (re-asked up to `repairs.interpret` times, then dropped); recommendations must cite
    findings; system assumptions (truncation, nulls, small samples) added by code.
-6. Verify: a separate call (`YACHAT_MODEL_VERIFY`) judges the checks not run in code and lists problems, each
+6. Verify: a separate call (`KEELCHAT_MODEL_VERIFY`) judges the checks not run in code and lists problems, each
    tagged with the stage that must fix it. The next round redoes the analysis from the earliest such stage, up to
    `repairs.verify` times. Pass or fail is derived in code from the structured verdict; a failed one makes the result
    `partial`. Knowledge answers use the same loop, with claims checked against the passages.
@@ -189,13 +189,13 @@ fake backends for tools that have no URL.
   and stores, 3 workers in parallel (provider rate limits). `tests/helpers.py:RecordingLLM` records every request so tests assert on what the
   runtime asked (purpose, metadata, allowed tools), never on canned answers. The contract suite
   (`registry/contract.py`) is what a capability from another team must pass.
-- `yachat/evals/` (sets in `evals/<agent>/`): replay sets of scripts and model-played personas, run on the simulator's
+- `keelchat/evals/` (sets in `evals/<agent>/`): replay sets of scripts and model-played personas, run on the simulator's
   engine, with expectations checked in code; DeepEval, Ragas and rule metrics with a litellm judge; a thresholds gate
   for CI; and an online outcome split for production sessions. See `EVALS.md`.
 
 ## 9. Extending
 
 A new agent is a YAML file. A new capability is a decorated function or class under `capabilities/` or shipped as an
-`yachat.capabilities` entry point (`examples/contrib_tool/`), validated by the contract suite and listed in the
+`keelchat.capabilities` entry point (`examples/contrib_tool/`), validated by the contract suite and listed in the
 manifest. A new channel implements `channels/base.py`. A new store implements the port in `state/store.py`. See
 `ADDING_A_CAPABILITY.md`.

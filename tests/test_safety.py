@@ -4,11 +4,11 @@ import asyncio
 
 import pytest
 
+from keelchat.policy.compiler import build
+from keelchat.runtime.runtime import PolicyRetired
+from keelchat.testing.fakes import FakeTools
 from tests.conftest import ROOT
 from tests.helpers import make_runtime, mutate, reach_form, say
-from yachat.policy.compiler import build
-from yachat.runtime.runtime import PolicyRetired
-from yachat.testing.fakes import FakeTools
 
 
 async def test_concurrent_turns_serialize_and_dedupe(policy_yaml):
@@ -90,7 +90,7 @@ async def test_input_guardrail_blocks(policy_yaml):
 async def test_session_resume_within_ttl_new_after(policy_yaml):
     from datetime import UTC, datetime, timedelta
 
-    from yachat.runtime.context import InboundMessage
+    from keelchat.runtime.context import InboundMessage
 
     rt, _ = await make_runtime(policy_yaml)
     t0 = datetime(2026, 10, 1, tzinfo=UTC)
@@ -124,7 +124,7 @@ async def test_completed_session_is_not_resumed(policy_yaml):
 
 
 async def test_advice_guardrails_redact(policy_yaml):
-    from yachat.registry.core import REGISTRY, GuardContext
+    from keelchat.registry.core import REGISTRY, GuardContext
 
     legal = await REGISTRY.guardrail("no_legal_advice").cls().check("You should sue your landlord.", GuardContext())
     assert legal.flagged and "can't give legal advice" in (legal.redacted or "")
@@ -169,8 +169,8 @@ async def test_tenants_do_not_share_sessions_or_memory(policy_yaml):
 
 
 async def test_pinned_model_tiers_override_runtime_defaults(policy_yaml):
+    from keelchat.runtime.llm import ModelConfig
     from tests.helpers import RecordingLLM
-    from yachat.runtime.llm import ModelConfig
 
     llm = RecordingLLM()
     rt, _ = await make_runtime(policy_yaml, llm=llm, models=ModelConfig(generate="not-a-model", classify="not-a-model"))

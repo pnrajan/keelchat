@@ -1,8 +1,8 @@
-# yachat on Fly.io, in your own Fly account: the API with the console, on the smallest machine, stopped when idle.
+# keelchat on Fly.io, in your own Fly account: the API with the console, on the smallest machine, stopped when idle.
 # No app name here: each deploy names its own (Fly app names are global). From a clone or your fork:
 #
 #   fly apps create <your-app>
-#   fly secrets set -a <your-app> YACHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
+#   fly secrets set -a <your-app> KEELCHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
 #   fly deploy -c deploy/fly.toml -a <your-app> .
 #
 # To redeploy from GitHub when CI passes on main (your fork's .github/workflows/deploy.yml):

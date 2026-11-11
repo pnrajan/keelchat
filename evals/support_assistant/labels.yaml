@@ -1,4 +1,4 @@
-# Replies marked pass or fail by a person, to measure how often the judge agrees (yachat evals calibrate).
+# Replies marked pass or fail by a person, to measure how often the judge agrees (keelchat evals calibrate).
 # The last turn of each label is the reply judged; earlier turns are its context.
 # Starter set: review each verdict, then add replies from your own runs (aim for 20+ per check, about half failing).
 labels:

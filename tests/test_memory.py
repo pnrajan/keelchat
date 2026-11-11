@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from keelchat.policy.compiler import build
+from keelchat.policy.memory_types import validate_value
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
+from keelchat.state.memory_writer import MemorySnapshot, MemoryWriter, extraction_schema
+from keelchat.state.models import MemoryRecord, now
+from keelchat.state.store import InMemoryMemoryStore
 from tests.helpers import fill_form, make_runtime, mutate, reach_form, say
-from yachat.policy.compiler import build
-from yachat.policy.memory_types import validate_value
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
-from yachat.state.memory_writer import MemorySnapshot, MemoryWriter, extraction_schema
-from yachat.state.models import MemoryRecord, now
-from yachat.state.store import InMemoryMemoryStore
 
 
 async def test_memory_written_after_reply_without_delaying_it(policy_yaml):
@@ -120,7 +120,7 @@ async def test_flagged_input_never_stored(policy_yaml):
 
 
 def test_a_structured_value_sent_as_a_json_string_is_decoded_not_dropped(policy_yaml):
-    from yachat.state.memory_writer import decoded
+    from keelchat.state.memory_writer import decoded
 
     item = build(policy_yaml).memory_item("job_preferences")
     got = decoded('{"roles": ["nurse"], "shift": "night", "min_pay": 25}', item.schema_)

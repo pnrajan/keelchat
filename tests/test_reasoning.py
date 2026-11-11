@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from keelchat.reasoning import Check, CheckResult, Issue, Plan, Task, normalize_checks, verified
+from keelchat.runtime.llm import ModelConfig
 from tests.helpers import RecordingLLM
-from yachat.reasoning import Check, CheckResult, Issue, Plan, Task, normalize_checks, verified
-from yachat.runtime.llm import ModelConfig
 
 MODELS = ModelConfig.from_env()
 

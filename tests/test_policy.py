@@ -4,13 +4,13 @@ import json
 
 import pytest
 
+from keelchat.cli import main
+from keelchat.policy.compiler import build, build_file
+from keelchat.policy.errors import PolicyValidationError
+from keelchat.policy.memory_types import type_to_schema, validate_value
+from keelchat.policy.schema import policy_json_schema
 from tests.conftest import EXAMPLE, ROOT
 from tests.helpers import mutate
-from yachat.cli import main
-from yachat.policy.compiler import build, build_file
-from yachat.policy.errors import PolicyValidationError
-from yachat.policy.memory_types import type_to_schema, validate_value
-from yachat.policy.schema import policy_json_schema
 
 
 def paths(exc: PolicyValidationError) -> list[str]:
@@ -200,7 +200,7 @@ def test_guardrails_block_and_base_set(policy_yaml):
 
 
 def test_intent_examples_file_loads():
-    from yachat.runtime.decide.intent_detector import few_shot, load_examples
+    from keelchat.runtime.decide.intent_detector import few_shot, load_examples
 
     ex = load_examples()
     assert {"new_answer", "edit", "enquiry", "off_topic"} <= set(ex["en"]) and "es" in ex
@@ -208,8 +208,8 @@ def test_intent_examples_file_loads():
 
 
 def test_v6_limits_mode_tenant_and_pins(policy_yaml):
+    from keelchat.policy.errors import PolicyValidationError
     from tests.helpers import mutate
-    from yachat.policy.errors import PolicyValidationError
 
     c = build(policy_yaml, tenant="acme")
     assert c.tenant == "acme" and set(c.models) == {"small", "large"} and c.mode == "adaptive"
@@ -257,9 +257,9 @@ def test_yes_and_no_are_words_not_booleans():
 
 
 def test_a_handoff_trigger_listed_twice_is_rejected_with_its_path() -> None:
+    from keelchat.policy.compiler import build
+    from keelchat.policy.errors import PolicyValidationError
     from tests.conftest import ROOT
-    from yachat.policy.compiler import build
-    from yachat.policy.errors import PolicyValidationError
 
     support = (ROOT / "examples" / "support_assistant.yaml").read_text()
     with pytest.raises(PolicyValidationError) as e:
@@ -270,9 +270,9 @@ def test_a_handoff_trigger_listed_twice_is_rejected_with_its_path() -> None:
 def test_the_language_reference_names_every_key_the_build_accepts() -> None:
     """docs/POLICY_LANGUAGE.md is the definition of the policy language: a key the build accepts but the page does not
     name is a gap in it."""
+    from keelchat.policy.schema import policy_json_schema
+    from keelchat.registry.core import REGISTRY
     from tests.conftest import ROOT
-    from yachat.policy.schema import policy_json_schema
-    from yachat.registry.core import REGISTRY
 
     doc = (ROOT / "docs" / "POLICY_LANGUAGE.md").read_text()
     s = policy_json_schema()
@@ -281,7 +281,7 @@ def test_the_language_reference_names_every_key_the_build_accepts() -> None:
         keys |= set(s["properties"][k]["properties"])
     for alt in s["properties"]["flow"]["items"]["oneOf"][1:]:
         ((name, body),) = alt["properties"].items()
-        if not REGISTRY.node(name).cls.__module__.startswith("yachat."):
+        if not REGISTRY.node(name).cls.__module__.startswith("keelchat."):
             continue  # a package's own step (e.g. booking_caps, registered by another test) documents itself
         keys.add(name)
         for part in [body, *body.get("anyOf", [])]:

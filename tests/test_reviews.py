@@ -5,11 +5,11 @@ from __future__ import annotations
 import yaml
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.evals.calibrate import LabelSet
+from keelchat.evals.replay import ReplaySet
+from keelchat.state.models import Review, ReviewTurn
 from tests.conftest import ROOT
 from tests.helpers import make_runtime
-from yachat.evals.calibrate import LabelSet
-from yachat.evals.replay import ReplaySet
-from yachat.state.models import Review, ReviewTurn
 
 SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text()
 TURNS = [
@@ -20,8 +20,8 @@ TURNS = [
 
 
 async def _client():  # type: ignore[no-untyped-def]
-    from yachat.api.app import create_app
-    from yachat.state.store import InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.state.store import InMemoryTenantToolStore
 
     rt, _ = await make_runtime(SUPPORT)
     return rt, AsyncClient(transport=ASGITransport(app=create_app(rt, tool_store=InMemoryTenantToolStore())), base_url="http://t")
@@ -62,7 +62,7 @@ async def test_a_rating_is_saved_listed_changed_and_exported() -> None:
 
 
 async def test_a_rating_names_an_agent_that_exists_and_its_own_id() -> None:
-    from yachat.policy.compiler import build
+    from keelchat.policy.compiler import build
 
     rt, client = await _client()
     await rt.register_policy(build(SUPPORT.replace("agent: support-assistant", "agent: other-bot")))
@@ -99,7 +99,7 @@ async def test_a_bad_rating_is_rejected_with_where() -> None:
 
 
 def test_only_failed_or_low_scored_conversations_become_cases() -> None:
-    from yachat.evals.review import cases_yaml, labels_yaml
+    from keelchat.evals.review import cases_yaml, labels_yaml
 
     turns = [ReviewTurn.model_validate(t) for t in TURNS]
     good = Review(tenant="t", agent="a", source="chat", conversation="ok", turns=turns, score=5)
@@ -115,4 +115,4 @@ def test_only_failed_or_low_scored_conversations_become_cases() -> None:
     assert [lb["pass"] for lb in yaml.safe_load(labels_yaml([first, again]))["labels"]] == [True]
     assert yaml.safe_load(cases_yaml([first, again]))["cases"] == []
     blank = Review(tenant="t", agent="a", source="chat", conversation="b", turns=[ReviewTurn(user="hi", agent="")], replies=rated)
-    assert labels_yaml([blank]).startswith("# yachat review: replies a person rated (yachat evals calibrate) (1 left out")
+    assert labels_yaml([blank]).startswith("# keelchat review: replies a person rated (keelchat evals calibrate) (1 left out")

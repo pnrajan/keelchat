@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import pytest
 
+from keelchat.capabilities.nodes.common import is_yes
+from keelchat.capabilities.preprocessors.handoff_request import asks_for_person
+from keelchat.policy.compiler import build
+from keelchat.policy.errors import PolicyValidationError
+from keelchat.registry.contract import make_context
+from keelchat.runtime.decide.planner import planner_tools
+from keelchat.state.store import InMemoryHandoffStore
+from keelchat.testing.fakes import FakeTools
 from tests.helpers import make_runtime, mutate, reach_form, say
-from yachat.capabilities.nodes.common import is_yes
-from yachat.capabilities.preprocessors.handoff_request import asks_for_person
-from yachat.policy.compiler import build
-from yachat.policy.errors import PolicyValidationError
-from yachat.registry.contract import make_context
-from yachat.runtime.decide.planner import planner_tools
-from yachat.state.store import InMemoryHandoffStore
-from yachat.testing.fakes import FakeTools
 
 
 def with_handoff(policy_yaml: str, **spec: object) -> str:
@@ -158,8 +158,8 @@ async def test_an_unlisted_dead_end_still_exits(policy_yaml):
 async def _handed_off(policy_yaml: str, **spec: object):  # type: ignore[no-untyped-def]
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.state.store import InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.state.store import InMemoryTenantToolStore
 
     rt, tools = await make_runtime(with_handoff(policy_yaml, **spec))
     s = await rt.start_session("hiring-agent", "u1")
@@ -230,7 +230,7 @@ async def test_a_ticket_still_closes_when_its_conversation_has_expired(policy_ya
 async def test_with_no_report_back_the_assistant_takes_over_after_the_timeout(policy_yaml):
     from datetime import timedelta
 
-    from yachat.state.models import now
+    from keelchat.state.models import now
 
     rt, _, s, h, c = await _handed_off(policy_yaml, timeout="1h")
     await c.aclose()

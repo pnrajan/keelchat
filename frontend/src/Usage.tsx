@@ -168,8 +168,8 @@ export default function Usage({ workspace }: { workspace: string | null }) {
                 ))}</tbody>
               </table>
             </div>
-            <p className="muted small">Models are set on the server (<code>YACHAT_MODEL_GENERATE</code>, <code>YACHAT_MODEL_CLASSIFY</code>, <code>YACHAT_MODEL_VERIFY</code>).
-              To set or correct a price, use <code>YACHAT_MODEL_PRICES</code>, for example <code>{'{"my-model": [0.5, 2]}'}</code> (USD per million input and output tokens).
+            <p className="muted small">Models are set on the server (<code>KEELCHAT_MODEL_GENERATE</code>, <code>KEELCHAT_MODEL_CLASSIFY</code>, <code>KEELCHAT_MODEL_VERIFY</code>).
+              To set or correct a price, use <code>KEELCHAT_MODEL_PRICES</code>, for example <code>{'{"my-model": [0.5, 2]}'}</code> (USD per million input and output tokens).
               Otherwise prices come from OpenRouter's public list, refreshed daily{data.openrouter_prices_at ? ` (last fetched ${new Date(data.openrouter_prices_at).toLocaleString()})` : " (not fetched yet)"}, then litellm's.
               OpenRouter's price can differ from your provider's own: set it to bill exactly. Simulations are not included: they run on their own log.</p>
           </section>

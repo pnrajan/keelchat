@@ -2,16 +2,16 @@
 # Point the app at them with the REDIS_URL / DATABASE_URL lines in .env.example. Data persists in named volumes.
 # The whole stack in Docker (the API and console too): `scripts/local.sh up` (the `app` profile).
 services:
-  yachat:
+  keelchat:
     profiles: [app]
     build: .
-    image: yachat:local
-    ports: ["${YACHAT_PORT:-8000}:8080"]
+    image: keelchat:local
+    ports: ["${KEELCHAT_PORT:-8000}:8080"]
     env_file: [.env]  # the model and its key; the lines below win for the stores
     environment:
-      DATABASE_URL: postgresql://yachat:yachat@postgres:5432/yachat
+      DATABASE_URL: postgresql://keelchat:keelchat@postgres:5432/keelchat
       REDIS_URL: redis://redis:6379/0
-      YACHAT_TOOLS: ${YACHAT_TOOLS:-fake}  # tools without a backend URL answer with sample data
+      KEELCHAT_TOOLS: ${KEELCHAT_TOOLS:-fake}  # tools without a backend URL answer with sample data
     depends_on:
       redis: {condition: service_healthy}
       postgres: {condition: service_healthy}
@@ -32,11 +32,11 @@ services:
     image: postgres:16-alpine
     ports: ["${POSTGRES_PORT:-5432}:5432"]
     environment:
-      POSTGRES_USER: yachat
-      POSTGRES_PASSWORD: yachat
-      POSTGRES_DB: yachat
+      POSTGRES_USER: keelchat
+      POSTGRES_PASSWORD: keelchat
+      POSTGRES_DB: keelchat
     volumes: ["postgres-data:/var/lib/postgresql/data"]
-    healthcheck: {test: ["CMD-SHELL", "pg_isready -U yachat"], interval: 5s, timeout: 3s, retries: 10}
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U keelchat"], interval: 5s, timeout: 3s, retries: 10}
 
   # --- optional model gateway stack: `docker compose --profile gateway up -d`
   litellm:

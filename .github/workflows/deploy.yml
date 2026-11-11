@@ -38,8 +38,8 @@ jobs:
           app=${APP:-$(sed -n 's/^app *= *"\(.*\)"/\1/p' "$CONFIG")}
           [ -n "$app" ] || { echo "::error::set the FLY_APP repository variable to your Fly app"; exit 1; }
           # the console and API must stay locked: never deploy an app without its key
-          flyctl secrets list -a "$app" --json | grep -q '"YACHAT_API_KEY"' \
-            || { echo "::error::set YACHAT_API_KEY on $app first: fly secrets set -a $app YACHAT_API_KEY=..."; exit 1; }
+          flyctl secrets list -a "$app" --json | grep -q '"KEELCHAT_API_KEY"' \
+            || { echo "::error::set KEELCHAT_API_KEY on $app first: fly secrets set -a $app KEELCHAT_API_KEY=..."; exit 1; }
           flyctl deploy -c "$CONFIG" -a "$app" --remote-only --ha=false .
           echo "url=https://$app.fly.dev" >> "$GITHUB_OUTPUT"
       - name: health

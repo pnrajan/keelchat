@@ -4,13 +4,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **yachat is now keelchat.** The repository (`github.com/pnrajan/keelchat`), the Python package (`import keelchat`),
+  the command (`keelchat`), settings (`KEELCHAT_*`, was `YACHAT_*`), the capabilities entry-point group
+  (`keelchat.capabilities`), the website (`pnrajan.github.io/keelchat`) and the demo (`keelchat-demo.fly.dev`). To
+  move over: rename `YACHAT_` to `KEELCHAT_` in `.env` and in your host's settings (Render, Fly secrets); change
+  imports to `keelchat`. Sessions kept in Redis use the prefix `keelchat:`, so open conversations start again; with
+  `scripts/local.sh`, run `scripts/local.sh reset` once (the Postgres user and database are now `keelchat`).
+
 ### Added
 
 - Deploy from GitHub to your own Render or Fly.io account: `render.yaml` (Render Blueprint, **Deploy to Render**
   button) and `.github/workflows/deploy.yml` (Fly.io, `deploy/fly.toml`, redeploying your fork's `main` when CI
   passes), on the smallest plan. The Fly workflow does nothing without `FLY_API_TOKEN`
-  and refuses an app without `YACHAT_API_KEY`.
-- Demo: `YACHAT_DEMO_DRAFT_MODEL`, a stronger model for writing bots than for chatting. The demo's models are now in
+  and refuses an app without `KEELCHAT_API_KEY`.
+- Demo: `KEELCHAT_DEMO_DRAFT_MODEL`, a stronger model for writing bots than for chatting. The demo's models are now in
   `deploy/demo/fly.toml` (Claude Haiku 5.5 to chat, Sonnet 5.5 to draft, via OpenRouter); `scripts/demo.sh --secrets`
   copies only the provider key.
 - `handoff: true` on a rule: when it matches, the conversation passes to a person in code (reason `rule:<name>`), instead
@@ -26,12 +35,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `?describe=` links start a draft, and the landing page has a box to describe a bot.
 - `closing` on `form_fill`: what to say once every field is answered, e.g. what happens next. The support example sets it.
 - `resume` on `POST /v1/sessions` (default true). The console's **New session** always starts afresh.
-- `yachat evals run` in the package (`yachat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
-- `yachat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
+- `keelchat evals run` in the package (`keelchat[evals]`): replay sets on the simulator, per-turn rule checks, `rule_followed`, Ragas metrics, eval-set rubrics.
+- `keelchat evals generate`: an eval set from the policy, one case per target, failures shortened to short scripts.
 - Console **Rate** tab: people rate conversations (per reply and overall); ratings export as `labels.yaml` and replay cases.
 - Console **Tests** tab: tests kept with the agent (in the store); save a conversation as a test, draft tests from the policy, run them on the current build, export as `replay.yaml`. The launch checklist counts them.
 - [The policy language](docs/POLICY_LANGUAGE.md): every key, value and default in one page; a test keeps it in step with the build. Linked from Compose's Show YAML.
-- Console **Judge** tab: a stronger model (`YACHAT_MODEL_CRITIC`) judges a trial conversation; policy fixes applied
+- Console **Judge** tab: a stronger model (`KEELCHAT_MODEL_CRITIC`) judges a trial conversation; policy fixes applied
   in the editor, code fixes kept as fix tasks (`/v1/tenants/{t}/fixes`). MCP tools `list_fix_tasks`, `get_fix_task`,
   `update_fix_task`, and the plugin's **fix-findings** skill: GitHub issues, then one subagent per fix with a failing
   test first.
@@ -45,13 +54,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Suggest policy changes** from ratings: the model revises the policy to answer failed replies and low scores, each change named; checked by the build, never saved.
 - `--trials k` / `trials:` on evals: each case runs k times and passes only when every run does; flaky cases listed.
 - `rule_followed` judged part by part: each part of the rule that applies needs a quote from the reply; code decides.
-- `yachat evals calibrate`: the judge's agreement with replies a person labeled (`labels.yaml`).
-- `yachat evals check` and checks every conversation must pass (no errors, loops or broken limits; in scope; rules followed).
+- `keelchat evals calibrate`: the judge's agreement with replies a person labeled (`labels.yaml`).
+- `keelchat evals check` and checks every conversation must pass (no errors, loops or broken limits; in scope; rules followed).
 - Handoffs resume: per-ticket `callback_url`, **Resolve and resume**, `handoff.timeout`.
 - `rules:` on agents and flow steps.
 - `model: small | large` and `high_stakes` per step.
-- `from yachat import ...` extension API; `py.typed`.
-- `yachat new agent|package`.
+- `from keelchat import ...` extension API; `py.typed`.
+- `keelchat new agent|package`.
 - `pytest --offline`.
 - `@metered` for LLM token and cost recording.
 - LiteLLM gateway cost; Headroom saved tokens.
@@ -60,7 +69,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Support example accepts order numbers in any format (`#98765` as well as `ORD-12345`).
-- Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `yachat.evals`.
+- Eval sets: `thresholds.yaml` takes `policy:` instead of `agent:`; import from `keelchat.evals`.
 
 ### Fixed
 

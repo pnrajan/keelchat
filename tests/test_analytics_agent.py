@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import pytest
 
+from keelchat.analytics.analyst import Analyst, Limits
+from keelchat.analytics.service import AnalyticsService
+from keelchat.capabilities.nodes.analytics import HISTORY, reply_text
+from keelchat.channels import CHANNELS
+from keelchat.policy.compiler import build_file
+from keelchat.registry.contract import check_capability
+from keelchat.runtime.context import OutboundMessage
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
+from keelchat.runtime.runtime import Runtime
 from tests.conftest import ROOT
 from tests.helpers import say
 from tests.test_analytics import root, sales  # noqa: F401  (fixture)
-from yachat.analytics.analyst import Analyst, Limits
-from yachat.analytics.service import AnalyticsService
-from yachat.capabilities.nodes.analytics import HISTORY, reply_text
-from yachat.channels import CHANNELS
-from yachat.policy.compiler import build_file
-from yachat.registry.contract import check_capability
-from yachat.runtime.context import OutboundMessage
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
-from yachat.runtime.runtime import Runtime
 
 EXAMPLE = ROOT / "examples" / "sales_analyst.yaml"
 

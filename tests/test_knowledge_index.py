@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from yachat.knowledge.models import Chunk
-from yachat.knowledge.service import index_uri
+from keelchat.knowledge.models import Chunk
+from keelchat.knowledge.service import index_uri
 
 lancedb = pytest.importorskip("lancedb")
 
-from yachat.knowledge.vectorstore import LanceDBIndex, _committed  # noqa: E402
+from keelchat.knowledge.vectorstore import LanceDBIndex, _committed  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -50,7 +50,7 @@ async def test_upserting_the_same_chunks_again_replaces_them(tmp_path: Path):
 
 
 def test_a_lost_commit_race_is_tried_again(monkeypatch):
-    monkeypatch.setattr("yachat.knowledge.vectorstore.time.sleep", lambda s: None)
+    monkeypatch.setattr("keelchat.knowledge.vectorstore.time.sleep", lambda s: None)
     calls = []
 
     def commit():
@@ -63,7 +63,7 @@ def test_a_lost_commit_race_is_tried_again(monkeypatch):
 
 
 def test_other_errors_are_not_retried(monkeypatch):
-    monkeypatch.setattr("yachat.knowledge.vectorstore.time.sleep", lambda s: None)
+    monkeypatch.setattr("keelchat.knowledge.vectorstore.time.sleep", lambda s: None)
     calls = []
 
     def commit():
@@ -90,13 +90,13 @@ async def test_s3_documents_are_kept_per_scope_and_listed_without_reading_them()
     import os
     import uuid
 
-    from yachat.knowledge.docstore import ArtifactDocumentStore
-    from yachat.knowledge.models import Document
-    from yachat.state.artifacts import S3ArtifactStore
+    from keelchat.knowledge.docstore import ArtifactDocumentStore
+    from keelchat.knowledge.models import Document
+    from keelchat.state.artifacts import S3ArtifactStore
 
     if not os.getenv("KNOWLEDGE_S3_BUCKET"):
         pytest.skip("needs KNOWLEDGE_S3_BUCKET")
-    store = ArtifactDocumentStore(S3ArtifactStore(os.environ["KNOWLEDGE_S3_BUCKET"]), prefix=f"yachat-verify/docs-{uuid.uuid4().hex[:8]}/")
+    store = ArtifactDocumentStore(S3ArtifactStore(os.environ["KNOWLEDGE_S3_BUCKET"]), prefix=f"keelchat-verify/docs-{uuid.uuid4().hex[:8]}/")
     shared, mine = Document.create("Corpus", "shared text"), Document.create("FAQ", "dataset text", "faq.md", dataset="acme/faq")
     try:
         await store.put(shared)

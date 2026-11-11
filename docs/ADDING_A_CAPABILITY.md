@@ -1,22 +1,22 @@
 # Adding a capability
 
 One decorated function or class. No runtime change. Everything an extension needs imports from the top level:
-`from yachat import tool, node, Node, NodeResult, guardrail, ...`.
+`from keelchat import tool, node, Node, NodeResult, guardrail, ...`.
 
 ## Start here: your first step in ten minutes
 
 ```bash
-uv run yachat new package acme_caps --out my_bot      # a tool, a step, a guardrail, an agent and a contract test
+uv run keelchat new package acme_caps --out my_bot      # a tool, a step, a guardrail, an agent and a contract test
 cd my_bot
-PYTHONPATH=. YACHAT_CAPABILITY_PACKAGES=acme_caps uv run --project <yachat checkout> yachat build acme-caps-agent.yaml
-PYTHONPATH=. uv run --project <yachat checkout> pytest test_acme_caps.py
+PYTHONPATH=. KEELCHAT_CAPABILITY_PACKAGES=acme_caps uv run --project <keelchat checkout> keelchat build acme-caps-agent.yaml
+PYTHONPATH=. uv run --project <keelchat checkout> pytest test_acme_caps.py
 ```
 
 The files build and pass the contract suite as written. Read them in this order:
 
 1. **`acme_caps/tools.py`: the tool.** An async function. Its type hints become the schema, and its docstring is what
    the model reads. It talks to your system; here a dictionary stands in.
-2. **`acme_caps/steps.py`: the step.** The core idea of yachat is that **code decides and the model phrases**. Each
+2. **`acme_caps/steps.py`: the step.** The core idea of keelchat is that **code decides and the model phrases**. Each
    turn the runtime calls `act()`, and you return one `NodeResult`:
    - **Need something from the user?** Return `ask=(field, sample wording, expect)`. The model words the question
      to fit the conversation. The answer is checked against `expect` before it reaches you.
@@ -36,7 +36,7 @@ Then change the tool to call your system, and run the build and the test again. 
 ## Tool
 
 ```python
-from yachat import tool
+from keelchat import tool
 
 
 @tool("salary_lookup", timeout_s=3.0, retries=1)  # translate=False, side_effects="write" as needed
@@ -54,11 +54,11 @@ prompts as data, never as instructions. Anything that changes something (book, p
 
 ## MCP server
 
-No code. List the server in `YACHAT_MCP_SERVERS`; every tool it exposes is registered as `<alias>.<tool>` with
+No code. List the server in `KEELCHAT_MCP_SERVERS`; every tool it exposes is registered as `<alias>.<tool>` with
 the server's schema and description, and runs through the Tool Gateway like any other tool:
 
 ```bash
-YACHAT_MCP_SERVERS="tm=https://talent.example.com/mcp, time=npx -y @modelcontextprotocol/server-time"
+KEELCHAT_MCP_SERVERS="tm=https://talent.example.com/mcp, time=npx -y @modelcontextprotocol/server-time"
 ```
 
 A target starting with `http` is a streamable-HTTP endpoint; anything else is a command started over stdio. Servers
@@ -84,7 +84,7 @@ curl -X POST localhost:8000/v1/tenants/acme/tools -H 'content-type: application/
 ```
 
 The gateway POSTs the validated arguments as JSON and treats the JSON reply as data. The URL must resolve to a
-public address (`YACHAT_ALLOW_PRIVATE_TOOL_URLS=1` lifts this for local development). Mark endpoints that
+public address (`KEELCHAT_ALLOW_PRIVATE_TOOL_URLS=1` lifts this for local development). Mark endpoints that
 change something `"side_effects": "write"` with `"retries": 0`: they are never retried or offered to the planner.
 A name is immutable once registered, because pinned policies may use it; register a new name to change one. The
 registration passes the contract suite before it goes live; `GET /v1/tenants/{tenant}/tools` lists a tenant's tools (never their headers),
@@ -96,7 +96,7 @@ so treat that table like any other secret store.
 ## Node
 
 ```python
-from yachat import CapabilityConfig, Node, NodeResult, node
+from keelchat import CapabilityConfig, Node, NodeResult, node
 
 
 class MyConfig(CapabilityConfig):
@@ -116,9 +116,9 @@ entry orders steps by those outputs. Use it in a policy as `- my_step: {greeting
 calls a tool, offers choices and completes on the user's pick:
 [`examples/extensions/booking_caps/steps.py`](../examples/extensions/booking_caps/steps.py). The built-in steps are
 `greet_consent`, `form_fill`, `survey`, `conversation_survey`, `knowledge`, `analytics`, `job_search`, `handoff` and
-`exit`; [`form_fill.py`](../yachat/capabilities/nodes/form_fill.py) is a good one to read first.
+`exit`; [`form_fill.py`](../keelchat/capabilities/nodes/form_fill.py) is a good one to read first.
 
-- **Datasets.** A config field typed `StructuredRef` or `UnstructuredRef` (`yachat.datasets.models`) names a
+- **Datasets.** A config field typed `StructuredRef` or `UnstructuredRef` (`keelchat.datasets.models`) names a
   dataset; the build checks it exists with that kind. A tool that reads one declares `@tool(..., dataset="structured")`
   and takes `dataset: Dataset`: the model passes a name, the gateway passes the tenant's resolved dataset.
 - **Repairs.** `@node(..., repairs={"sql": 3, "code": 3})` sets how many times each stage may fix its own model
@@ -126,7 +126,7 @@ calls a tool, offers choices and completes on the user's pick:
   or `repairs:` on the step). Without it a node gets one `default` stage at the platform value (2). A tool declares
   the same with `repairs=` and a `repairs: dict[str, int] | None = None` parameter, which the gateway fills and caps.
 - **Verified reasoning.** A capability that reasons or calculates runs its work through
-  `yachat.reasoning.verified(llm, models, task, rounds)`. The task supplies `brief()` (the question and trusted
+  `keelchat.reasoning.verified(llm, models, task, rounds)`. The task supplies `brief()` (the question and trusted
   context), `produce(plan, checks, feedback)` (one attempt, with the reviewer's problems from the last one),
   `evidence()` and `answer()` (what the verifier reads), `results()` (checks it ran itself, e.g. assertions in a
   sandbox), and `stages` (where a problem can be sent back). The loop writes the plan and checks before the first
@@ -148,7 +148,7 @@ calls a tool, offers choices and completes on the user's pick:
 ## Candidate-only action
 
 ```python
-from yachat import action
+from keelchat import action
 
 
 @action("withdraw_application", by="candidate")
@@ -161,7 +161,7 @@ candidate's own action proves it (`InboundMessage.action` from the channel, or a
 ## Pre-processor
 
 ```python
-from yachat import PreProcessor, preprocessor
+from keelchat import PreProcessor, preprocessor
 
 
 # built-ins: receiver 10, opt_out 15, handoff_request 16, language 20, shorthand 30, entity_normalization 40,
@@ -177,7 +177,7 @@ class SpamFilter(PreProcessor):
 ## Guardrail
 
 ```python
-from yachat import Guardrail, GuardResult, guardrail
+from keelchat import Guardrail, GuardResult, guardrail
 
 
 @guardrail("no_competitors", stage="output")
@@ -196,9 +196,9 @@ A channel turns its platform's payload into an `InboundMessage`, and a channel-n
 within its limits.
 
 ```python
-from yachat.channels import CHANNELS
-from yachat.channels.base import Channel, split_text
-from yachat.runtime.context import ChannelMessage, InboundMessage
+from keelchat.channels import CHANNELS
+from keelchat.channels.base import Channel, split_text
+from keelchat.runtime.context import ChannelMessage, InboundMessage
 
 
 class Telegram(Channel):
@@ -221,24 +221,24 @@ example: [`examples/extensions/booking_caps/telegram.py`](../examples/extensions
 
 ## Make it discoverable
 
-- In this repo: put the module under `yachat/capabilities/`.
-- In any importable package: list it in `YACHAT_CAPABILITY_PACKAGES=acme_caps,other_pkg`; every module in it
+- In this repo: put the module under `keelchat/capabilities/`.
+- In any importable package: list it in `KEELCHAT_CAPABILITY_PACKAGES=acme_caps,other_pkg`; every module in it
   is imported at startup and at build.
 - In your own package: declare an entry point and ship it (`examples/contrib_tool` is the template):
 
 ```toml
-[project.entry-points."yachat.capabilities"]
+[project.entry-points."keelchat.capabilities"]
 salary_lookup = "contrib_tool.salary:register"
 ```
 
 ## Pass the contract suite
 
 ```python
-from yachat import check_capability
+from keelchat import check_capability
 
 await check_capability("tool", "salary_lookup", fake_impl)
 ```
 
 It checks: schemas are valid JSON Schema, a fake call succeeds, the gateway timeout is honored, no socket is opened
 outside the Tool Gateway, actions are rejected without the candidate's action, and pre-processors return the context. `tests/test_registry.py` runs it over everything registered. Then reference the
-name in a policy and run `yachat build`.
+name in a policy and run `keelchat build`.

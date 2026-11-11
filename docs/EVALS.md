@@ -1,18 +1,18 @@
 # Evaluation
 
-Harness: `yachat.evals` (platform-owned; `pip install 'yachat[evals]'`). Each team owns its eval set in
+Harness: `keelchat.evals` (platform-owned; `pip install 'keelchat[evals]'`). Each team owns its eval set in
 `evals/<agent>/`: `replay.yaml` and `thresholds.yaml`. Everything specific to an agent lives in those two files; the
 harness hardcodes no scripts, personas or rubrics.
 
 ## Offline (CI gate)
 
 ```bash
-uv run yachat evals run                          # every evals/<agent>/ with a thresholds.yaml; non-zero exit on failure
-uv run yachat evals run evals/support_assistant
-EVALS_JUDGE_MODEL=openrouter/openai/gpt-4o-mini uv run yachat evals run   # adds the judged metrics
+uv run keelchat evals run                          # every evals/<agent>/ with a thresholds.yaml; non-zero exit on failure
+uv run keelchat evals run evals/support_assistant
+EVALS_JUDGE_MODEL=openrouter/openai/gpt-4o-mini uv run keelchat evals run   # adds the judged metrics
 ```
 
-Cases run on the simulator's engine (`yachat/sim/harness.py`): a runtime of their own with the real model, fake tools
+Cases run on the simulator's engine (`keelchat/sim/harness.py`): a runtime of their own with the real model, fake tools
 and fresh stores, so nothing is submitted or sent. The console's **Simulate** tab uses the same engine.
 
 ### `replay.yaml`
@@ -44,7 +44,7 @@ cases:
 
 ### Checks every conversation must pass
 
-Besides its own `expect`, every case is held to checks that come from the policy (`yachat/evals/checks.py`), so a
+Besides its own `expect`, every case is held to checks that come from the policy (`keelchat/evals/checks.py`), so a
 conversation needs no expected answers to be a test:
 
 | Check | Fails when | How |
@@ -57,19 +57,19 @@ conversation needs no expected answers to be a test:
 | `in_scope` | a reply does work the charter puts out of scope; the judge must quote the sentence, and a quote not in the reply does not count | judge |
 | `rule_followed:<rule>` | on a turn where the rule matched, the reply leaves out a part of its `then` that applies; each part done needs a quote from the reply (earlier turns count as known) | judge |
 
-`yachat evals run` applies the code checks. `yachat evals check` applies the judged ones too (when
+`keelchat evals run` applies the code checks. `keelchat evals check` applies the judged ones too (when
 `EVALS_JUDGE_MODEL` is set) instead of scoring the thresholds' metrics. Generated cases kept for an `in_scope` or
 `rule_followed` failure carry no `expect`, so only `evals check` catches them again: run both in CI.
 
 ```bash
-uv run yachat evals check evals/support_assistant
+uv run keelchat evals check evals/support_assistant
 ```
 
 ### Generating a set
 
 ```bash
-uv run yachat evals generate examples/support_assistant.yaml           # writes evals/support_assistant/generated.yaml
-uv run yachat evals generate examples/support_assistant.yaml --only rule: handed_off
+uv run keelchat evals generate examples/support_assistant.yaml           # writes evals/support_assistant/generated.yaml
+uv run keelchat evals generate examples/support_assistant.yaml --only rule: handed_off
 ```
 
 1. **Targets come from the policy, in code**: finishing the flow, giving up, a bad answer to each form field, each
@@ -102,7 +102,7 @@ rubrics:
 options:                           # extra arguments a DeepEval metric needs
   non_advice: {advice_types: [medical]}
 trials: 3                          # runs per case (default 1); a case passes only when every run does
-calibration: {in_scope: 0.95, rule_followed: 0.95}  # from `yachat evals calibrate`
+calibration: {in_scope: 0.95, rule_followed: 0.95}  # from `keelchat evals calibrate`
 ```
 
 Metric names:
@@ -112,7 +112,7 @@ Metric names:
 | `conversation_completeness`, `knowledge_retention`, `role_adherence`, `conversation_relevancy` | each conversation | DeepEval |
 | `faithfulness`, `task_completion`, `pii_leakage`, `non_advice`, `role_violation`, `tool_correctness`, `argument_correctness` | each agent turn, with that turn's tool output as context | DeepEval |
 | a name under `rubrics:` | each conversation (ConversationalGEval with your criteria) | DeepEval |
-| `rule_followed` | each turn where a policy rule matched: the judge splits the rule's `then` into parts and quotes where the reply does each; code passes it only when every part that applies is done | judge (yachat) |
+| `rule_followed` | each turn where a policy rule matched: the judge splits the rule's `then` into parts and quotes where the reply does each; code passes it only when every part that applies is done | judge (keelchat) |
 | `ragas.<Metric>` | each turn with output from a `context_tools` tool: `user_input`, `response`, `retrieved_contexts`. Reference-free ones work: `Faithfulness`, `ResponseGroundedness`, `ContextPrecisionWithoutReference`, `AnswerRelevancy` needs embeddings and is not supported | Ragas |
 
 - **Gate**: each metric's average must reach its minimum; an unknown name fails the build (typo guard). A metric with
@@ -128,7 +128,7 @@ Metric names:
   inside provider rate limits.
 - **Judge**: `EVALS_JUDGE_MODEL`, any litellm model id, so evals need no Anthropic credit. Without it only the
   expectations run.
-- **Simulate first**: the console's **Simulate** tab and `yachat simulate` run the same kinds of conversations
+- **Simulate first**: the console's **Simulate** tab and `keelchat simulate` run the same kinds of conversations
   without expectations or scores, to explore an agent before you write its set.
 
 ## People rating conversations
@@ -140,10 +140,10 @@ conversation an overall score (1 bad, 5 great) and a note. Ratings are kept per 
 Use them three ways:
 
 1. **Measure the judge.** **Download labels.yaml** writes every rated reply as a label. Save it as
-   `evals/<agent>/labels.yaml` and run `yachat evals calibrate` (below).
+   `evals/<agent>/labels.yaml` and run `keelchat evals calibrate` (below).
 2. **Keep fixed problems fixed.** **Download failed conversations as replay cases** writes each conversation with a
    failed reply, or a score of 2 or less, as a script up to the last failed reply. The checks it failed are in its
-   `note`. Add the cases to `replay.yaml`; `yachat evals check` judges them on every change.
+   `note`. Add the cases to `replay.yaml`; `keelchat evals check` judges them on every change.
 3. **Fix the policy.** The tab counts failures per check. A rule that fails often needs its `then` reworded or split;
    out-of-scope replies need the charter's scope tightened; a low score with no failed check means a check is missing,
    so turn the note into a rule or a rubric. **Suggest policy changes** does this for you: the model reads the failed
@@ -152,7 +152,7 @@ Use them three ways:
    revision and the model repairs its errors, like a drafted policy. **Open in editor** replaces the editor text;
    nothing is saved until you build it, run the tests and save a version.
 
-**Judge** (the tab after Rate) does the rating for you with a stronger model (`YACHAT_MODEL_CRITIC`): problems by turn,
+**Judge** (the tab after Rate) does the rating for you with a stronger model (`KEELCHAT_MODEL_CRITIC`): problems by turn,
 policy fixes applied in the editor, and code fixes kept for Claude Code (see FEATURES.md, *Judge a trial
 conversation*). Use it to find problems quickly; keep rating by hand to calibrate judges you trust in CI.
 
@@ -170,7 +170,7 @@ built in the console has tests without a folder on disk.
 
 - **Save as test**: pick the test chat or a simulated conversation. The test replays what the user said; with **Expect
   the same ending** it also expects the conversation to finish (or not) and exit the same way.
-- **+ Draft from policy**: `yachat evals generate` on the server, for targets that have no drafted test yet.
+- **+ Draft from policy**: `keelchat evals generate` on the server, for targets that have no drafted test yet.
   Each drafted case shows whether it passes now; **Keep** the ones you want.
 - **Run tests** (or **Run this one**): every test (or one) on the agent's current build, on sample tools, like a simulation. A test passes when its
   `expect` holds and the checks every conversation must pass do; the judged checks run when the server sets
@@ -199,11 +199,11 @@ far to trust them. Measure how often the judge agrees with a person:
        note: order number already known       # optional: why
    ```
 
-2. Run `EVALS_JUDGE_MODEL=... uv run yachat evals calibrate evals/<agent>`. It runs the same judged checks on every
+2. Run `EVALS_JUDGE_MODEL=... uv run keelchat evals calibrate evals/<agent>`. It runs the same judged checks on every
    label and prints the agreement per check, how often the judge was too lenient or too strict, and each
    disagreement with the judge's reason. It exits 1 when a check agrees less than 80% or a label could not be judged.
 3. Copy the printed `calibration:` block into `thresholds.yaml`. The judge varies too: run it twice and record the
-   lower figure. Rerun it when you change the judge model or the prompts in `yachat/evals/checks.py`.
+   lower figure. Rerun it when you change the judge model or the prompts in `keelchat/evals/checks.py`.
 
 A disagreement means either the judge or the label is wrong: fix the label, or check that check's failures by hand
 until the judge improves. Metrics with no `calibration` entry are listed under `uncalibrated` in the report.
@@ -218,12 +218,12 @@ a ceiling until labels from real conversations are added.
 
 ## Online (production)
 
-- Nightly job: `yachat.evals.online.nightly_sample` redacts live sessions (PII patterns; field values never leave), then scores
-  the reference-free subset (`yachat.evals.metrics.online_metrics`).
+- Nightly job: `keelchat.evals.online.nightly_sample` redacts live sessions (PII patterns; field values never leave), then scores
+  the reference-free subset (`keelchat.evals.metrics.online_metrics`).
 - Tracked per agent, policy version, channel, language, step: completion rate, wrong-exit rate, re-asks per field, p95
   latency (`/v1/metrics`), cost per conversation (from `llm_calls` and model prices).
-- Outcome split (`yachat.evals.online.OutcomeSplit`, outcome = application submitted): digressions, Intent Detector failures per
+- Outcome split (`keelchat.evals.online.OutcomeSplit`, outcome = application submitted): digressions, Intent Detector failures per
   field, language switches, all-steps-complete, early exits by reason. Summary: digression lift, drop-off after a re-ask
   failure per field, wrong exits (disengaged, later returned and submitted). Correlations only; confirm with A/B tests
   on policy versions.
-- Export a failed conversation as a replay test: `uv run yachat evals export <session_id> --state-file state.json [--out evals/hiring_agent/replay.yaml]`.
+- Export a failed conversation as a replay test: `uv run keelchat evals export <session_id> --state-file state.json [--out evals/hiring_agent/replay.yaml]`.

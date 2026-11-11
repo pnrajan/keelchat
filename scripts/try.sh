@@ -22,19 +22,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 for tool in uv npm curl; do command -v "$tool" >/dev/null || { echo "missing: $tool (see README Quickstart)" >&2; exit 1; }; done
-[ -f .env ] || { echo "no .env: cp .env.example .env and set YACHAT_LLM and its key" >&2; exit 1; }
+[ -f .env ] || { echo "no .env: cp .env.example .env and set KEELCHAT_LLM and its key" >&2; exit 1; }
 while curl -s -o /dev/null "http://127.0.0.1:$PORT/"; do PORT=$((PORT + 1)); done  # skip ports in use
 
 # empty values win over .env (the app reads it too): in-memory stores, no API key, sample tools, judge off unless asked
-export DATABASE_URL='' REDIS_URL='' YACHAT_API_KEY=''
-export YACHAT_TOOLS=fake  # tools without a backend URL answer from built-in sample data (knowledge, jobs)
+export DATABASE_URL='' REDIS_URL='' KEELCHAT_API_KEY=''
+export KEELCHAT_TOOLS=fake  # tools without a backend URL answer from built-in sample data (knowledge, jobs)
 [ -n "$JUDGE" ] || export EVALS_JUDGE_MODEL=''
 
 uv sync -q --inexact
 [ -d frontend/node_modules ] || (cd frontend && npm install --silent)
 (cd frontend && npm run build --silent)
 
-uv run uvicorn yachat.api.app:create_app --factory --host 127.0.0.1 --port "$PORT" &
+uv run uvicorn keelchat.api.app:create_app --factory --host 127.0.0.1 --port "$PORT" &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null || true' EXIT INT TERM
 BASE=http://127.0.0.1:$PORT
@@ -54,7 +54,7 @@ saved || { echo "could not save the sample agent and tests" >&2; exit 1; }
 
 cat <<EOF
 
-  yachat is running: $BASE/console/   (API docs: $BASE/docs, judge $JUDGED)
+  keelchat is running: $BASE/console/   (API docs: $BASE/docs, judge $JUDGED)
 
   Try the Test tab
     1. In the Policy dropdown (top left), pick  support-assistant  under "Saved agents".

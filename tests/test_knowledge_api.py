@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from yachat.knowledge.api import create_app
-from yachat.knowledge.docstore import InMemoryDocumentStore
-from yachat.knowledge.embedder import FakeEmbedder
-from yachat.knowledge.models import Document
-from yachat.knowledge.service import KnowledgeService, make_indexer
-from yachat.knowledge.vectorstore import InMemoryIndex
+from keelchat.knowledge.api import create_app
+from keelchat.knowledge.docstore import InMemoryDocumentStore
+from keelchat.knowledge.embedder import FakeEmbedder
+from keelchat.knowledge.models import Document
+from keelchat.knowledge.service import KnowledgeService, make_indexer
+from keelchat.knowledge.vectorstore import InMemoryIndex
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ async def test_rejects_bad_input(client):
 
 
 async def test_api_key_gates_documents_and_search(monkeypatch):
-    monkeypatch.setenv("YACHAT_API_KEY", "secret")
+    monkeypatch.setenv("KEELCHAT_API_KEY", "secret")
     svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
     async with AsyncClient(transport=ASGITransport(app=create_app(svc)), base_url="http://t") as c:
         assert (await c.get("/health")).status_code == 200
@@ -72,12 +72,12 @@ def docs_root(tmp_path, monkeypatch):
     root.mkdir()
     (root / "returns.md").write_text("Returns are accepted within 30 days with a receipt.")
     (root / "shipping.txt").write_text("Standard shipping takes five business days.")
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(root))
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(root))
     return root
 
 
 def _dataset(tenant: str, *files: str, root=None) -> dict:
-    from yachat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
+    from keelchat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
 
     spec = UnstructuredDataset(documents=[DocumentSource(uri=str(root / f)) for f in files])
     return Dataset.create(tenant, "policies", DatasetIn(spec=spec)).model_dump(mode="json")
@@ -120,7 +120,7 @@ async def test_a_drop_during_indexing_wins(docs_root):
     import asyncio
 
     svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
-    from yachat.datasets.models import Dataset
+    from keelchat.datasets.models import Dataset
 
     ds = Dataset.model_validate(_dataset("acme", "returns.md", "shipping.txt", root=docs_root))
     gate = asyncio.Event()
@@ -142,7 +142,7 @@ async def test_a_drop_during_indexing_wins(docs_root):
 
 
 async def test_a_restart_or_a_description_change_does_not_embed_again(docs_root):
-    from yachat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
+    from keelchat.datasets.models import Dataset, DatasetIn, DocumentSource, UnstructuredDataset
 
     class Counting(FakeEmbedder):
         calls = 0
@@ -188,12 +188,12 @@ async def test_the_shared_corpus_and_datasets_stay_apart(client, docs_root):
 
 
 async def test_a_restart_rebuilds_the_shared_corpus_even_when_datasets_are_indexed(docs_root):
-    from yachat.datasets.models import Dataset
+    from keelchat.datasets.models import Dataset
 
     docs, index = InMemoryDocumentStore(), InMemoryIndex()
     svc = KnowledgeService(docs, index, FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
     await svc.index_dataset(Dataset.model_validate(_dataset("acme", "returns.md", root=docs_root)))
-    from yachat.knowledge.models import Document
+    from keelchat.knowledge.models import Document
 
     await docs.put(Document.create("Corpus", "Returns policy for the shared corpus: 14 days."))  # stored, not indexed (a lost index)
     assert await svc.reindex_if_empty() >= 1  # dataset chunks no longer hide an empty shared corpus

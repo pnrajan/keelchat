@@ -7,15 +7,15 @@ import pandas as pd
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from yachat.analytics.analyst import Analyst, Limits
-from yachat.analytics.api import create_app
-from yachat.analytics.duck import AnalyticsError, DatasetDB, check_select, summarize
-from yachat.analytics.grounding import Grounding
-from yachat.analytics.models import AnalyzeIn, HistoryItem
-from yachat.analytics.service import AnalyticsService
-from yachat.datasets.models import Dataset, DatasetIn, SqlExample, StructuredDataset, TableSource
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
+from keelchat.analytics.analyst import Analyst, Limits
+from keelchat.analytics.api import create_app
+from keelchat.analytics.duck import AnalyticsError, DatasetDB, check_select, summarize
+from keelchat.analytics.grounding import Grounding
+from keelchat.analytics.models import AnalyzeIn, HistoryItem
+from keelchat.analytics.service import AnalyticsService
+from keelchat.datasets.models import Dataset, DatasetIn, SqlExample, StructuredDataset, TableSource
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 TOTALS = {"APAC": 14620, "EU": 10450, "US": 30990}
@@ -25,7 +25,7 @@ TOTALS = {"APAC": 14620, "EU": 10450, "US": 30990}
 def root(tmp_path, monkeypatch):
     r = tmp_path / "data"
     shutil.copytree(DATA, r)
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(r))
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(r))
     return r
 
 
@@ -91,13 +91,13 @@ async def test_row_cap_timeout_and_summary(root):
 def test_sources_outside_the_root_never_load(root, tmp_path):
     (tmp_path / "other.csv").write_text("a\n1\n")
     ds = Dataset.create("acme", "x", DatasetIn(spec=StructuredDataset(tables=[TableSource(name="t", uri=str(tmp_path / "other.csv"))])))
-    with pytest.raises(ValueError, match="outside YACHAT_DATA_ROOT"):
+    with pytest.raises(ValueError, match="outside KEELCHAT_DATA_ROOT"):
         DatasetDB(ds)
 
 
 async def test_small_samples_are_flagged_only_for_raw_rows(root):
-    from yachat.analytics.analyst import Analyst
-    from yachat.analytics.models import AnalysisData
+    from keelchat.analytics.analyst import Analyst
+    from keelchat.analytics.models import AnalysisData
 
     db = DatasetDB(sales(root))
     analyst = Analyst(None, ModelConfig())  # type: ignore[arg-type]  # no model call in this check
@@ -108,7 +108,7 @@ async def test_small_samples_are_flagged_only_for_raw_rows(root):
 
 
 def test_group_subtotals_are_grounded():
-    from yachat.analytics.analyst import _subtotals
+    from keelchat.analytics.analyst import _subtotals
 
     frame = pd.DataFrame({"product": ["Team", "Pro", "Team", "Pro"], "region": ["US", "US", "EU", "EU"], "revenue": [19200, 8350, 6720, 2850]})
     g = Grounding(_subtotals(frame))
@@ -223,7 +223,7 @@ async def test_api(root, service):
         assert r.status_code == 200 and r.json()["tables"][0] == {"name": "orders", "rows": 576, "columns": r.json()["tables"][0]["columns"]}
         bad = dict(ds, spec={"kind": "structured", "tables": [{"name": "t", "uri": "/etc/passwd", "format": "csv"}]}, name="bad")
         r = await c.post("/datasets", json=bad)
-        assert r.status_code == 422 and "outside YACHAT_DATA_ROOT" in r.text  # the caller's own URI, never file content
+        assert r.status_code == 422 and "outside KEELCHAT_DATA_ROOT" in r.text  # the caller's own URI, never file content
         r = await c.post("/analyze", json={"question": "How many orders are there?", "dataset": ds})
         assert r.status_code == 200 and r.json()["schema_version"] == 1 and "576" in r.text
         calls = r.json()["usage"]  # the service's own model calls, for the caller's cost page
@@ -247,7 +247,7 @@ async def test_a_folder_of_parquet_files_is_one_table(root, tmp_path):
 
 
 def test_only_statistics_reach_the_answer():
-    from yachat.analytics.analyst import statistics_of
+    from keelchat.analytics.analyst import statistics_of
 
     got = statistics_of(
         {

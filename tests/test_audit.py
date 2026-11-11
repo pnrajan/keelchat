@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from keelchat.runtime.audit import summarize
+from keelchat.state.models import AuditEvent, subject_of
+from keelchat.state.store import InMemoryAuditStore
 from tests.helpers import audit_window, make_runtime, reach_form, say
-from yachat.runtime.audit import summarize
-from yachat.state.models import AuditEvent, subject_of
-from yachat.state.store import InMemoryAuditStore
 
 
 def ev(**kw: object) -> AuditEvent:
@@ -84,13 +84,13 @@ async def test_rejected_answers_exits_and_blocked_input_are_recorded(policy_yaml
 async def test_people_work_the_inbox_and_see_outcomes_over_the_api(policy_yaml):
     from httpx import ASGITransport, AsyncClient
 
+    from keelchat.api.app import create_app
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryTenantToolStore
+    from keelchat.testing.fakes import FakeTools
     from tests.helpers import mutate
-    from yachat.api.app import create_app
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.store import InMemoryTenantToolStore
-    from yachat.testing.fakes import FakeTools
 
     app = create_app(Runtime(llm_from_env(), FakeTools().impls(), models=ModelConfig.from_env()), tool_store=InMemoryTenantToolStore())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
@@ -116,7 +116,7 @@ async def test_people_work_the_inbox_and_see_outcomes_over_the_api(policy_yaml):
 
 
 async def test_the_dashboard_has_daily_outcomes_per_agent_latency_and_handoff_wait():
-    from yachat.runtime.audit import dashboard
+    from keelchat.runtime.audit import dashboard
 
     now = datetime.now(UTC).replace(hour=12)
     y = now - timedelta(days=1)
@@ -145,16 +145,16 @@ async def test_the_dashboard_has_daily_outcomes_per_agent_latency_and_handoff_wa
 async def test_a_tenant_sees_only_its_own_dashboard(monkeypatch):
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.store import InMemoryTenantToolStore
-    from yachat.testing.fakes import FakeTools
+    from keelchat.api.app import create_app
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryTenantToolStore
+    from keelchat.testing.fakes import FakeTools
 
     rt = Runtime(llm_from_env(), FakeTools().impls(), models=ModelConfig.from_env())
     await rt.audit.append([ev(tenant="acme", session_id="s1", ms=500.0, llm_calls=1), ev(tenant="other", session_id="s9", ms=900.0)])
-    monkeypatch.setenv("YACHAT_TENANT_KEYS", "acme:k-acme")
+    monkeypatch.setenv("KEELCHAT_TENANT_KEYS", "acme:k-acme")
     app = create_app(rt, tool_store=InMemoryTenantToolStore())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t", headers={"authorization": "Bearer k-acme"}) as c:
         d = (await c.get("/v1/tenants/acme/dashboard", params={"days": 7})).json()
@@ -170,12 +170,12 @@ class AuditDown(InMemoryAuditStore):
 async def test_a_failed_audit_write_does_not_fail_a_handoff_change():
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.llm_factory import llm_from_env
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.models import Handoff
-    from yachat.state.store import InMemoryHandoffStore, InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.models import Handoff
+    from keelchat.state.store import InMemoryHandoffStore, InMemoryTenantToolStore
 
     handoffs = InMemoryHandoffStore()
     h = await handoffs.create(Handoff(tenant="default", agent="a", session_id="s1", user_id="u1", channel="web", policy_hash="h", reason="user_request"))
@@ -191,10 +191,10 @@ async def test_memory_writer_logs_carry_the_session(policy_yaml):
     import json
     import logging
 
+    from keelchat.logging import JsonFormatter
+    from keelchat.policy.compiler import build
+    from keelchat.state.memory_writer import MemorySnapshot
     from tests.helpers import make_runtime
-    from yachat.logging import JsonFormatter
-    from yachat.policy.compiler import build
-    from yachat.state.memory_writer import MemorySnapshot
 
     class Broken:
         async def write(self, snap: MemorySnapshot) -> list[str]:
@@ -205,11 +205,11 @@ async def test_memory_writer_logs_carry_the_session(policy_yaml):
     lines: list[str] = []
     handler = logging.Handler()
     handler.emit = lambda rec: lines.append(JsonFormatter().format(rec))  # type: ignore[method-assign]
-    logging.getLogger("yachat").addHandler(handler)
+    logging.getLogger("keelchat").addHandler(handler)
     try:
         await rt._write_memory(MemorySnapshot(user_id="u1", policy=build(policy_yaml), turn_id="t1", user_text="hi"), "ses_1")
     finally:
-        logging.getLogger("yachat").removeHandler(handler)
+        logging.getLogger("keelchat").removeHandler(handler)
     failed = [json.loads(x) for x in lines if "memory writer failed" in x]
     assert failed and failed[0]["session_id"] == "ses_1"
 
@@ -219,14 +219,14 @@ async def test_deleting_a_user_clears_their_words_from_the_audit_log_but_keeps_t
 
     from httpx import ASGITransport, AsyncClient
 
-    from yachat.api.app import create_app
-    from yachat.state.store import InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.state.store import InMemoryTenantToolStore
 
     stores: list[object] = [InMemoryAuditStore()]
     if url := os.getenv("DATABASE_URL"):
         import asyncpg
 
-        from yachat.state.postgres_store import PostgresAuditStore
+        from keelchat.state.postgres_store import PostgresAuditStore
 
         try:  # a configured but unreachable database (a local .env) only skips the Postgres half
             await (await asyncpg.connect(url, timeout=3)).close()

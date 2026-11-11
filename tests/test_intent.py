@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from keelchat.runtime.decide.intent_detector import ROUTE_REASK
+from keelchat.runtime.llm import LLMError
 from tests.helpers import RecordingLLM, make_runtime, mutate, reach_form, say
-from yachat.runtime.decide.intent_detector import ROUTE_REASK
-from yachat.runtime.llm import LLMError
 
 
 async def test_required_address_fails_twice_exits_max_reasks(policy_yaml):

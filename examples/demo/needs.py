@@ -2,7 +2,7 @@
 
 Two sources: what the YAML itself uses (a model, documents, a handoff destination, memory, a channel), read in code
 from the compiled policy; and the outside systems the description implies but the YAML can't reach yet (a calendar, a
-CRM, an order system), suggested by the model with real products to pick from and how yachat connects to them.
+CRM, an order system), suggested by the model with real products to pick from and how keelchat connects to them.
 """
 
 from __future__ import annotations
@@ -11,19 +11,19 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from yachat.policy.compiler import CompiledPolicy
-from yachat.runtime.llm import LLMClient, LLMRequest, ModelConfig, untrusted
+from keelchat.policy.compiler import CompiledPolicy
+from keelchat.runtime.llm import LLMClient, LLMRequest, ModelConfig, untrusted
 
 Source = Literal["yaml", "suggested"]
 Connect = Literal["config", "tool", "mcp", "webhook", "built-in"]
 
-DOCS = "https://github.com/pnrajan/yachat/blob/main/docs"
+DOCS = "https://github.com/pnrajan/keelchat/blob/main/docs"
 HOW: dict[str, tuple[str, str]] = {  # how each kind of connection is made, and where it's explained
     "config": ("Set it in .env", f"{DOCS}/REFERENCE.md"),
     "tool": ("Write a Python tool: one decorated function that calls its API", f"{DOCS}/ADDING_A_CAPABILITY.md"),
-    "mcp": ("Point yachat at its MCP server; its tools appear as <alias>.<tool>", f"{DOCS}/ADDING_A_CAPABILITY.md"),
+    "mcp": ("Point keelchat at its MCP server; its tools appear as <alias>.<tool>", f"{DOCS}/ADDING_A_CAPABILITY.md"),
     "webhook": ("Send handoffs to it with the handoff_webhook tool (HANDOFF_URL)", f"{DOCS}/FEATURES.md"),
-    "built-in": ("Nothing to install: it ships with yachat", f"{DOCS}/FEATURES.md"),
+    "built-in": ("Nothing to install: it ships with keelchat", f"{DOCS}/FEATURES.md"),
 }
 
 
@@ -42,15 +42,15 @@ class Need(BaseModel):
 
 
 def from_policy(policy: CompiledPolicy) -> list[Need]:
-    """What the YAML uses that lives outside yachat. Computed in code."""
+    """What the YAML uses that lives outside keelchat. Computed in code."""
     tools = set(policy.allowed_tools)
     out = [
         Need(
             name="A model key",
-            why="Every reply is phrased by a model; yachat's code decides what happens.",
+            why="Every reply is phrased by a model; keelchat's code decides what happens.",
             options=["Anthropic", "OpenAI", "Google Gemini", "any provider litellm reaches", "Ollama for a local model"],
             connect="config",
-            how="Set YACHAT_LLM and the provider's key in .env",
+            how="Set KEELCHAT_LLM and the provider's key in .env",
         )
     ]
     if "knowledge_search" in tools:
@@ -105,7 +105,7 @@ def from_policy(policy: CompiledPolicy) -> list[Need]:
 
 
 SYSTEM = """You list the outside systems a chatbot needs to do its job for real, beyond what its policy already uses.
-You get the owner's description, and the bot's policy (YAML) when there is one. Never list what yachat already covers:
+You get the owner's description, and the bot's policy (YAML) when there is one. Never list what keelchat already covers:
 a model, documents or a knowledge base, passing the chat to a person (it has a handoff inbox and helpdesk webhooks),
 storage, or a chat channel (web, WhatsApp, SMS, Slack, phone). List only other systems the description implies, such as
 a booking calendar, an order or CRM system, a payments provider or an email sender.
@@ -135,7 +135,7 @@ SCHEMA = {
     "required": ["needs"],
 }
 LIMIT = 4
-#: what yachat covers already; a suggestion named for one of these repeats the list read from the YAML
+#: what keelchat covers already; a suggestion named for one of these repeats the list read from the YAML
 COVERED = ("document", "knowledge", "faq", "person", "human", "handoff", "helpdesk", "database", "storage", "model", "channel", "chat widget")
 
 

@@ -5,14 +5,14 @@ from typing import Any
 
 import yaml
 
-from yachat.policy.compiler import build
-from yachat.runtime.context import InboundMessage
-from yachat.runtime.llm import LLMClient, LLMRequest, ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
-from yachat.runtime.runtime import Runtime, TurnResult
-from yachat.state.models import AuditEvent
-from yachat.state.store import InMemoryAuditStore
-from yachat.testing.fakes import FakeTools
+from keelchat.policy.compiler import build
+from keelchat.runtime.context import InboundMessage
+from keelchat.runtime.llm import LLMClient, LLMRequest, ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
+from keelchat.runtime.runtime import Runtime, TurnResult
+from keelchat.state.models import AuditEvent
+from keelchat.state.store import InMemoryAuditStore
+from keelchat.testing.fakes import FakeTools
 
 AGENT = "hiring-agent"
 
@@ -69,7 +69,7 @@ async def fill_form(rt: Runtime, session_id: str) -> TurnResult:
 
 async def audit_window(events: list[AuditEvent], tenant: str, since: datetime = datetime(1970, 1, 1, tzinfo=UTC)) -> Any:
     """`events` loaded the way the dashboards read them: one tenant's window in a DuckDB table `audit` (close it)."""
-    from yachat.runtime.audit import audit_db
+    from keelchat.runtime.audit import audit_db
 
     store = InMemoryAuditStore()
     await store.append(events)

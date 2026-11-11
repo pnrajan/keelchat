@@ -23,7 +23,7 @@ export default function Review({ agent, conversations, policy, onRevised }: Prop
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [score, setScore] = useState<number | null>(null);
   const [note, setNote] = useState("");
-  const [rater, setRater] = useState(() => remember("yachat.rater"));
+  const [rater, setRater] = useState(() => remember("keelchat.rater"));
   const [id, setId] = useState<string | undefined>();
   // the agent whose ratings `saved` holds: a slow answer for an agent no longer shown is dropped
   const [saved, setSaved] = useState<{ agent: string; reviews: Saved[] } | null>(null);
@@ -80,7 +80,7 @@ export default function Review({ agent, conversations, policy, onRevised }: Prop
 
   async function save() {
     if (!agent || !conv) return;
-    remember("yachat.rater", rater);
+    remember("keelchat.rater", rater);
     try {
       const r = await api.saveReview(agent, { id, policy_hash: conv.policy_hash, source: conv.source, conversation: conv.id, turns: conv.turns, replies, score, note, rater });
       setId(r.id); setMsg({ kind: "ok", text: `Saved: ${replies.length} replies rated${score ? `, ${score}/5` : ""}.` }); load();
@@ -194,8 +194,8 @@ export default function Review({ agent, conversations, policy, onRevised }: Prop
             <button className="ghost compact" onClick={() => download("replay")}>Download failed conversations as replay cases</button>
           </div>
           <p className="muted small">
-            Save labels as <code>labels.yaml</code> in the agent's eval folder (<code>evals/{agent.replace(/-/g, "_")}/</code>) and run <code>yachat evals calibrate</code> to see how often the judge agrees
-            with you. Add the replay cases to <code>replay.yaml</code> so <code>yachat evals check</code> catches each failure again.
+            Save labels as <code>labels.yaml</code> in the agent's eval folder (<code>evals/{agent.replace(/-/g, "_")}/</code>) and run <code>keelchat evals calibrate</code> to see how often the judge agrees
+            with you. Add the replay cases to <code>replay.yaml</code> so <code>keelchat evals check</code> catches each failure again.
           </p>
         </>
       )}

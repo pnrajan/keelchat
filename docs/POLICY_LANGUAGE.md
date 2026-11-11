@@ -1,6 +1,6 @@
 # The policy language
 
-Every yachat bot is one YAML file, the **policy**. This page defines every key the build accepts: what it means, what
+Every keelchat bot is one YAML file, the **policy**. This page defines every key the build accepts: what it means, what
 values it takes and its default. The build rejects anything else, and names the place (`flow[1].form_fill.fields[0].expect`).
 How to choose good values is in [Writing an agent](WRITING_AN_AGENT.md).
 
@@ -10,7 +10,7 @@ How to choose good values is in [Writing an agent](WRITING_AN_AGENT.md).
 |---|---|
 | Console, **Compose** → **Show YAML** | The file behind the bot you are composing. Changes show in the plain-words summary above it. |
 | Console, **Editor · test chat** | The full editor: completion for keys, step names, tools and guardrails, docs on hover, errors marked on their line as you type. **Build & try** runs it in the chat beside it. |
-| Your own editor | Keep policies in git (`examples/` has samples). `uv run yachat build my_bot.yaml` checks a file; `uv run yachat schema > policy.schema.json` writes the JSON Schema, so VS Code (with the YAML extension) completes and checks keys: put `# yaml-language-server: $schema=./policy.schema.json` on the first line. |
+| Your own editor | Keep policies in git (`examples/` has samples). `uv run keelchat build my_bot.yaml` checks a file; `uv run keelchat schema > policy.schema.json` writes the JSON Schema, so VS Code (with the YAML extension) completes and checks keys: put `# yaml-language-server: $schema=./policy.schema.json` on the first line. |
 | The API | `POST /v1/agents/validate {yaml}` returns the errors and a plain-words summary; `POST /v1/tenants/{t}/agents {yaml}` saves a version. |
 
 Comments (`# ...`) are kept when the console edits a file.

@@ -77,7 +77,7 @@ function CreateFromContent({ onCreated }: { onCreated: () => void }) {
   return (
     <section className="panel">
       <h3>Create a chatbot from your content</h3>
-      <p className="muted small">Upload files (PDF, text, Markdown, CSV, HTML) and/or add web pages. yachat reads them, builds an assistant that answers only from them, and publishes it for your website, Shopify store, WhatsApp number and more.</p>
+      <p className="muted small">Upload files (PDF, text, Markdown, CSV, HTML) and/or add web pages. keelchat reads them, builds an assistant that answers only from them, and publishes it for your website, Shopify store, WhatsApp number and more.</p>
       <form className="create-form" onSubmit={create}>
         <label>Name<input id="as-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bloom Bakery" maxLength={60} required /></label>
         <label>Files<input id="as-files" type="file" multiple accept=".pdf,.txt,.md,.markdown,.csv,.html,.htm" onChange={(e) => setFiles(e.target.files)} /></label>

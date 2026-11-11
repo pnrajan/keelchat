@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 
-from yachat.policy.compiler import build
-from yachat.policy.errors import PolicyValidationError
-from yachat.registry.core import REGISTRY, EmptyConfig, Node, NodeResult, NodeSpec, RegistryError, ToolSpec, _input_model_from_signature, node, tool
-from yachat.runtime.decide.tool_gateway import ToolGateway
+from keelchat.policy.compiler import build
+from keelchat.policy.errors import PolicyValidationError
+from keelchat.registry.core import REGISTRY, EmptyConfig, Node, NodeResult, NodeSpec, RegistryError, ToolSpec, _input_model_from_signature, node, tool
+from keelchat.runtime.decide.tool_gateway import ToolGateway
 
 seen: list[dict[str, int]] = []
 

@@ -6,14 +6,14 @@ from typing import Any
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from yachat.api.app import create_app
-from yachat.registry.core import REGISTRY
-from yachat.runtime.decide.tool_gateway import ToolGateway
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import fake_tools_from_env, litellm_settings, llm_from_env
-from yachat.runtime.runtime import Runtime
-from yachat.state.store import InMemoryTenantToolStore
-from yachat.testing.fakes import FakeTools
+from keelchat.api.app import create_app
+from keelchat.registry.core import REGISTRY
+from keelchat.runtime.decide.tool_gateway import ToolGateway
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import fake_tools_from_env, litellm_settings, llm_from_env
+from keelchat.runtime.runtime import Runtime
+from keelchat.state.store import InMemoryTenantToolStore
+from keelchat.testing.fakes import FakeTools
 
 
 @pytest.fixture
@@ -79,10 +79,10 @@ def test_litellm_settings(monkeypatch):
 
 
 def test_the_litellm_client_routes_each_model_to_its_own_provider(monkeypatch):
-    from yachat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.litellm_client import LiteLLMClient
 
-    monkeypatch.setenv("YACHAT_LLM", "litellm")
-    monkeypatch.setenv("YACHAT_MODEL_GENERATE", "siliconflow/Qwen/Qwen3.5-27B")
+    monkeypatch.setenv("KEELCHAT_LLM", "litellm")
+    monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "siliconflow/Qwen/Qwen3.5-27B")
     monkeypatch.setenv("SILICONFLOW_API_KEY", "k")
     client = llm_from_env()
     # not pinned to the generate model's provider: a critic on OpenRouter must not be sent to SiliconFlow
@@ -92,8 +92,8 @@ def test_the_litellm_client_routes_each_model_to_its_own_provider(monkeypatch):
 async def test_reasoning_is_off_for_models_whose_provider_turns_it_on(monkeypatch):
     """OpenRouter turns reasoning on for some models (Claude Haiku 5.5): hidden reasoning used the whole max_tokens and the
     intent detector got no answer. Like Qwen's thinking on SiliconFlow, it is switched off; a gateway's config owns it."""
-    from yachat.runtime.litellm_client import LiteLLMClient
-    from yachat.runtime.llm import LLMRequest
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm import LLMRequest
 
     for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
         monkeypatch.delenv(var, raising=False)
@@ -118,8 +118,8 @@ async def test_claude_without_reasoning_is_made_to_answer_with_the_tool(monkeypa
     is forced, so a structured call does not fail on a prose reply."""
     from types import SimpleNamespace
 
-    from yachat.runtime.litellm_client import LiteLLMClient
-    from yachat.runtime.llm import LLMRequest
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm import LLMRequest
 
     for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
         monkeypatch.delenv(var, raising=False)
@@ -141,9 +141,9 @@ async def test_a_model_that_must_reason_is_sent_again_with_the_providers_default
     call is sent again with the provider's default (Claude then picks the tool itself), and later calls go straight there."""
     from types import SimpleNamespace
 
-    from yachat.runtime import litellm_client
-    from yachat.runtime.litellm_client import LiteLLMClient
-    from yachat.runtime.llm import LLMError, LLMRequest
+    from keelchat.runtime import litellm_client
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm import LLMError, LLMRequest
 
     for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
         monkeypatch.delenv(var, raising=False)
@@ -178,10 +178,10 @@ async def test_a_model_that_must_reason_is_sent_again_with_the_providers_default
 
 
 def test_fake_tools_only_replace_tools_without_a_backend(monkeypatch):
-    for var in ("YACHAT_TOOLS", "KNOWLEDGE_URL", "JOB_SEARCH_URL", "CAREER_URL", "ANALYTICS_URL", "HANDOFF_URL"):
+    for var in ("KEELCHAT_TOOLS", "KNOWLEDGE_URL", "JOB_SEARCH_URL", "CAREER_URL", "ANALYTICS_URL", "HANDOFF_URL"):
         monkeypatch.delenv(var, raising=False)
     assert fake_tools_from_env() == {}
-    monkeypatch.setenv("YACHAT_TOOLS", "fake")
+    monkeypatch.setenv("KEELCHAT_TOOLS", "fake")
     assert {"job_search", "knowledge_search", "submit_application"} <= fake_tools_from_env().keys()
     monkeypatch.setenv("KNOWLEDGE_URL", "http://kn:8001")
     faked = fake_tools_from_env()
@@ -205,7 +205,7 @@ async def test_policy_route_and_memory_export(client, policy_yaml):
 
 
 async def test_api_key_gates_every_route_except_health(monkeypatch, policy_yaml):
-    monkeypatch.setenv("YACHAT_API_KEY", "secret")
+    monkeypatch.setenv("KEELCHAT_API_KEY", "secret")
     app = create_app(Runtime(llm_from_env(), FakeTools().impls(), models=ModelConfig.from_env()), tool_store=InMemoryTenantToolStore())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         assert (await c.get("/health")).status_code == 200
@@ -249,7 +249,7 @@ async def test_tenant_tool_registry_api(client, policy_yaml, crm_endpoint, monke
         json={"name": "meta", "description": "x", "url": "http://169.254.169.254/latest", "input_schema": {"type": "object"}},
     )
     assert rejected.status_code == 422 and "non-public" in rejected.json()["detail"]
-    monkeypatch.setenv("YACHAT_ALLOW_PRIVATE_TOOL_URLS", "1")  # the endpoint below is on localhost
+    monkeypatch.setenv("KEELCHAT_ALLOW_PRIVATE_TOOL_URLS", "1")  # the endpoint below is on localhost
     body = {
         "name": "crm_lookup",
         "description": "Customer tier from the CRM.",

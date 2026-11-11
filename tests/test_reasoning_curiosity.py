@@ -4,11 +4,11 @@ decides and counts."""
 
 from __future__ import annotations
 
+from keelchat.evals.generate import targets
+from keelchat.policy.compiler import build
+from keelchat.testing.fakes import FakeTools
 from tests.conftest import ROOT
 from tests.helpers import make_runtime, mutate, say
-from yachat.evals.generate import targets
-from yachat.policy.compiler import build
-from yachat.testing.fakes import FakeTools
 
 SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text()
 
@@ -105,7 +105,7 @@ async def test_without_small_talk_a_chat_counts_as_wandering_off() -> None:
 
 
 def test_only_the_change_lines_an_edit_adds_are_its_changes() -> None:
-    from yachat.policy.drafter import new_changes
+    from keelchat.policy.drafter import new_changes
 
     before = "# change: reworded the refund rule (for: 2 failed replies)\nagent: a\n"
     after = "# change: reworded the refund rule (for: 2 failed replies)\n# change: added Spanish\nagent: a\nlanguages: [en, es]\n"

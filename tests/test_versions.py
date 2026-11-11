@@ -6,13 +6,13 @@ import pytest
 import yaml
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api.app import create_app
+from keelchat.runtime.llm import ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
+from keelchat.runtime.runtime import Runtime
+from keelchat.state.store import AgentVersionStore, InMemoryAgentVersionStore, InMemoryTenantToolStore
+from keelchat.testing.fakes import FakeTools
 from tests.conftest import ROOT
-from yachat.api.app import create_app
-from yachat.runtime.llm import ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
-from yachat.runtime.runtime import Runtime
-from yachat.state.store import AgentVersionStore, InMemoryAgentVersionStore, InMemoryTenantToolStore
-from yachat.testing.fakes import FakeTools
 
 SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text()
 
@@ -52,7 +52,7 @@ async def test_in_memory_version_store():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set")
 async def test_postgres_version_store():
-    from yachat.state.postgres_store import PostgresAgentVersionStore
+    from keelchat.state.postgres_store import PostgresAgentVersionStore
 
     store, tenant = PostgresAgentVersionStore(url=os.environ["DATABASE_URL"]), f"t{os.getpid()}-{os.urandom(3).hex()}"
     try:
@@ -140,8 +140,8 @@ async def test_draft_a_policy_from_a_description():
 
 async def test_a_draft_hands_off_in_a_named_situation_with_a_handoff_rule():
     """'Hand emergencies to a person' becomes a rule the runtime hands off on, not a reply that only promises a person."""
-    from yachat.policy.compiler import build
-    from yachat.policy.summary import plain_summary
+    from keelchat.policy.compiler import build
+    from keelchat.policy.summary import plain_summary
 
     async with AsyncClient(transport=ASGITransport(app=app_with(InMemoryAgentVersionStore())), base_url="http://t") as c:
         r = await c.post(
@@ -156,11 +156,11 @@ async def test_a_draft_hands_off_in_a_named_situation_with_a_handoff_rule():
 
 
 async def test_sessions_follow_the_shared_active_version_and_keep_their_pinned_one(policy_yaml):
+    from keelchat.policy.compiler import build
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.runtime import Runtime
+    from keelchat.state.store import InMemoryAgentVersionStore, InMemorySessionStore
     from tests.helpers import RecordingLLM, mutate, say
-    from yachat.policy.compiler import build
-    from yachat.runtime.llm import ModelConfig
-    from yachat.runtime.runtime import Runtime
-    from yachat.state.store import InMemoryAgentVersionStore, InMemorySessionStore
 
     versions, sessions = InMemoryAgentVersionStore(), InMemorySessionStore()  # shared by every replica (Postgres, Redis)
 
@@ -191,9 +191,9 @@ async def test_sessions_follow_the_shared_active_version_and_keep_their_pinned_o
 
 
 async def test_a_policy_is_changed_as_asked_in_plain_words() -> None:
+    from keelchat.policy.compiler import build
+    from keelchat.state.store import InMemoryTenantToolStore
     from tests.helpers import make_runtime
-    from yachat.policy.compiler import build
-    from yachat.state.store import InMemoryTenantToolStore
 
     support = (ROOT / "examples" / "support_assistant.yaml").read_text()
     rt, _ = await make_runtime(support)
@@ -208,9 +208,9 @@ async def test_a_policy_is_changed_as_asked_in_plain_words() -> None:
 
 
 def test_the_plain_summary_lists_rules_and_small_talk() -> None:
+    from keelchat.policy.compiler import build
+    from keelchat.policy.summary import plain_summary
     from tests.conftest import ROOT
-    from yachat.policy.compiler import build
-    from yachat.policy.summary import plain_summary
 
     lines = plain_summary(build((ROOT / "examples" / "support_assistant.yaml").read_text()))
     assert "When the customer says an item arrived damaged or broken: say a free replacement can be sent" in " ".join(lines)
@@ -219,8 +219,8 @@ def test_the_plain_summary_lists_rules_and_small_talk() -> None:
 
 def test_a_rule_reads_as_one_sentence_in_the_summary() -> None:
     """A drafted `when` often starts with a capital ("The user ..."); mid-sentence it is lowered. Acronyms stay."""
-    from yachat.policy.compiler import build
-    from yachat.policy.summary import plain_summary
+    from keelchat.policy.compiler import build
+    from keelchat.policy.summary import plain_summary
 
     rules = [
         {"name": "urgent", "when": "The user describes an emergency.", "then": "Hand over to a person."},

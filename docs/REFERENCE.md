@@ -11,16 +11,16 @@ Commands, routes, keys, model routing, dashboards, settings, deployment and trou
 ## CLI
 
 ```bash
-uv run yachat new agent|package <name>                # starter files that build and pass the contract suite
-uv run yachat build <policy.yaml>                     # validate and compile
-uv run yachat schema                                  # JSON Schema of the policy, from the registry
-uv run yachat registry                                # tools, steps, guardrails, pre-processors
-uv run yachat serve --port 8000                       # the runtime API
-uv run yachat simulate <policy.yaml> <script.yaml>    # scripted conversations
-uv run yachat evals run [evals/<agent>]               # evaluation harness
-uv run yachat evals check|generate|calibrate|export   # judged checks, sets from a policy, judge agreement, a session as a case
-uv run yachat knowledge serve|add ...                 # Knowledge Service and indexing
-uv run yachat analytics serve                         # Analytics Service
+uv run keelchat new agent|package <name>                # starter files that build and pass the contract suite
+uv run keelchat build <policy.yaml>                     # validate and compile
+uv run keelchat schema                                  # JSON Schema of the policy, from the registry
+uv run keelchat registry                                # tools, steps, guardrails, pre-processors
+uv run keelchat serve --port 8000                       # the runtime API
+uv run keelchat simulate <policy.yaml> <script.yaml>    # scripted conversations
+uv run keelchat evals run [evals/<agent>]               # evaluation harness
+uv run keelchat evals check|generate|calibrate|export   # judged checks, sets from a policy, judge agreement, a session as a case
+uv run keelchat knowledge serve|add ...                 # Knowledge Service and indexing
+uv run keelchat analytics serve                         # Analytics Service
 ```
 
 ## HTTP API
@@ -46,7 +46,7 @@ Interactive docs at `/docs`. The main routes:
 
 ## Tenants and API keys
 
-`YACHAT_API_KEY` is the admin key. Issue keys per tenant with `POST /v1/tenants/{t}/keys`; each is shown once and
+`KEELCHAT_API_KEY` is the admin key. Issue keys per tenant with `POST /v1/tenants/{t}/keys`; each is shown once and
 stored as a hash. A key reaches only its own tenant.
 
 | Scope | Allows |
@@ -55,20 +55,20 @@ stored as a hash. A key reaches only its own tenant.
 | `read` | read-only access |
 | `runtime` | sessions and turns only: the key for a website or messaging backend |
 
-With `YACHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry are set by the server.
+With `KEELCHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry are set by the server.
 
 ## Model routing
 
-<p align="center"><img src="assets/routing.svg" alt="yachat calls a provider directly, or a LiteLLM gateway, or Headroom in front of the gateway" width="720"></p>
+<p align="center"><img src="assets/routing.svg" alt="keelchat calls a provider directly, or a LiteLLM gateway, or Headroom in front of the gateway" width="720"></p>
 
 | Layout | Set |
 |---|---|
-| Direct | `YACHAT_LLM=anthropic` or `litellm` plus the provider key; model ids like `openai/gpt-4o-mini` or `siliconflow/<model>` |
+| Direct | `KEELCHAT_LLM=anthropic` or `litellm` plus the provider key; model ids like `openai/gpt-4o-mini` or `siliconflow/<model>` |
 | LiteLLM gateway | `LITELLM_PROXY_URL`, `LITELLM_PROXY_KEY`; model ids are the gateway's aliases |
 | Headroom → LiteLLM | add `HEADROOM_PROXY_URL`; context is compressed before the gateway |
 
-`YACHAT_MODEL_CLASSIFY` (intents, validation, planning) and `YACHAT_MODEL_GENERATE` (replies) are the two tiers, and
-`YACHAT_MODEL_VERIFY` checks reasoning and replies. `YACHAT_MODEL_CRITIC` names a stronger model that judges trial
+`KEELCHAT_MODEL_CLASSIFY` (intents, validation, planning) and `KEELCHAT_MODEL_GENERATE` (replies) are the two tiers, and
+`KEELCHAT_MODEL_VERIFY` checks reasoning and replies. `KEELCHAT_MODEL_CRITIC` names a stronger model that judges trial
 conversations in the console's Judge tab; unset, the tab explains how to turn it on.
 
 **Cost tracking** works with every layout. Each model call is recorded with its tokens in and out, cached tokens,
@@ -78,9 +78,9 @@ time and cost, and summed by model, purpose, agent and day on the console's **Se
   cost the gateway reports.
 - Behind Headroom, the tokens it removed are shown as **saved**. Headroom compresses tool-result messages, not chat
   text, so savings depend on the traffic.
-- Prices come from `YACHAT_MODEL_PRICES`, then the gateway, then OpenRouter's public list, then litellm's.
+- Prices come from `KEELCHAT_MODEL_PRICES`, then the gateway, then OpenRouter's public list, then litellm's.
 - A model client you write yourself gets all of this by decorating its provider call with `@metered`
-  ([`runtime/usage.py`](../yachat/runtime/usage.py)).
+  ([`runtime/usage.py`](../keelchat/runtime/usage.py)).
 
 ## Dashboards and long-term metrics
 
@@ -101,7 +101,7 @@ Spark, Trino or your own DuckDB can read the same table. How it works: [ARCHITEC
 ## Configuration
 
 Everything is an environment variable, loaded from `.env`; [`.env.example`](../.env.example) documents most keys
-(not yet `YACHAT_MODEL_CRITIC`, `YACHAT_DUCKDB_EXTENSIONS` or `YACHAT_ALLOW_PRIVATE_TOOL_URLS`). Only
+(not yet `KEELCHAT_MODEL_CRITIC`, `KEELCHAT_DUCKDB_EXTENSIONS` or `KEELCHAT_ALLOW_PRIVATE_TOOL_URLS`). Only
 the model provider is required; everything else runs in memory when unset.
 
 <details>
@@ -109,28 +109,28 @@ the model provider is required; everything else runs in memory when unset.
 
 | Variable | Purpose |
 |---|---|
-| `YACHAT_LLM`, `*_API_KEY`, `YACHAT_MODEL_*` | provider, key and model tiers; a missing key raises, nothing falls back to a fake |
-| `YACHAT_API_KEY`, `YACHAT_JWT_SECRET` | the admin key; signed tenant keys |
+| `KEELCHAT_LLM`, `*_API_KEY`, `KEELCHAT_MODEL_*` | provider, key and model tiers; a missing key raises, nothing falls back to a fake |
+| `KEELCHAT_API_KEY`, `KEELCHAT_JWT_SECRET` | the admin key; signed tenant keys |
 | `REDIS_URL`, `DATABASE_URL` | Redis for sessions; Postgres for memory, versions, datasets, tools, audit, handoffs and rate limits. In-process when unset (`scripts/db.sh up` starts both) |
-| `YACHAT_CAPABILITY_PACKAGES`, `YACHAT_MCP_SERVERS` | extension packages and MCP servers to load capabilities from |
-| `KNOWLEDGE_URL`, `ANALYTICS_URL`, `YACHAT_DATA_ROOT`, `YACHAT_DATA_BUCKETS` | the Knowledge and Analytics Services, and where dataset sources may live |
-| `YACHAT_SANDBOX` | `local` or `agentcore`: where statistics code runs; unset for SQL-only answers |
-| `YACHAT_UPLOADS_BUCKET` | S3 bucket for uploaded content and files; unset, a folder under `YACHAT_DATA_ROOT` |
-| `YACHAT_EMBED_SECRET`, `YACHAT_PUBLIC_URL` | signs widget conversation tokens; the public address links point at |
+| `KEELCHAT_CAPABILITY_PACKAGES`, `KEELCHAT_MCP_SERVERS` | extension packages and MCP servers to load capabilities from |
+| `KNOWLEDGE_URL`, `ANALYTICS_URL`, `KEELCHAT_DATA_ROOT`, `KEELCHAT_DATA_BUCKETS` | the Knowledge and Analytics Services, and where dataset sources may live |
+| `KEELCHAT_SANDBOX` | `local` or `agentcore`: where statistics code runs; unset for SQL-only answers |
+| `KEELCHAT_UPLOADS_BUCKET` | S3 bucket for uploaded content and files; unset, a folder under `KEELCHAT_DATA_ROOT` |
+| `KEELCHAT_EMBED_SECRET`, `KEELCHAT_PUBLIC_URL` | signs widget conversation tokens; the public address links point at |
 | `VOICE_STT_MODEL`, `VOICE_TTS_MODEL`, `TWILIO_AUTH_TOKEN` | voice in the widget; phone calls through Twilio |
 | `HANDOFF_URL`, `HANDOFF_TOKEN` | where `handoff_webhook` sends each handoff |
 | `MEM0_API_KEY` or `MEM0_QDRANT_URL` | user memory in mem0 instead of Postgres |
 | `AUDIT_RETENTION_DAYS`, `AUDIT_ARCHIVE_WAREHOUSE` | audit retention; an archive in an Apache Iceberg table on S3 |
-| `YACHAT_DUCKDB_EXTENSIONS` | where DuckDB's iceberg, httpfs and aws extensions are installed (the Docker image sets it), so dashboards read the archive without a download |
+| `KEELCHAT_DUCKDB_EXTENSIONS` | where DuckDB's iceberg, httpfs and aws extensions are installed (the Docker image sets it), so dashboards read the archive without a download |
 | `SENTRY_DSN` | errors and traces per stage and model call; no message text is sent |
-| `YACHAT_TOOLS=fake` | development only: fake backends for tools whose URL is unset |
+| `KEELCHAT_TOOLS=fake` | development only: fake backends for tools whose URL is unset |
 
 </details>
 
 ## Deployment
 
 ```bash
-docker build -t yachat . && docker run -p 8080:8080 --env-file .env yachat
+docker build -t keelchat . && docker run -p 8080:8080 --env-file .env keelchat
 ```
 
 One image serves the API (with the console), the Knowledge Service or the Analytics Service; the process command
@@ -141,11 +141,11 @@ Redis, Postgres and an optional LiteLLM gateway next to it.
 
 Deploy to your own Render or Fly.io account, on its smallest plan. Fork the repository first, so the deploy follows
 your copy. State is in memory until you set `DATABASE_URL` (and
-`REDIS_URL`): without them, saved bots go when the app restarts. The console asks for `YACHAT_API_KEY` to sign in.
+`REDIS_URL`): without them, saved bots go when the app restarts. The console asks for `KEELCHAT_API_KEY` to sign in.
 
 **Render.** Open `https://render.com/deploy?repo=<your fork's URL>` and sign in to Render. It reads
-[`render.yaml`](../render.yaml), asks for `ANTHROPIC_API_KEY`, and generates `YACHAT_API_KEY` (on the service's
-**Environment** page). For another provider, set `YACHAT_LLM=litellm`, the two `YACHAT_MODEL_*` and its key there,
+[`render.yaml`](../render.yaml), asks for `ANTHROPIC_API_KEY`, and generates `KEELCHAT_API_KEY` (on the service's
+**Environment** page). For another provider, set `KEELCHAT_LLM=litellm`, the two `KEELCHAT_MODEL_*` and its key there,
 as in `.env.example`. The free plan sleeps when idle. The Blueprint turns auto-deploy off, as Render advises for Deploy
 buttons, so a push to this repository never redeploys your service; to redeploy when CI passes on your fork, set
 **Auto-Deploy** to "After CI checks pass" in the service's **Settings**.
@@ -154,7 +154,7 @@ buttons, so a push to this repository never redeploys your service; to redeploy 
 
 ```bash
 fly apps create <your-app>
-fly secrets set -a <your-app> YACHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
+fly secrets set -a <your-app> KEELCHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
 fly deploy -c deploy/fly.toml -a <your-app> .          # the first deploy
 fly tokens create deploy -a <your-app> | gh secret set FLY_API_TOKEN
 gh variable set FLY_APP --body <your-app>
@@ -162,7 +162,7 @@ gh variable set FLY_APP --body <your-app>
 
 From then on [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) deploys
 [`deploy/fly.toml`](../deploy/fly.toml) to that app after CI passes on `main`; **Actions → Deploy → Run workflow**
-deploys by hand. Without `FLY_API_TOKEN` it does nothing, and it refuses an app without `YACHAT_API_KEY`. The
+deploys by hand. Without `FLY_API_TOKEN` it does nothing, and it refuses an app without `KEELCHAT_API_KEY`. The
 `FLY_CONFIG` variable picks another config (`deploy/demo/fly.toml` is the public demo's).
 
 Elsewhere (Railway, Koyeb, Cloud Run, a VM): build the `Dockerfile`, serve port 8080, check `/health`, and set the

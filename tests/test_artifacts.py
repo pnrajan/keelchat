@@ -7,7 +7,7 @@ import uuid
 
 import pytest
 
-from yachat.state.artifacts import ArtifactExists, InMemoryArtifactStore, LocalArtifactStore, S3ArtifactStore, artifact_store_from_env
+from keelchat.state.artifacts import ArtifactExists, InMemoryArtifactStore, LocalArtifactStore, S3ArtifactStore, artifact_store_from_env
 
 
 @pytest.fixture(params=["memory", "local", "s3"])
@@ -19,7 +19,7 @@ def store(request, tmp_path):
     bucket = os.getenv("KNOWLEDGE_S3_BUCKET")
     if not bucket:
         pytest.skip("needs KNOWLEDGE_S3_BUCKET")
-    return S3ArtifactStore(bucket), f"yachat-verify/artifacts-{uuid.uuid4().hex[:8]}/"
+    return S3ArtifactStore(bucket), f"keelchat-verify/artifacts-{uuid.uuid4().hex[:8]}/"
 
 
 async def test_every_backend_keeps_files_the_same_way(store):
@@ -50,18 +50,18 @@ async def test_keys_that_could_escape_the_store_are_refused(tmp_path, key):
 
 
 def test_the_backend_comes_from_configuration(monkeypatch, tmp_path):
-    monkeypatch.delenv("YACHAT_UPLOADS_BUCKET", raising=False)
-    monkeypatch.delenv("YACHAT_DATA_ROOT", raising=False)
+    monkeypatch.delenv("KEELCHAT_UPLOADS_BUCKET", raising=False)
+    monkeypatch.delenv("KEELCHAT_DATA_ROOT", raising=False)
     assert artifact_store_from_env() is None
-    monkeypatch.setenv("YACHAT_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("KEELCHAT_DATA_ROOT", str(tmp_path))
     assert isinstance(artifact_store_from_env(), LocalArtifactStore)
-    monkeypatch.setenv("YACHAT_UPLOADS_BUCKET", "some-bucket")
+    monkeypatch.setenv("KEELCHAT_UPLOADS_BUCKET", "some-bucket")
     assert isinstance(artifact_store_from_env(), S3ArtifactStore)
 
 
 async def test_knowledge_documents_are_kept_in_the_artifact_store(tmp_path):
-    from yachat.knowledge.docstore import ArtifactDocumentStore
-    from yachat.knowledge.models import Document
+    from keelchat.knowledge.docstore import ArtifactDocumentStore
+    from keelchat.knowledge.models import Document
 
     files = LocalArtifactStore(tmp_path)
     store = ArtifactDocumentStore(files)

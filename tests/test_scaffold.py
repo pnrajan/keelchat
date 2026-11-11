@@ -1,4 +1,4 @@
-"""`yachat new` writes files that build and pass the contract suite; `from yachat import ...` is the extension API."""
+"""`keelchat new` writes files that build and pass the contract suite; `from keelchat import ...` is the extension API."""
 
 from __future__ import annotations
 
@@ -7,18 +7,18 @@ from pathlib import Path
 
 import pytest
 
-import yachat
-from yachat.cli import main
-from yachat.policy.compiler import build_file
-from yachat.registry.contract import check_capability
-from yachat.scaffold import ScaffoldError, new_agent, new_package
+import keelchat
+from keelchat.cli import main
+from keelchat.policy.compiler import build_file
+from keelchat.registry.contract import check_capability
+from keelchat.scaffold import ScaffoldError, new_agent, new_package
 
 
 def test_top_level_names_are_the_real_objects() -> None:
-    for name, module in yachat._EXPORTS.items():
-        assert getattr(yachat, name) is getattr(importlib.import_module(module), name), name
+    for name, module in keelchat._EXPORTS.items():
+        assert getattr(keelchat, name) is getattr(importlib.import_module(module), name), name
     with pytest.raises(AttributeError):
-        yachat.not_a_name  # noqa: B018
+        keelchat.not_a_name  # noqa: B018
 
 
 def test_new_agent_builds(tmp_path: Path) -> None:

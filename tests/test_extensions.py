@@ -7,15 +7,15 @@ import sys
 
 import pytest
 
+from keelchat.channels import CHANNELS
+from keelchat.policy.compiler import build
+from keelchat.registry.contract import check_capability
+from keelchat.registry.core import REGISTRY
+from keelchat.registry.discovery import discover_packages
+from keelchat.runtime.context import OutboundMessage
+from keelchat.runtime.decide.tool_gateway import ToolGateway
 from tests.conftest import ROOT
 from tests.helpers import make_runtime, say
-from yachat.channels import CHANNELS
-from yachat.policy.compiler import build
-from yachat.registry.contract import check_capability
-from yachat.registry.core import REGISTRY
-from yachat.registry.discovery import discover_packages
-from yachat.runtime.context import OutboundMessage
-from yachat.runtime.decide.tool_gateway import ToolGateway
 
 BOOKING = (ROOT / "examples" / "booking_assistant.yaml").read_text()
 

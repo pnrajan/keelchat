@@ -8,10 +8,10 @@ ACME, GLOBEX, ADMIN = {"Authorization": "Bearer acme-key"}, {"Authorization": "B
 
 
 def scoped_app(monkeypatch):
-    from yachat.state.store import InMemoryAgentVersionStore
+    from keelchat.state.store import InMemoryAgentVersionStore
 
-    monkeypatch.setenv("YACHAT_API_KEY", "admin-key")
-    monkeypatch.setenv("YACHAT_TENANT_KEYS", "acme:acme-key, globex:globex-key")
+    monkeypatch.setenv("KEELCHAT_API_KEY", "admin-key")
+    monkeypatch.setenv("KEELCHAT_TENANT_KEYS", "acme:acme-key, globex:globex-key")
     monkeypatch.setenv("DATABASE_URL", "")
     return app_with(InMemoryAgentVersionStore())
 

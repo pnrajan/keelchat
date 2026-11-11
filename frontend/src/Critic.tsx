@@ -38,7 +38,7 @@ export default function Critic({ agent, conversations, policy, onRevised }: Prop
   if (!model) return (
     <div className="callout">
       <strong>No judge model set.</strong>
-      <p className="small">Set <code>YACHAT_MODEL_CRITIC</code> to a stronger model than the agent uses (for example <code>claude-opus-5-5</code>) and restart the server. It reads a trial conversation, says what went wrong and proposes fixes.</p>
+      <p className="small">Set <code>KEELCHAT_MODEL_CRITIC</code> to a stronger model than the agent uses (for example <code>claude-opus-5-5</code>) and restart the server. It reads a trial conversation, says what went wrong and proposes fixes.</p>
     </div>
   );
   if (!agent || !conv) return <p className="muted small">Build the agent and have a conversation in the chat (or run a simulation), then judge it here.</p>;
@@ -146,7 +146,7 @@ export default function Critic({ agent, conversations, policy, onRevised }: Prop
       <h3 className="review-h">Open code fixes for {agent}</h3>
       {tasks.length === 0 ? <p className="muted small">None.</p> : (
         <>
-          <p className="muted small">In Claude Code with the yachat plugin, run <code>/yachat:fix-findings</code>: it picks these up, writes a failing test, fixes the code in its own branch, and can file each as a GitHub issue.</p>
+          <p className="muted small">In Claude Code with the keelchat plugin, run <code>/keelchat:fix-findings</code>: it picks these up, writes a failing test, fixes the code in its own branch, and can file each as a GitHub issue.</p>
           <ul className="fix-tasks">{tasks.map((t) => (
             <li key={t.id}>
               <div><p><b>{t.title}</b></p><p className="muted small"><code>{t.id}</code>{t.issue && <> · <a href={t.issue} target="_blank" rel="noreferrer">issue</a></>}</p></div>

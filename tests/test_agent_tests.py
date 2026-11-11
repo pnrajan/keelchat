@@ -7,13 +7,13 @@ import pytest
 import yaml
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.evals.generate import case_name, targets
+from keelchat.evals.replay import ReplaySet
+from keelchat.evals.review import feedback
+from keelchat.policy.compiler import build
+from keelchat.state.models import ReplyRating, Review, ReviewTurn
 from tests.conftest import ROOT
 from tests.helpers import make_runtime
-from yachat.evals.generate import case_name, targets
-from yachat.evals.replay import ReplaySet
-from yachat.evals.review import feedback
-from yachat.policy.compiler import build
-from yachat.state.models import ReplyRating, Review, ReviewTurn
 
 SUPPORT = (ROOT / "examples" / "support_assistant.yaml").read_text()
 PATH = "/v1/tenants/default/agents/support-assistant"
@@ -21,8 +21,8 @@ DONE = {"name": "finishes", "messages": ["hi, I need help with an order", "yes",
 
 
 async def _client(policy: str = SUPPORT):  # type: ignore[no-untyped-def]
-    from yachat.api.app import create_app
-    from yachat.state.store import InMemoryTenantToolStore
+    from keelchat.api.app import create_app
+    from keelchat.state.store import InMemoryTenantToolStore
 
     rt, _ = await make_runtime(policy)
     return rt, AsyncClient(transport=ASGITransport(app=create_app(rt, tool_store=InMemoryTenantToolStore())), base_url="http://t")
@@ -44,7 +44,7 @@ async def test_a_test_is_saved_renamed_exported_and_deleted() -> None:
         assert (await client.delete(f"{PATH}/tests/{other['id']}")).status_code == 204
         assert (await client.delete(f"{PATH}/tests/{other['id']}")).status_code == 404
         assert [t["case"]["name"] for t in (await client.get(f"{PATH}/tests")).json()] == ["renamed"]
-    cases = ReplaySet.model_validate(yaml.safe_load(text)).cases  # loads as `yachat evals` reads it
+    cases = ReplaySet.model_validate(yaml.safe_load(text)).cases  # loads as `keelchat evals` reads it
     assert [c.name for c in cases] == ["renamed", "second"] and cases[0].expect.completed is True
 
 
@@ -137,7 +137,7 @@ async def test_suggested_changes_answer_the_ratings_and_build() -> None:
 
 
 def test_the_yaml_is_taken_from_a_reply_that_says_something_first() -> None:
-    from yachat.policy.drafter import _yaml_only
+    from keelchat.policy.drafter import _yaml_only
 
     assert _yaml_only("Here is the revised policy:\n\n# change: x\nagent: a\n") == "# change: x\nagent: a\n"
     assert _yaml_only("```yaml\nagent: a\n```\nDone.") == "agent: a\n"

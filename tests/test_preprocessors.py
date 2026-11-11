@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from keelchat.registry.core import REGISTRY, PreProcessor, preprocessor
 from tests.helpers import make_runtime, say
-from yachat.registry.core import REGISTRY, PreProcessor, preprocessor
 
 
 def test_builtin_order():

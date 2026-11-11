@@ -11,11 +11,11 @@ import re
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from keelchat.api import public
+from keelchat.api.app import create_app
+from keelchat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
+from keelchat.voice import FakeTranscriber, Speaker, VoiceError
 from tests.helpers import make_runtime
-from yachat.api import public
-from yachat.api.app import create_app
-from yachat.state.store import InMemoryEmbedStore, InMemoryTenantToolStore
-from yachat.voice import FakeTranscriber, Speaker, VoiceError
 
 BASE = "http://chat.example.test"
 
@@ -32,7 +32,7 @@ class Down(FakeTranscriber):
 
 @pytest.fixture
 async def setup(policy_yaml, monkeypatch):
-    monkeypatch.setenv("YACHAT_EMBED_SECRET", "s")
+    monkeypatch.setenv("KEELCHAT_EMBED_SECRET", "s")
     monkeypatch.setenv("TWILIO_AUTH_TOKEN", "twilio-secret")
     monkeypatch.setattr(public, "_SECRET", None)
     rt, _ = await make_runtime(policy_yaml)
@@ -108,7 +108,7 @@ async def test_a_phone_call_runs_turn_by_turn_with_signed_webhooks(setup):
 
 @pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="needs OPENROUTER_API_KEY")
 async def test_an_audio_chat_model_transcribes_speech():
-    from yachat.voice import ChatAudioTranscriber, LiteLLMSpeaker
+    from keelchat.voice import ChatAudioTranscriber, LiteLLMSpeaker
 
     if not os.getenv("OPENAI_API_KEY"):
         pytest.skip("needs OPENAI_API_KEY to make the test audio")

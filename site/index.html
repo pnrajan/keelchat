@@ -3,28 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>yachat: open-source LLM chatbot framework in YAML and Python</title>
+<title>keelchat: open-source LLM chatbot framework in YAML and Python</title>
 <meta name="description" content="Open-source Python framework for customer-facing LLM chatbots: support, bookings, intake, surveys. Describe a bot in plain English, get one YAML file; steps, limits, guardrails and handoff are enforced in code.">
-<link rel="canonical" href="https://pnrajan.github.io/yachat/">
+<link rel="canonical" href="https://pnrajan.github.io/keelchat/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6f4f'/%3E%3Ctext x='16' y='22' font-family='system-ui,sans-serif' font-size='18' font-weight='700' text-anchor='middle' fill='%23fff'%3Ey%3C/text%3E%3C/svg%3E">
 <meta name="theme-color" content="#2f6f4f">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="yachat">
-<meta property="og:url" content="https://pnrajan.github.io/yachat/">
-<meta property="og:title" content="yachat: chatbots that follow your rules">
+<meta property="og:site_name" content="keelchat">
+<meta property="og:url" content="https://pnrajan.github.io/keelchat/">
+<meta property="og:title" content="keelchat: chatbots that follow your rules">
 <meta property="og:description" content="Describe a bot in plain English, get one YAML file, run it yourself. Steps, limits, guardrails and handoff enforced in code. Open source, any model.">
-<meta property="og:image" content="https://pnrajan.github.io/yachat/assets/og.jpg">
+<meta property="og:image" content="https://pnrajan.github.io/keelchat/assets/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="yachat: a dental booking bot as one short YAML file">
+<meta property="og:image:alt" content="keelchat: a dental booking bot as one short YAML file">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="yachat: chatbots that follow your rules">
+<meta name="twitter:title" content="keelchat: chatbots that follow your rules">
 <meta name="twitter:description" content="Open-source Python framework: one YAML file per bot, rules enforced in code, any model.">
-<meta name="twitter:image" content="https://pnrajan.github.io/yachat/assets/og.jpg">
+<meta name="twitter:image" content="https://pnrajan.github.io/keelchat/assets/og.jpg">
 <script type="application/ld+json">
-{"@context": "https://schema.org", "@type": "SoftwareSourceCode", "name": "yachat",
+{"@context": "https://schema.org", "@type": "SoftwareSourceCode", "name": "keelchat",
  "description": "Open-source Python framework for customer-facing LLM chatbots defined in YAML, with steps, limits, guardrails and handoff enforced in code.",
- "url": "https://pnrajan.github.io/yachat/", "codeRepository": "https://github.com/pnrajan/yachat", "programmingLanguage": "Python",
+ "url": "https://pnrajan.github.io/keelchat/", "codeRepository": "https://github.com/pnrajan/keelchat", "programmingLanguage": "Python",
  "license": "https://www.apache.org/licenses/LICENSE-2.0", "keywords": "chatbot framework, LLM, YAML, conversational AI, customer support bot, guardrails, MCP, self-hosted"}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -192,13 +192,13 @@
 <header>
   <div class="wrap">
     <nav>
-      <a class="logo" href="#"><i>y</i>yachat</a>
+      <a class="logo" href="#"><i>y</i>keelchat</a>
       <a class="wide" href="#how">How it works</a>
       <a class="wide" href="#why">Why</a>
       <a class="wide" href="#uses">Use cases</a>
       <a class="wide" href="#developers">Developers</a>
-      <a class="wide" href="https://github.com/pnrajan/yachat/tree/main/docs">Docs</a>
-      <a class="btn sm" href="https://github.com/pnrajan/yachat">★ Star on GitHub</a>
+      <a class="wide" href="https://github.com/pnrajan/keelchat/tree/main/docs">Docs</a>
+      <a class="btn sm" href="https://github.com/pnrajan/keelchat">★ Star on GitHub</a>
     </nav>
   </div>
 </header>
@@ -207,23 +207,23 @@
 <section class="hero">
   <div class="wrap">
     <div>
-      <a class="pill" href="https://github.com/pnrajan/yachat"><b>Open source</b> Python · Apache-2.0 · any LLM</a>
+      <a class="pill" href="https://github.com/pnrajan/keelchat"><b>Open source</b> Python · Apache-2.0 · any LLM</a>
       <h1>Chatbots that <em>follow your rules.</em></h1>
-      <p class="lead">Describe a customer-facing bot in plain English and get one short YAML file. yachat runs it with the
+      <p class="lead">Describe a customer-facing bot in plain English and get one short YAML file. keelchat runs it with the
         steps, limits, guardrails and handoff enforced in code, not left to a prompt.</p>
-      <form class="make" action="https://yachat-demo.fly.dev/" method="get">
+      <form class="make" action="https://keelchat-demo.fly.dev/" method="get">
         <input name="describe" required minlength="3" maxlength="1000" aria-label="Describe your bot"
                placeholder="e.g. Book haircuts and ask for a phone number">
         <button type="submit">Make my bot →</button>
       </form>
       <div class="eg">Try:
-        <a href="https://yachat-demo.fly.dev/?describe=Book+dental+appointments%3A+ask+which+treatment%2C+a+preferred+day+and+a+phone+number.+Hand+over+to+a+person+for+emergencies.">Dental bookings</a>
-        <a href="https://yachat-demo.fly.dev/?describe=A+short+survey+after+delivery%3A+how+likely+they+are+to+recommend+us+from+0+to+10%2C+and+what+we+could+do+better.">Delivery survey</a>
-        <a href="https://yachat-demo.fly.dev/?describe=Screen+job+applicants%3A+the+role+they+want%2C+years+of+experience%2C+notice+period+and+an+email+address.+Friendly+and+brief.">Applicant screening</a>
+        <a href="https://keelchat-demo.fly.dev/?describe=Book+dental+appointments%3A+ask+which+treatment%2C+a+preferred+day+and+a+phone+number.+Hand+over+to+a+person+for+emergencies.">Dental bookings</a>
+        <a href="https://keelchat-demo.fly.dev/?describe=A+short+survey+after+delivery%3A+how+likely+they+are+to+recommend+us+from+0+to+10%2C+and+what+we+could+do+better.">Delivery survey</a>
+        <a href="https://keelchat-demo.fly.dev/?describe=Screen+job+applicants%3A+the+role+they+want%2C+years+of+experience%2C+notice+period+and+an+email+address.+Friendly+and+brief.">Applicant screening</a>
       </div>
       <div class="ctas">
-        <a class="btn solid" href="https://github.com/pnrajan/yachat">Get started on GitHub</a>
-        <a class="btn" href="https://yachat-demo.fly.dev/#try">Chat with a sample bot</a>
+        <a class="btn solid" href="https://github.com/pnrajan/keelchat">Get started on GitHub</a>
+        <a class="btn" href="https://keelchat-demo.fly.dev/#try">Chat with a sample bot</a>
       </div>
     </div>
 
@@ -261,7 +261,7 @@
   <section class="block" id="how">
     <p class="eyebrow">How it works</p>
     <h2>From a sentence to a running bot in minutes.</h2>
-    <p class="intro">No prompt engineering. You say what the bot is for; yachat writes a file you can read, and the runtime
+    <p class="intro">No prompt engineering. You say what the bot is for; keelchat writes a file you can read, and the runtime
       does exactly what the file says.</p>
     <div class="steps">
       <div class="step"><h3>Describe it</h3><p>"Book dental appointments; hand emergencies to a person." A model writes the YAML and the build checks it.</p></div>
@@ -272,13 +272,13 @@
   </section>
 
   <section class="block" id="why">
-    <p class="eyebrow">Why yachat</p>
+    <p class="eyebrow">Why keelchat</p>
     <h2>A prompt works in a demo. Production needs rules.</h2>
     <p class="intro">When a bot has a job to finish, a prompt-only bot is asked to remember the steps, count its own attempts
-      and know when to stop. It does, most of the time. yachat moves those decisions into code and leaves the model to
+      and know when to stop. It does, most of the time. keelchat moves those decisions into code and leaves the model to
       read and phrase.</p>
     <div class="vs">
-      <div class="head"><div>A prompt-only bot</div><div>With yachat</div></div>
+      <div class="head"><div>A prompt-only bot</div><div>With keelchat</div></div>
       <div class="row"><div class="bad">Skips a question, or moves on with an answer it couldn't use</div>
         <div class="good"><div><b>Steps are code.</b><span>A form isn't done until every field passes its check.</span></div></div></div>
       <div class="row"><div class="bad">Asks the same thing forever, or gives up at random</div>
@@ -299,12 +299,12 @@
     <h2>Built for bots with a job to finish.</h2>
     <p class="intro">Each ships as an example you can run, read and change.</p>
     <div class="grid3">
-      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/support_assistant.yaml"><div class="ic">🛟</div><h3>Support triage</h3><p>Consent, the order number and what went wrong, answers from your help docs, a person when needed.</p><code>support_assistant.yaml</code></a>
-      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/booking_assistant.yaml"><div class="ic">📅</div><h3>Bookings</h3><p>Service, day and contact details, with open slots from your calendar through a Python tool.</p><code>booking_assistant.yaml</code></a>
-      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/hiring_agent.yaml"><div class="ic">📝</div><h3>Applications and intake</h3><p>Search, pick, a validated form, and a submit that runs only when the user confirms.</p><code>hiring_agent.yaml</code></a>
-      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/customer_feedback.yaml"><div class="ic">📊</div><h3>Surveys</h3><p>A 0-10 score and open questions as a conversation; scores computed in code, results over time.</p><code>customer_feedback.yaml</code></a>
-      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/sales_analyst.yaml"><div class="ic">🔎</div><h3>Questions about data</h3><p>Answers from your tables with SQL and checked statistics, not guesses.</p><code>sales_analyst.yaml</code></a>
-      <a class="use" href="https://github.com/pnrajan/yachat/blob/main/examples/concierge.yaml"><div class="ic">🧭</div><h3>Concierge</h3><p>No fixed steps: it picks read-only tools each turn, within a budget counted in code.</p><code>concierge.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/keelchat/blob/main/examples/support_assistant.yaml"><div class="ic">🛟</div><h3>Support triage</h3><p>Consent, the order number and what went wrong, answers from your help docs, a person when needed.</p><code>support_assistant.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/keelchat/blob/main/examples/booking_assistant.yaml"><div class="ic">📅</div><h3>Bookings</h3><p>Service, day and contact details, with open slots from your calendar through a Python tool.</p><code>booking_assistant.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/keelchat/blob/main/examples/hiring_agent.yaml"><div class="ic">📝</div><h3>Applications and intake</h3><p>Search, pick, a validated form, and a submit that runs only when the user confirms.</p><code>hiring_agent.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/keelchat/blob/main/examples/customer_feedback.yaml"><div class="ic">📊</div><h3>Surveys</h3><p>A 0-10 score and open questions as a conversation; scores computed in code, results over time.</p><code>customer_feedback.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/keelchat/blob/main/examples/sales_analyst.yaml"><div class="ic">🔎</div><h3>Questions about data</h3><p>Answers from your tables with SQL and checked statistics, not guesses.</p><code>sales_analyst.yaml</code></a>
+      <a class="use" href="https://github.com/pnrajan/keelchat/blob/main/examples/concierge.yaml"><div class="ic">🧭</div><h3>Concierge</h3><p>No fixed steps: it picks read-only tools each turn, within a budget counted in code.</p><code>concierge.yaml</code></a>
     </div>
   </section>
 
@@ -316,7 +316,7 @@
     <div class="dev">
       <div>
         <div class="file"><div class="bar"><span></span><span></span><span></span><b>my_caps/tools.py</b></div>
-<pre><span class="k">from</span> yachat <span class="k">import</span> tool
+<pre><span class="k">from</span> keelchat <span class="k">import</span> tool
 
 <span class="k">@tool</span>("slot_search", timeout_s=3.0, retries=1)
 <span class="k">async def</span> slot_search(service: str, day: str = "") -> dict[str, list[str]]:
@@ -326,13 +326,13 @@
       </div>
       <div>
         <div class="file"><div class="bar"><span></span><span></span><span></span><b>terminal</b></div>
-<pre>uv run yachat new package my_caps  <span class="c"># tool, step, guardrail, test</span>
-uv run yachat build my_bot.yaml    <span class="c"># validate and compile</span>
-uv run yachat evals generate my_bot.yaml
-uv run yachat serve --port 8000    <span class="c"># API + console</span></pre></div>
-        <p><a href="https://github.com/pnrajan/yachat/blob/main/docs/ADDING_A_CAPABILITY.md">Adding a capability</a> ·
-          <a href="https://github.com/pnrajan/yachat/blob/main/docs/ARCHITECTURE.md">Architecture</a> ·
-          <a href="https://github.com/pnrajan/yachat/blob/main/docs/POLICY_LANGUAGE.md">Every YAML key</a></p>
+<pre>uv run keelchat new package my_caps  <span class="c"># tool, step, guardrail, test</span>
+uv run keelchat build my_bot.yaml    <span class="c"># validate and compile</span>
+uv run keelchat evals generate my_bot.yaml
+uv run keelchat serve --port 8000    <span class="c"># API + console</span></pre></div>
+        <p><a href="https://github.com/pnrajan/keelchat/blob/main/docs/ADDING_A_CAPABILITY.md">Adding a capability</a> ·
+          <a href="https://github.com/pnrajan/keelchat/blob/main/docs/ARCHITECTURE.md">Architecture</a> ·
+          <a href="https://github.com/pnrajan/keelchat/blob/main/docs/POLICY_LANGUAGE.md">Every YAML key</a></p>
       </div>
     </div>
     <div class="chips"><span>Anthropic · OpenAI · Gemini · Bedrock · Ollama</span><span>MCP tools in and out</span><span>FastAPI HTTP API</span>
@@ -348,7 +348,7 @@ uv run yachat serve --port 8000    <span class="c"># API + console</span></pre><
       <div><h3>Reviewers</h3><p>Read one file per bot, see why each reply was chosen, and check the audit log, outcomes and model cost.</p></div>
     </div>
     <p class="fit"><b>Not the right tool</b> for a free-form assistant, multi-agent research workflows, or if you need stable
-      APIs today: yachat is alpha. <a href="https://github.com/pnrajan/yachat/blob/main/docs/COMPARISON.md">How it compares</a>
+      APIs today: keelchat is alpha. <a href="https://github.com/pnrajan/keelchat/blob/main/docs/COMPARISON.md">How it compares</a>
       with Parlant, Rasa, LangGraph and Botpress.</p>
   </section>
 </div>
@@ -361,14 +361,14 @@ uv run yachat serve --port 8000    <span class="c"># API + console</span></pre><
       <p>Needs macOS, Linux or WSL and one model key; <code>setup.sh</code> installs the rest. Or run it all in Docker with
         <code>scripts/local.sh up</code>.</p>
       <div class="ctas">
-        <a class="btn solid" href="https://github.com/pnrajan/yachat">★ Star on GitHub</a>
-        <a class="btn" href="https://github.com/pnrajan/yachat/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">Good first issues</a>
-        <a class="btn" href="https://github.com/pnrajan/yachat/discussions">Discussions</a>
+        <a class="btn solid" href="https://github.com/pnrajan/keelchat">★ Star on GitHub</a>
+        <a class="btn" href="https://github.com/pnrajan/keelchat/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">Good first issues</a>
+        <a class="btn" href="https://github.com/pnrajan/keelchat/discussions">Discussions</a>
       </div>
     </div>
     <div class="file copy">
       <div class="bar"><span></span><span></span><span></span><b>terminal</b></div>
-<pre id="steps">git clone https://github.com/pnrajan/yachat &amp;&amp; cd yachat
+<pre id="steps">git clone https://github.com/pnrajan/keelchat &amp;&amp; cd keelchat
 ./setup.sh      <span class="c"># installs what's missing, asks for your key</span>
 scripts/try.sh  <span class="c"># the console, with a sample bot</span></pre>
       <button type="button" id="copy">Copy</button>
@@ -379,12 +379,12 @@ scripts/try.sh  <span class="c"># the console, with a sample bot</span></pre>
 
 <footer>
   <div class="wrap">
-    <a class="logo" href="#"><i>y</i>yachat</a>
-    <a href="https://github.com/pnrajan/yachat">GitHub</a>
-    <a href="https://yachat-demo.fly.dev">Demo</a>
-    <a href="https://github.com/pnrajan/yachat/tree/main/docs">Docs</a>
-    <a href="https://github.com/pnrajan/yachat/blob/main/CONTRIBUTING.md">Contributing</a>
-    <a href="https://github.com/pnrajan/yachat/blob/main/CHANGELOG.md">Changelog</a>
+    <a class="logo" href="#"><i>y</i>keelchat</a>
+    <a href="https://github.com/pnrajan/keelchat">GitHub</a>
+    <a href="https://keelchat-demo.fly.dev">Demo</a>
+    <a href="https://github.com/pnrajan/keelchat/tree/main/docs">Docs</a>
+    <a href="https://github.com/pnrajan/keelchat/blob/main/CONTRIBUTING.md">Contributing</a>
+    <a href="https://github.com/pnrajan/keelchat/blob/main/CHANGELOG.md">Changelog</a>
     <span>Apache-2.0</span>
   </div>
 </footer>

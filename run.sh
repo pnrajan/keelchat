@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One command to run yachat locally: checks prerequisites, then starts console + API + Knowledge + Analytics services.
+# One command to run keelchat locally: checks prerequisites, then starts console + API + Knowledge + Analytics services.
 #
 #   ./run.sh                 # same as scripts/dev.sh --knowledge --analytics (model from .env, sample docs and data)
 #   ./run.sh --sandbox       # also run analytics statistics code in a local Docker sandbox
@@ -12,14 +12,14 @@ cd "$(dirname "$0")"
 for tool in uv node npm; do command -v "$tool" >/dev/null || { echo "missing: $tool (see README Quickstart)" >&2; exit 1; }; done
 if [ ! -f .env ]; then
   cp .env.example .env
-  echo "created .env from .env.example; set YACHAT_LLM and the provider key, then rerun" >&2
+  echo "created .env from .env.example; set KEELCHAT_LLM and the provider key, then rerun" >&2
   exit 1
 fi
 set -a; . ./.env; set +a
-case "${YACHAT_LLM:-}" in
+case "${KEELCHAT_LLM:-}" in
   anthropic) [ -n "${ANTHROPIC_API_KEY:-}" ] || { echo "ANTHROPIC_API_KEY is empty in .env" >&2; exit 1; } ;;
-  litellm) [ -n "${SILICONFLOW_API_KEY:-}${OPENROUTER_API_KEY:-}${OPENAI_API_KEY:-}" ] || { echo "no provider key in .env for YACHAT_LLM=litellm" >&2; exit 1; } ;;
-  *) echo "set YACHAT_LLM=anthropic|litellm in .env" >&2; exit 1 ;;
+  litellm) [ -n "${SILICONFLOW_API_KEY:-}${OPENROUTER_API_KEY:-}${OPENAI_API_KEY:-}" ] || { echo "no provider key in .env for KEELCHAT_LLM=litellm" >&2; exit 1; } ;;
+  *) echo "set KEELCHAT_LLM=anthropic|litellm in .env" >&2; exit 1 ;;
 esac
 
 ARGS=(--knowledge --analytics)

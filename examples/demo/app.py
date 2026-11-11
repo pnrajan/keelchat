@@ -21,33 +21,33 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.routing import APIRoute
 from pydantic import BaseModel, ConfigDict, Field
 
-from yachat.api.app import create_app as create_api
-from yachat.api.public import client_ip
-from yachat.logging import get_logger
-from yachat.policy.compiler import build
-from yachat.policy.drafter import draft_policy, edit_policy
-from yachat.policy.errors import PolicyValidationError
-from yachat.runtime.llm import LLMError
-from yachat.runtime.runtime import Runtime
-from yachat.state.models import Embed
-from yachat.state.store import InMemoryEmbedStore
+from keelchat.api.app import create_app as create_api
+from keelchat.api.public import client_ip
+from keelchat.logging import get_logger
+from keelchat.policy.compiler import build
+from keelchat.policy.drafter import draft_policy, edit_policy
+from keelchat.policy.errors import PolicyValidationError
+from keelchat.runtime.llm import LLMError
+from keelchat.runtime.runtime import Runtime
+from keelchat.state.models import Embed
+from keelchat.state.store import InMemoryEmbedStore
 
 from .needs import Need, from_policy, suggested
 
 HERE = Path(__file__).parent
 POLICY = HERE.parent / "support_assistant.yaml"
-DEMO_ID = os.getenv("YACHAT_DEMO_ID", "pk_demo_support")
+DEMO_ID = os.getenv("KEELCHAT_DEMO_ID", "pk_demo_support")
 #: drafts per visitor network per 10 minutes, and per day across everyone: each one is several model calls
-DRAFTS_PER_IP = int(os.getenv("YACHAT_DEMO_DRAFTS_PER_IP", "6"))
-DRAFTS_PER_DAY = int(os.getenv("YACHAT_DEMO_DRAFTS_DAILY", "200"))
+DRAFTS_PER_IP = int(os.getenv("KEELCHAT_DEMO_DRAFTS_PER_IP", "6"))
+DRAFTS_PER_DAY = int(os.getenv("KEELCHAT_DEMO_DRAFTS_DAILY", "200"))
 #: drafted bots put up to chat with, the same way; each is kept in memory until the machine restarts
-TRIES_PER_IP = int(os.getenv("YACHAT_DEMO_TRIES_PER_IP", "10"))
-TRIES_PER_DAY = int(os.getenv("YACHAT_DEMO_TRIES_DAILY", "300"))
+TRIES_PER_IP = int(os.getenv("KEELCHAT_DEMO_TRIES_PER_IP", "10"))
+TRIES_PER_DAY = int(os.getenv("KEELCHAT_DEMO_TRIES_DAILY", "300"))
 #: conversations per tried bot per day
 TRY_CHATS = 30
 #: a stronger model for writing bots than for chatting (YAML that builds, handoffs in the right place); unset: the
-#: chat's own YACHAT_MODEL_GENERATE
-DRAFT_MODEL = os.getenv("YACHAT_DEMO_DRAFT_MODEL", "")
+#: chat's own KEELCHAT_MODEL_GENERATE
+DRAFT_MODEL = os.getenv("KEELCHAT_DEMO_DRAFT_MODEL", "")
 log = get_logger("demo")
 
 
@@ -83,9 +83,9 @@ def create_app() -> FastAPI:
                     id=DEMO_ID,
                     tenant=policy.tenant,
                     agent=policy.agent,
-                    name="yachat demo",
-                    title="yachat demo: support assistant",
-                    daily_limit=int(os.getenv("YACHAT_DEMO_DAILY", "300")),
+                    name="keelchat demo",
+                    title="keelchat demo: support assistant",
+                    daily_limit=int(os.getenv("KEELCHAT_DEMO_DAILY", "300")),
                 )
             )
             yield
@@ -121,7 +121,7 @@ def create_app() -> FastAPI:
         if not await rt.limits.take("try-day", TRIES_PER_DAY, 86_400):
             raise HTTPException(429, "The demo has run all the bots it can today. Clone the repo to keep going.")
         await rt.save_version(policy, body.yaml, note="demo try")
-        embed = Embed(tenant=policy.tenant, agent=policy.agent, name="yachat demo: your bot", daily_limit=TRY_CHATS)
+        embed = Embed(tenant=policy.tenant, agent=policy.agent, name="keelchat demo: your bot", daily_limit=TRY_CHATS)
         await embeds.put(embed)
         log.info("demo bot up", agent=policy.agent, policy_hash=policy.hash)
         return {"embed": embed.id, "agent": policy.agent}

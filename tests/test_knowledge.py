@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import pytest
 
+from keelchat.knowledge.chunker import SemanticChunker, split_sentences
+from keelchat.knowledge.docstore import InMemoryDocumentStore
+from keelchat.knowledge.embedder import Embedder, FakeEmbedder
+from keelchat.knowledge.models import Document
+from keelchat.knowledge.service import KnowledgeService, make_indexer
+from keelchat.knowledge.vectorstore import InMemoryIndex
+from keelchat.runtime.llm import LLMRequest, ModelConfig
+from keelchat.runtime.llm_factory import llm_from_env
 from tests.helpers import RecordingLLM, make_runtime, reach_form, say
-from yachat.knowledge.chunker import SemanticChunker, split_sentences
-from yachat.knowledge.docstore import InMemoryDocumentStore
-from yachat.knowledge.embedder import Embedder, FakeEmbedder
-from yachat.knowledge.models import Document
-from yachat.knowledge.service import KnowledgeService, make_indexer
-from yachat.knowledge.vectorstore import InMemoryIndex
-from yachat.runtime.llm import LLMRequest, ModelConfig
-from yachat.runtime.llm_factory import llm_from_env
 
 DOCS = [
     Document.create("Benefits", "We offer health insurance, dental coverage and a generous 401k match for every employee. " * 30, "hr/benefits"),
@@ -76,13 +76,13 @@ async def test_knowledge_service_backs_the_tool(policy_yaml):
     svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
     for d in DOCS:
         await svc.add(d)
-    from yachat.testing.fakes import FakeTools
+    from keelchat.testing.fakes import FakeTools
 
     tools = FakeTools()
     impls = tools.impls()
     impls["knowledge_search"] = svc.tool_impl()
-    from yachat.policy.compiler import build
-    from yachat.runtime.runtime import Runtime
+    from keelchat.policy.compiler import build
+    from keelchat.runtime.runtime import Runtime
 
     rt = Runtime(llm_from_env(), impls, models=ModelConfig.from_env())
     await rt.register_policy(build(policy_yaml))
@@ -95,8 +95,8 @@ async def test_knowledge_service_backs_the_tool(policy_yaml):
 
 
 async def test_a_knowledge_answer_the_verifier_rejects_is_not_shown(policy_yaml, monkeypatch):
-    from yachat.capabilities.nodes import knowledge
-    from yachat.testing.fakes import FakeTools
+    from keelchat.capabilities.nodes import knowledge
+    from keelchat.testing.fakes import FakeTools
 
     async def made_up(self, plan, checks, feedback):
         return "Yes: every employee gets free daily lunch and a company car."  # nothing in the passages says so
@@ -114,7 +114,7 @@ async def test_a_knowledge_answer_the_verifier_rejects_is_not_shown(policy_yaml,
 
 async def test_lancedb_index(tmp_path):
     pytest.importorskip("lancedb")
-    from yachat.knowledge.vectorstore import LanceDBIndex
+    from keelchat.knowledge.vectorstore import LanceDBIndex
 
     emb = FakeEmbedder(dim=16)
     svc = KnowledgeService(InMemoryDocumentStore(), LanceDBIndex(str(tmp_path / "lance"), dim=16), emb, make_indexer("simple", FakeEmbedder()))
@@ -131,8 +131,8 @@ async def test_lancedb_index(tmp_path):
 
 async def test_lancedb_filters_by_dataset_and_upgrades_old_tables(tmp_path):
     lancedb = pytest.importorskip("lancedb")
-    from yachat.knowledge.models import Chunk
-    from yachat.knowledge.vectorstore import LanceDBIndex
+    from keelchat.knowledge.models import Chunk
+    from keelchat.knowledge.vectorstore import LanceDBIndex
 
     uri = str(tmp_path / "lance")
     old = {"id": "a:0", "doc_id": "a", "title": "Old", "text": "t", "context": "", "level": 0, "strategy": "simple", "source": "", "vector": [1.0, 0.0]}
@@ -146,7 +146,7 @@ async def test_lancedb_filters_by_dataset_and_upgrades_old_tables(tmp_path):
 
 
 async def test_litellm_client_structured(monkeypatch):
-    from yachat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.litellm_client import LiteLLMClient
 
     class Msg:
         content = "hi"
