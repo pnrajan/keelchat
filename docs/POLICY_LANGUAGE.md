@@ -21,7 +21,7 @@ Most bots add only a few more:
 |---|---|
 | ask for consent, then collect answers | `flow: [greet_consent, {form_fill: {fields: [...]}}]` |
 | answer from your documents | a `knowledge` step with `dataset: <knowledge base>` ([how](FEATURES.md#answer-from-documents)) |
-| always handle a situation the same way | `rules: [{name, when, then}]`, with `handoff: true` to pass it to a person |
+| always handle a situation the same way | `rules: [{name, when, then}]`, with `handoff: true` to pass it to a person (needs the top-level `handoff`) |
 | let people ask for a person | `handoff: {when: [user_request]}` |
 | speak more languages | `languages: [en, es]` |
 
@@ -96,7 +96,7 @@ until its job is done, then the next ready one starts.
 | `knowledge` | Answers questions from your documents, and says so when they don't cover one. | `dataset` |
 | `analytics` | Answers questions about a structured dataset with checked figures. | `dataset` (required) |
 | `job_search` | Searches jobs and lets the person pick one. | none |
-| `handoff` | Passes the conversation to a person. Usually set with the top-level `handoff` key instead. | none |
+| `handoff` | Passes the conversation to a person. Runs from the top-level `handoff` key and rules with `handoff: true`; don't list it in `flow`. | none |
 | `exit` | Ends the conversation. It runs by itself when the flow is done. | none |
 
 Your own steps (registered in Python, see [Adding a capability](ADDING_A_CAPABILITY.md)) appear here too.
@@ -112,13 +112,13 @@ Your own steps (registered in Python, see [Adding a capability](ADDING_A_CAPABIL
 | `high_stakes` | `true`/`false` | `false` | Write this step's replies with the large model and always check them. |
 | `model` | `small`, `large` | each job's usual | Run all of this step's work on one model size. |
 | `verify` | `true`/`false` | the step's own | Check replies before they are sent. `false` saves a model call per turn. |
-| `repairs` | number, or `{stage: number}` | 2 | Retries when a step's own check fails, capped by the step. |
+| `repairs` | number, or `{stage: number}` | the step's own maxima | Retries when a step's own check fails. It can only lower the step's maxima: `analytics` sql 3, code 3, interpret 2, verify 2; `knowledge` verify 2; other steps 2. |
 
 ### `form_fill` settings
 
 | Key | Value | Default | Meaning |
 |---|---|---|---|
-| `fields` | list of fields | required | What to ask, in order. |
+| `fields` | list of fields | none (the step only says `closing`) | What to ask, in order. |
 | `review` | `true`/`false` | `true` | When the step can submit (a job picked earlier and the `submit_application` action), show the answers and wait for "submit". Otherwise the form simply ends. |
 | `curious` | `true`/`false` | `false` | After a valid but vague answer ("it's broken"), ask one follow-up for the detail that matters. |
 | `closing` | text | "That's everything I need." | Said once every field is answered: what happens next ("We'll email you a return label within a day."). |
@@ -137,22 +137,22 @@ A field:
 
 | Key | Value | Default | Meaning |
 |---|---|---|---|
-| `questions` | list of questions | required | Asked in order. |
+| `questions` | list of questions | none (the step only says `closing`) | Asked in order. |
 | `closing` | text | "That's everything." | Said at the end. |
 
 A question:
 
 | Key | Value | Default | Meaning |
 |---|---|---|---|
-| `key` | lowercase with `_` | required | The answer's name in results. `nps` makes it an NPS score. |
+| `key` | lowercase with `_` | required | The answer's name in results. A `scale` question from 0 to 10 whose key contains `nps` (or whose prompt asks about recommending) is scored as NPS. |
 | `prompt` | text | required | The question. |
 | `kind` | `open`, `single_choice`, `multi_choice`, `scale`, `rank`, `allocation`, `number` | `open` | What kind of answer. Closed kinds are read in code. |
 | `expectation` | text | none | For `open`: what a complete answer covers. |
-| `max_probes` | number | 2 | For `open`: follow-ups until the answer covers `expectation`. |
+| `max_probes` | number, 0-5 | 2 | For `open`: follow-ups until the answer covers `expectation`. |
 | `ask_why` | `true`/`false` | `false` | One "why?" after a closed answer. |
 | `optional` | `true`/`false` | `false` | May be skipped. |
 | `ask_if` | `{question, op, value, values}` | always | Ask only when an earlier answer meets the condition. `op`: `answered`, `equals`, `any_of`, `gte`, `lte`. |
-| `options` | list of `{key, label}` | none | Choices for `single_choice`, `multi_choice`, `rank`, `allocation`. |
+| `options` | list of `{key, label}`, or plain labels | none | Choices for `single_choice`, `multi_choice`, `rank`, `allocation`. A plain label gets a key made from it. |
 | `max_select` | number | 0 (no limit) | For `multi_choice`. |
 | `top_n` | number | 3 | For `rank`: how many to rank. |
 | `scale_min`, `scale_max` | numbers | 1, 10 | For `scale`. |
@@ -175,8 +175,8 @@ An option (in `options`) is `{key, label}`: `key` is the answer's value in resul
 
 | Key | Value | Default | Meaning |
 |---|---|---|---|
-| `objectives` | list of objectives | required | What you want to learn. |
-| `max_questions` | number | 10 | Questions asked at most, follow-ups included. |
+| `objectives` | list of objectives (at most 12) | none (the step only says `closing`) | What you want to learn. |
+| `max_questions` | number, 1-30 | 10 | Questions asked at most, follow-ups included. |
 | `closing` | text | "That's really helpful." | Said at the end. |
 
 An objective:
@@ -189,7 +189,7 @@ An objective:
 | `scale_min`, `scale_max` | numbers | 1, 5 | For `measure: scale`. |
 | `options` | list of `{key, label}` | none | For `measure: choice`. |
 | `ask` | text | written from `learn` | A sample question. |
-| `max_probes` | number | 1 | Follow-ups when an answer is thin. |
+| `max_probes` | number, 0-3 | 1 | Follow-ups when an answer is thin. |
 
 ### `knowledge` and `analytics` settings
 
@@ -210,12 +210,14 @@ An objective:
 
 ## `guardrails`
 
-| Key | Value | Meaning |
-|---|---|---|
-| `input` | list from `prompt_injection`, `sql_injection` | Checks on what users send. |
-| `output` | list from `pii`, `profanity`, `no_legal_advice`, `no_medical_advice` | Checks on what the bot replies. |
+| Key | Value | Default | Meaning |
+|---|---|---|---|
+| `input` | list from `prompt_injection`, `sql_injection` | `prompt_injection`, `sql_injection` | Checks on what users send. |
+| `output` | list from `pii`, `profanity`, `no_legal_advice`, `no_medical_advice` | `pii`, `profanity` | Checks on what the bot replies. |
 
-`prompt_injection` and `pii` always run, listed or not. Your own registered guardrails can be named here too.
+Listing a stage replaces its defaults, so list the defaults you want to keep
+(`output: [pii, profanity, no_medical_advice]`). `prompt_injection` and `pii` always run, listed or not. Your own
+registered guardrails can be named here too.
 
 ## `limits`
 
@@ -226,7 +228,7 @@ An objective:
 | `reopens` | number ≥ 0 | 2 | Times a finished step can be reopened by an edit. |
 | `planner_calls` | number ≥ 1 | 6 | Tool calls the planner may make in one turn. |
 | `on_step_enquiries` | number ≥ 1 | 3 | Questions about the current step (e.g. the jobs shown) before it asks the person to choose. |
-| `repairs` | number ≥ 0 | 2 | Retries for every step's own checks, capped by each step. |
+| `repairs` | number ≥ 0 | none (each step's maxima) | Lowers every step's retries of its own checks; a step's `repairs` wins. |
 
 These are counted in code; the model never decides to stop.
 
@@ -239,12 +241,12 @@ An item is a name (`- preferred_contact`) or a mapping:
 | `field` | lowercase with `_` | required | What it remembers. |
 | `extract` | text | "The user's ..., when they state it" | How to find it in the conversation. Give `extract` or `from`, not both. |
 | `from` | `step.field` | none | Copy a checked answer instead, e.g. `form_fill.address`. |
-| `type` | `string`, `integer`, `number`, `boolean`, `email`, `a\|b\|c`, `list[...]`, or a mapping | `string` | The value's shape. Values that don't fit are not kept. |
+| `type` | `string`, `integer`, `number`, `boolean`, `a\|b\|c`, `list[...]`, or a mapping | `string` | The value's shape. Values that don't fit are not kept. |
 | `half_life` | duration | 180d | How fast it fades; a faded value is asked again. |
-| `sensitive` | `true`/`false` | by name | Kept only with explicit consent, never sent to tools. |
+| `sensitive` | `true`/`false` | `true` for `gender`, else `false` | Kept only with explicit consent, never sent to tools. |
 | `confirm_on_reuse` | `true`/`false` | `true` | Ask "is it still ...?" before using it again. |
 
-Memory needs consent: put `greet_consent` first in the flow.
+Memory needs consent: put `greet_consent` first in the flow. The build doesn't check this.
 
 ## `handoff`
 
@@ -271,6 +273,8 @@ Small talk is never taken as an answer. Two such turns in a row are answered; th
 | `flow` | Each turn goes to the next step in `flow`. The default when there is a flow. |
 | `planner` | No fixed steps: each turn the planner picks read-only tools to answer. The default without a flow. |
 | `adaptive` | A flow, where a question that needs several lookups may use the planner for one turn. |
+
+`planner` with a `flow`, or `flow`/`adaptive` without one, is rejected by the build.
 
 ## Value formats
 

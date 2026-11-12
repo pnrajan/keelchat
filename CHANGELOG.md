@@ -36,11 +36,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Docs checked against the code and corrected throughout (policy defaults, guardrail defaults, memory types,
+  architecture, knowledge search, the API walkthrough, extension examples). A plugin README; complete policies in the
+  docs are built by `tests/test_docs.py`.
 - README and docs screenshots re-taken from the current console and demo: Compose shows the Knowledge base panel; a new
   image shows the demo's questions before drafting.
 
 ### Fixed
 
+- `@tool(..., side_effects="write")` is no longer retried by default (a retried write could happen twice), as HTTP
+  and MCP tools already weren't; an explicit `retries` is kept.
+- `KEELCHAT_LLM=litellm` works with any provider litellm supports, using its usual key variables (e.g.
+  `GEMINI_API_KEY`); a missing one is named at start. `run.sh` no longer limits it to three providers.
+- `keelchat new package`: the generated tests pass when run from the package folder (no pytest plugin needed; the
+  model key is read from a `.env` there).
+- A bad memory item's error names its position (`memory[1].type`).
+- The MCP server's instructions no longer name a tool that doesn't exist.
+- `deploy/fly.toml` sets `KEELCHAT_CLIENT_IP_HEADER`, so the public widget's per-visitor limits see each visitor.
 - pgvector finds a small knowledge base beside a large one (iterative index scans), and takes embeddings over 2000
   dimensions; tables are created by one process at a time.
 - Qdrant and Chroma refuse an `s3://` index address instead of writing to a local folder named after it.

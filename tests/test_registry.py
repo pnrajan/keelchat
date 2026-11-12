@@ -115,3 +115,32 @@ agent: mcp-agent
 charter: test
 tools: [tm.lookup_plan]
 """
+
+
+def test_a_write_tool_is_not_retried_unless_asked():
+    """A retried write can do it twice (book twice, submit twice): `side_effects="write"` defaults to no retries, as
+    tools registered over HTTP and MCP already do. An explicit `retries` is kept."""
+    from keelchat.registry.core import REGISTRY, tool
+
+    @tool("audit_write_tool", side_effects="write")
+    async def write_once(x: str) -> dict[str, str]:
+        """Writes once."""
+        return {"x": x}
+
+    @tool("audit_write_tool_retried", side_effects="write", retries=2)
+    async def write_retried(x: str) -> dict[str, str]:
+        """Safe to repeat."""
+        return {"x": x}
+
+    @tool("audit_read_tool")
+    async def read(x: str) -> dict[str, str]:
+        """Reads."""
+        return {"x": x}
+
+    try:
+        assert REGISTRY.tool("audit_write_tool").retries == 0
+        assert REGISTRY.tool("audit_write_tool_retried").retries == 2
+        assert REGISTRY.tool("audit_read_tool").retries == 1
+    finally:
+        for n in ("audit_write_tool", "audit_write_tool_retried", "audit_read_tool"):
+            REGISTRY._tools.pop(n, None)

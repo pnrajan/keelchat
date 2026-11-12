@@ -47,3 +47,23 @@ async def test_new_package_registers_passes_contract_and_builds(tmp_path: Path, 
     await check_capability("node", "scaffold_caps_order_lookup")
     await check_capability("guardrail", "scaffold_caps_no_delivery_promises")
     assert build_file(str(tmp_path / "scaffold-caps-agent.yaml")).agent == "scaffold-caps-agent"
+
+
+def test_the_new_package_tests_pass_when_run_from_its_own_folder(tmp_path: Path) -> None:
+    """As a developer runs them: pytest from the package folder, with none of keelchat's own pytest settings."""
+    import os
+    import subprocess
+    import sys
+
+    new_package("acme_caps", tmp_path)
+    env = {**os.environ, "PYTHONPATH": ".", "KEELCHAT_CAPABILITY_PACKAGES": "acme_caps", "DATABASE_URL": "", "REDIS_URL": ""}
+    run = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-o", "addopts=", "test_acme_caps.py"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    assert run.returncode == 0, run.stdout[-3000:] + run.stderr[-2000:]
+    assert "3 passed" in run.stdout

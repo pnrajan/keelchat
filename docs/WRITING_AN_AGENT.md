@@ -18,8 +18,8 @@ Versions tab compares them and re-activates an older one to roll back.
 
 Replies are written by the model from what each step needs, in the charter's tone; a form field's `ask` is a sample
 wording and `expect` is what is accepted. Every step's replies are checked before they are sent; set
-`verify: false` on a step to pass them through (saves a model call per turn), or `natural_replies: false` in the
-platform defaults to send the steps' plain replies.
+`verify: false` on a step to pass them through (saves a model call per turn). Sending the steps' plain replies
+without rewording (`natural_replies`) is a platform constant in `keelchat/policy/defaults.py`, not a policy key.
 
 ## 1. Charter: scope in two sentences
 
@@ -74,9 +74,10 @@ it with a score clicked in an email.
 limits: {reasks: 3, digressions: 3}
 ```
 
-Every exit is counted in code: re-asks per field, digressions, nudges, reopens, tool failures. Set them from the
-channel: SMS users tolerate fewer re-asks than web users. The exit message is `defaults.exit_message`; a resume
-token is issued so the user can come back within `session_ttl_days`.
+Every exit is counted in code: re-asks per field, digressions, nudges, reopens, tool failures. `reasks`,
+`digressions` and `reopens` are set in `limits`; pick them for the channel (SMS users tolerate fewer re-asks than web
+users). The exit message and how long a resume token lasts are platform constants (`exit_message`,
+`session_ttl_days` in `keelchat/policy/defaults.py`), not policy keys.
 
 Steps that fix their own output (rewrite failed SQL, re-run code) have repair budgets. Lower them for the whole
 policy with `limits: {repairs: 1}`, or per step: `- analytics: {dataset: sales, repairs: {sql: 1}}`. A step can never
@@ -84,7 +85,8 @@ exceed its node's maximum; the build reports the YAML path if you try.
 
 Analytics and knowledge steps also have a `verify` budget: before any work the model writes a plan and the checks its
 result must pass, and a separate verifier judges the result. Problems are sent back up to `repairs.verify` times
-(default 2): `- analytics: {dataset: sales, repairs: {verify: 1}}`. `verify: 0` still verifies once but never redoes.
+(default 2): `- analytics: {dataset: sales, repairs: {verify: 1}}`. `repairs: {verify: 0}` still verifies once but
+never redoes (unlike a step's `verify: false`, which skips checking its replies).
 An answer that does not pass is never shown as verified: an analysis becomes `partial` with the problems under
 limitations, and a knowledge answer is replaced by "I couldn't confirm an answer to that from our documents."
 
@@ -185,6 +187,18 @@ flow:
   names and cycles.
 - Every match is an audit record (`kind: rule`) and appears in the console's turn details.
 - Write `when` about the customer's message, not the conversation ("asks for a refund amount", not "is unhappy").
+- `handoff: true` on a rule passes the conversation to a person in code when it matches: the reply says so and asks
+  nothing more, and the handoff's reason is `rule:<name>`. Use it for emergencies and anything the bot must not
+  handle. It needs the top-level `handoff:` (e.g. `handoff: {when: [user_request]}`), or the build says so:
+
+  ```yaml
+  rules:
+    - name: dental_emergency
+      when: the patient describes severe pain, bleeding or a knocked-out tooth
+      then: say it sounds urgent and a person will take over now
+      handoff: true
+  handoff: {when: [user_request]}
+  ```
 
 ### Which model each step uses
 
@@ -194,8 +208,10 @@ A step's work (reading the message, checking answers, writing the reply) runs on
 ```yaml
 flow:
   - greet_consent: {model: small}     # simple: everything on the small, cheaper model
-  - claims_review: {model: large}     # nuanced: everything on the large model
-  - refund_decision: {high_stakes: true}
+  - form_fill:                         # nuanced: everything on the large model
+      model: large
+      fields: [...]
+  - knowledge: {high_stakes: true}    # answers that must be right: large model, always checked
 ```
 
 - `model: small | large` puts all of the step's jobs on one tier.
@@ -236,8 +252,26 @@ what they mentioned. It is not counted as wandering off, and is never taken as a
 allows two such turns in a row; the third counts like any other detour (`limits.digressions`). With `off`, small talk
 counts as wandering off, as before. Tone still comes from the charter. Drafted tests cover it when it is on.
 
-Answers from documents are also held to the question: when the documents found do not answer it, the agent says it
-does not know, instead of describing what they contain.
+### Answers from documents
+
+Give the bot a knowledge base (help pages, manuals, FAQs) and a `knowledge` step, or `knowledge_search` in `tools` to
+answer side questions during any step:
+
+```yaml
+flow:
+  - greet_consent
+  - knowledge: {dataset: help_centre}
+```
+
+- Make the knowledge base in the console (Compose → **Knowledge base**: upload files and web pages, then apply the
+  change it proposes) or with the API (`POST /v1/tenants/{t}/documents`, or `PUT /v1/tenants/{t}/datasets/{name}` for
+  documents already in a folder or S3). The indexing method is picked from the documents unless you set one.
+- Answers come only from the passages found and are checked against them. When the documents don't answer the
+  question, the bot says it doesn't know instead of describing what they contain, and offers a person when the
+  policy hands off on request. `repairs: {verify: n}` sets how often a failed answer is redone.
+- Name the documents' subject in the charter, or questions about it look out of scope.
+
+[Answer from documents](FEATURES.md#answer-from-documents) has the settings and the parts you can replace.
 
 ## 6. Languages
 

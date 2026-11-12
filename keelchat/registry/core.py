@@ -478,7 +478,7 @@ def tool(
     *,
     translate: bool = True,
     timeout_s: float = 5.0,
-    retries: int = 1,
+    retries: int | None = None,
     side_effects: SideEffects = "none",
     version: str = "1",
     dataset: DatasetKind | None = None,
@@ -499,7 +499,8 @@ def tool(
                 output_schema=_output_schema(fn),
                 translate=translate,
                 timeout_s=timeout_s,
-                retries=retries,
+                # a retried write could happen twice: writes are tried once unless you say otherwise
+                retries=retries if retries is not None else (0 if side_effects == "write" else 1),
                 side_effects=side_effects,
                 version=version,
                 description=inspect.getdoc(fn) or "",

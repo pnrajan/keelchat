@@ -119,14 +119,19 @@ limits: {{reasks: 3, digressions: 3}}
 handoff: {{when: [user_request, max_reasks]}}
 """
 
-TEST = '''\
+TEST = (
+    '''\
 """The contract suite for {pkg}: schemas, a call, the timeout, no sockets outside the gateway.
 
-Run: PYTHONPATH=. KEELCHAT_CAPABILITY_PACKAGES={pkg} pytest test_{pkg}.py"""
+Run: PYTHONPATH=. KEELCHAT_CAPABILITY_PACKAGES={pkg} pytest test_{pkg}.py
+The step check calls your model: keep a .env with KEELCHAT_LLM and its key here (or export them)."""
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
+from dotenv import load_dotenv
 from keelchat import check_capability
 from keelchat.registry.core import REGISTRY
 
@@ -134,12 +139,16 @@ import {pkg}.guardrails  # noqa: F401  (registers on import)
 import {pkg}.steps  # noqa: F401
 import {pkg}.tools  # noqa: F401
 
+load_dotenv()  # the model key, for the step check
+
 
 @pytest.mark.parametrize("kind,name", [("tool", "{pkg}_order_status"), ("node", "{pkg}_order_lookup"), ("guardrail", "{pkg}_no_delivery_promises")])
-async def test_contract(kind: str, name: str) -> None:
+def test_contract(kind: str, name: str) -> None:
     REGISTRY.discover()
-    await check_capability(kind, name)
+    asyncio.run(check_capability(kind, name))  # no pytest plugin needed
 '''
+    ""
+)
 
 
 class ScaffoldError(Exception):

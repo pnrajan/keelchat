@@ -10,7 +10,7 @@ Checked against each project's own documentation; corrections welcome in an issu
 | **Limits and safety** | Built in and counted in code: re-asks, digressions, planner budget, guardrails, one tool gateway | Built in | Built in: guideline matching, canned replies | You build it | Platform features |
 | **Channels** | Web widget, WhatsApp, SMS, Slack, phone, plus your own | Many connectors | Bring your own | Bring your own | Many, hosted |
 | **Licence** | Apache-2.0 | Commercial; free developer edition with a monthly conversation cap. The older Rasa Open Source is Apache-2.0 and in maintenance | Apache-2.0 | MIT | Hosted product; SDK and CLI are MIT; self-hosted v12 retired |
-| **Maturity** | Early: 0.1, alpha | Mature, widely deployed | Active, 3.x | Mature, large ecosystem | Mature, hosted |
+| **Maturity** | Early: 0.2.0, alpha | Mature, widely deployed | Active, 3.x | Mature, large ecosystem | Mature, hosted |
 
 **Pick keelchat** when bots must finish a defined job reliably, behaviour should live in a reviewable file rather than in
 prompts or code, and you want many bots on one self-hosted runtime with per-tenant cost, audit and handoff.

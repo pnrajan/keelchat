@@ -1,7 +1,9 @@
 # Adding a capability
 
-One decorated function or class. No runtime change. Everything an extension needs imports from the top level:
-`from keelchat import tool, node, Node, NodeResult, guardrail, ...`.
+One decorated function or class. No runtime change. Most of what an extension needs imports from the top level:
+`from keelchat import tool, node, Node, NodeResult, guardrail, ...`. A few names come from submodules: dataset refs
+from `keelchat.datasets.models`, `check_vector_store` from `keelchat.testing`, and channel helpers from
+`keelchat.channels`.
 
 ## Start here: your first step in ten minutes
 
@@ -12,7 +14,8 @@ PYTHONPATH=. KEELCHAT_CAPABILITY_PACKAGES=acme_caps uv run --project <keelchat c
 PYTHONPATH=. uv run --project <keelchat checkout> pytest test_acme_caps.py
 ```
 
-The files build and pass the contract suite as written. Read them in this order:
+The node check calls the configured model: copy your `.env` into `my_bot` (or export `KEELCHAT_LLM` and its key)
+before you run the test. The files build and pass the contract suite as written. Read them in this order:
 
 1. **`acme_caps/tools.py`: the tool.** An async function. Its type hints become the schema, and its docstring is what
    the model reads. It talks to your system; here a dictionary stands in.
@@ -46,8 +49,10 @@ async def salary_lookup(title: str, location: str = "") -> dict[str, str]:
 ```
 
 Input schema comes from the type hints, output schema from the return hint. Raise `ToolError(name, kind, message)`
-for failures. `retries` is how many times the gateway retries after a timeout or error (default 1); after that a
-circuit breaker opens for the tool. Never open sockets outside the function the gateway calls. Tool output goes into
+for failures. `retries` is how many times the gateway retries after a timeout or error (default 1). After three failed calls in a
+row the tool's circuit opens for 30 seconds, and calls fail fast until then. A write tool
+(`side_effects="write"`) is not retried unless you pass `retries` yourself. Don't retry anything that isn't safe to
+repeat. Never open sockets outside the function the gateway calls. Tool output goes into
 prompts as data, never as instructions. Anything that changes something (book, pay, submit) is an
 [action](#candidate-only-action), not a tool. Allow it in a policy with `tools: [salary_lookup]`. Full example:
 [`examples/extensions/booking_caps/tools.py`](../examples/extensions/booking_caps/tools.py).
@@ -111,8 +116,9 @@ class MyStep(Node[MyConfig]):
         return NodeResult("…", ask=("field", "Ask…", "expect…"))  # or outputs={...}, complete=True
 ```
 
-`produces` are the outputs that make the step complete; `tools` join the agent's allow list; `requires:` on a flow
-entry orders steps by those outputs. Use it in a policy as `- my_step: {greeting: Hello}`. A worked example that
+`produces` are the outputs that make the step complete: `complete=True` is ignored until every name in `produces` is
+set in `outputs`. `tools` join the agent's allow list. `requires:` on a flow entry lists the steps that must finish
+first (default: the step before). Use it in a policy as `- my_step: {greeting: Hello}`. A worked example that
 calls a tool, offers choices and completes on the user's pick:
 [`examples/extensions/booking_caps/steps.py`](../examples/extensions/booking_caps/steps.py). The built-in steps are
 `greet_consent`, `form_fill`, `survey`, `conversation_survey`, `knowledge`, `analytics`, `job_search`, `handoff` and
@@ -129,7 +135,8 @@ calls a tool, offers choices and completes on the user's pick:
   `keelchat.reasoning.verified(llm, models, task, rounds)`. The task supplies `brief()` (the question and trusted
   context), `produce(plan, checks, feedback)` (one attempt, with the reviewer's problems from the last one),
   `evidence()` and `answer()` (what the verifier reads), `results()` (checks it ran itself, e.g. assertions in a
-  sandbox), and `stages` (where a problem can be sent back). The loop writes the plan and checks before the first
+  sandbox), `settled(out)` (true when there is nothing to verify, such as failed work; the answer is returned as is),
+  and `stages` (where a problem can be sent back). The loop writes the plan and checks before the first
   attempt, verifies each attempt, and counts rounds; declare the budget as a `verify` repair stage
   (`repairs={"verify": 2}`) and pass the step's value as `rounds`. When `passed` is false, do not present the result
   as verified. Examples: `capabilities/nodes/knowledge.py` (claims checked against passages) and
@@ -183,10 +190,14 @@ from keelchat import Guardrail, GuardResult, guardrail
 @guardrail("no_competitors", stage="output")
 class NoCompetitors(Guardrail):
     async def check(self, text, ctx):
-        return GuardResult(flagged=True, reason="…", redacted=text.replace("Globex", "another company"))
+        if "Globex" not in text:
+            return GuardResult()
+        return GuardResult(flagged=True, reason="names a competitor", redacted=text.replace("Globex", "another company"))
 ```
 
-List it in a policy: `guardrails: {output: [pii, no_competitors]}`. `prompt_injection` and `pii` always run. Input
+List it in a policy: `guardrails: {output: [pii, profanity, no_competitors]}`. Without `guardrails`, input gets
+`prompt_injection` and `sql_injection`, and output gets `pii` and `profanity`. A list you give replaces that stage's
+defaults, so repeat any you want to keep. `prompt_injection` and `pii` always run. Input
 guardrails can stop a turn; output guardrails redact or replace the reply. Flagged turns are never written to memory.
 Full example: [`examples/extensions/booking_caps/guardrails.py`](../examples/extensions/booking_caps/guardrails.py).
 
@@ -230,7 +241,7 @@ setting that picks it (a registered name, or `package.module:Name` without regis
 | Embedding model | `Embedder`: `dim`, `id`, `embed(texts)` | `@embedder("name")` | `KNOWLEDGE_EMBEDDER` (+ `KNOWLEDGE_EMBED_MODEL`) | `litellm`, `chonkie`, `sentence-transformers`, `siliconflow`, `hash` |
 | Splitting into passages | `Chunker`: `chunk(text)` | `@chunker("name")` | `KNOWLEDGE_CHUNKER` | `chonkie` (default when installed), `semantic`, `sentences` |
 | Indexing method | `Indexer`: `chunks(doc)` | `@indexer("name")` | `KNOWLEDGE_STRATEGY`, or `strategy:` on a knowledge base | `simple`, `contextual`, `raptor`, `full_context` |
-| Vector store | `VectorIndex`: `upsert`, `search`, `delete_doc`, `count` | `@vector_store("name")` | `KNOWLEDGE_VECTOR_STORE` | `memory`, `lancedb`, `qdrant`, `chroma`, `pgvector` |
+| Vector store | `VectorIndex`: `upsert`, `search`, `delete_doc`, `count`, optional `doc_ids` | `@vector_store("name")` | `KNOWLEDGE_VECTOR_STORE` | `memory`, `lancedb`, `qdrant`, `chroma`, `pgvector` |
 
 What each factory receives: an embedder its model name (`KNOWLEDGE_EMBED_MODEL`, or nothing); a chunker the
 embedder; an indexing method an `IndexContext` (`embedder`, `chunker`, and `llm`/`models` for summaries, which
@@ -255,28 +266,35 @@ class AcmeEmbedder(Embedder):
         return await acme_client.embed(self.model, texts)
 
 
-@vector_store("pgvector")
-class PgVectorIndex(VectorIndex):
+@vector_store("acme_store")
+class AcmeStore(VectorIndex):
     def __init__(self, cfg: VectorStoreConfig):
         self.table, self.dim = cfg.table, cfg.dim
 
     ...  # upsert, search (filter on chunk.dataset), delete_doc, count
 ```
 
+Don't register a part under a built-in name: it replaces the built-in. The optional `doc_ids(dataset)` returns the
+documents that have chunks in a dataset, so the service can embed again any whose vectors are missing. Without it,
+only an empty dataset is filled again.
+
 A vector store must keep datasets apart, honour `max_level`, replace a chunk upserted again with the same id, and return
-whole chunks with cosine similarity as the score. `check_vector_store` tests all of it; run it on an empty store:
+whole chunks with cosine similarity as the score. `check_vector_store` tests all of it, and `doc_ids` when the store
+has it; run it on an empty store:
 
 ```python
 from keelchat.testing import check_vector_store
 
 
 async def test_my_store():
-    await check_vector_store(PgVectorIndex(VectorStoreConfig(uri=None, table="chunks_test", dim=0)))
+    await check_vector_store(AcmeStore(VectorStoreConfig(uri=None, table="chunks_test", dim=0)))
 ```
 
-Then `KNOWLEDGE_EMBEDDER=acme KNOWLEDGE_VECTOR_STORE=pgvector`, with the package made discoverable as below. A custom
-indexing method is also offered in the console's **Knowledge base** panel. `GET /v1/registry` lists every part under
-`knowledge`, and which are in use. Switching embedders re-indexes rather than mixing vectors that can't be compared.
+Then `KNOWLEDGE_EMBEDDER=acme KNOWLEDGE_VECTOR_STORE=acme_store`, with the package made discoverable as below. With a
+separate Knowledge Service (`KNOWLEDGE_URL` set, as `./run.sh` does), the parts run in that process: set
+`KEELCHAT_CAPABILITY_PACKAGES` there too. A custom indexing method is also offered in the console's **Knowledge base**
+panel. `GET /v1/registry` lists every part under `knowledge`, and `using` names the embedder, chunker and indexing
+method in use. Switching embedders re-indexes rather than mixing vectors that can't be compared.
 
 ## Make it discoverable
 

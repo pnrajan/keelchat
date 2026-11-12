@@ -196,7 +196,8 @@ class AgentPolicy(PolicyModel):
     def _parse_memory(cls, v: Any) -> Any:
         if not isinstance(v, list):
             raise ValueError("memory must be a list of items")
-        return [MemoryField.parse(m) if not isinstance(m, MemoryField) else m for m in v]
+        # names become mappings here; mappings are validated per item by pydantic, so errors carry their index
+        return [{"field": m, "extract": f"The user's {m.replace('_', ' ')}, when they state it"} if isinstance(m, str) else m for m in v]
 
     @model_validator(mode="after")
     def _defaults(self) -> AgentPolicy:

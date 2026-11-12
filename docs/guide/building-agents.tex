@@ -272,7 +272,7 @@ so you understand what is going on underneath.
 \subsection{The life of one message}
 
 Every message goes through three stages: \textbf{Understand}, \textbf{Decide}, \textbf{Respond}. The model
-helps in the first and last; the middle is your policy, enforced in code.
+reads the message and words the reply; what happens next is decided in code, by your policy.
 
 \begin{figure}[h]
 \centering
@@ -285,8 +285,8 @@ helps in the first and last; the middle is your policy, enforced in code.
   darr/.style={-{Stealth[length=2.2mm]},line width=0.6pt,color=gray!80!black,dashed},
   node distance=0.75cm]
   \node[ext,minimum width=1.6cm] (msg) {User\\message};
-  \node[stage=boxA,right=0.6cm of msg] (u) {\textbf{Understand}\\[3pt]\footnotesize language\\intent\\input guardrails};
-  \node[stage=boxB,right=of u] (d) {\textbf{Decide}\\[3pt]\footnotesize current step\\rules \& counters\\handoff or exit};
+  \node[stage=boxA,right=0.6cm of msg] (u) {\textbf{Understand}\\[3pt]\footnotesize language, opt-out\\asks for a person\\input guardrails};
+  \node[stage=boxB,right=of u] (d) {\textbf{Decide}\\[3pt]\footnotesize reads the message\\step, rules, counters\\handoff or exit};
   \node[stage=boxC,right=of d] (r) {\textbf{Respond}\\[3pt]\footnotesize word the reply\\check it\\output guardrails};
   \node[ext,below=0.55cm of r,minimum width=1.6cm] (rep) {Reply to\\the channel};
   \draw[arr] (msg) -- (u);
@@ -302,7 +302,7 @@ helps in the first and last; the middle is your policy, enforced in code.
   % model
   \node[ext,above=0.7cm of d,fill=keellight,draw=keel,minimum width=9.6cm] (llm)
      {\textbf{The model} reads the message and words the reply};
-  \draw[darr] (llm.south -| u) -- (u.north);
+  \draw[darr] (llm.south -| d) -- (d.north);
   \draw[darr] (llm.south -| r) -- (r.north);
   \node[font=\scriptsize\itshape,color=gray!70!black,below=0.05cm of d.south,anchor=north west,xshift=0.08cm] {};
 \end{tikzpicture}
@@ -311,9 +311,9 @@ helps in the first and last; the middle is your policy, enforced in code.
 
 \begin{description}[leftmargin=0pt,style=nextline]
   \item[Understand] keelchat detects the language, runs the input guardrails (for example
-    \code{prompt\_injection}, which blocks attempts to trick the bot), and works out what the person
-    meant: a new answer, a change to an earlier answer, a side question, or something off-topic.
-  \item[Decide] The current step of your \key{flow} runs. Answers are checked against what you said to
+    \code{prompt\_injection}, which blocks attempts to trick the bot).
+  \item[Decide] The model reads the message: a new answer, a change to an earlier answer, a side question, or
+    something off-topic. Code turns that into counts and decisions. The current step of your \key{flow} runs. Answers are checked against what you said to
     \key{expect}. Re-asks, side trips and failures are counted against your \key{limits}. Rules that fit are
     added. If a tool is needed, it is called through the \textbf{Tool Gateway}, which only allows tools the
     policy lists, applies timeouts and retries, and treats tool output as data, never as instructions.
@@ -420,7 +420,7 @@ https://keelchat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number
 
 \begin{lstlisting}[style=bashstyle]
 git clone https://github.com/pnrajan/keelchat && cd keelchat
-./setup.sh        # checks for git, uv, Node 20+; offers to install what's missing;
+./setup.sh        # checks for git, curl, uv, Node 20+; offers to install what's missing;
                   # asks for your model key and writes it to .env
 scripts/try.sh    # opens the console with a sample bot, everything in memory
 \end{lstlisting}
@@ -834,7 +834,7 @@ Here is a policy that uses most of the ``behaviour'' settings at once. Each one 
   \code{no\_legal\_advice}, \code{no\_medical\_advice}. \code{prompt\_injection} and \code{pii} always run. \\
 \key{memory} & Only the items you list are remembered between conversations, each typed and fading by
   \code{half\_life}. \code{sensitive: true} items need consent, must be volunteered, and never reach a tool.
-  \code{confirm\_on\_reuse} asks ``is it still \ldots?''. Needs \code{greet\_consent} first in the flow. \\
+  \code{confirm\_on\_reuse} asks ``is it still \ldots?''. Put \code{greet\_consent} first: without consent, sensitive items are never kept. \\
 \key{languages} & Languages it speaks; the first is the fallback. List only ones you support end to end. \\
 \key{small\_talk} & \code{off} (default: chit-chat counts as off-topic), \code{brief} (one friendly line, then back),
   \code{warm} (one or two sentences). Never taken as an answer. \\
@@ -1079,7 +1079,7 @@ conversation into a test case.
 \midrule
 A reply says it can't do something ``right now'' (``I can't look that up right now\ldots'') & The tool's service is
   down or its URL is unset: start it (\code{./run.sh} starts Knowledge and Analytics), or run with
-  \code{--fake-tools}. \\
+  \code{./run.sh --fake-tools} (or set \code{KEELCHAT\_TOOLS=fake}). \\
 ``The API no longer has this policy'' or ``This session is no longer on the server'' & The API restarted with
   in-memory state: \textbf{Build \& try} again and start a new session, or set \code{DATABASE\_URL} and
   \code{REDIS\_URL}. \\

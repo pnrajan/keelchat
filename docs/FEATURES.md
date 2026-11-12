@@ -134,8 +134,9 @@ which and why:
 | Many shorter documents | `contextual` | Each passage gets a line of context, so search finds the right one |
 | No model to index with | `simple` | Passages found by meaning |
 
-Set `strategy` to one of these to choose, and `top_k` (1–20, default 5) for the passages each answer gets.
-`KNOWLEDGE_STRATEGY` on the server makes every knowledge base use one method.
+Set `strategy` to one of these, or to the name of your own `@indexer`, to choose. Set `top_k` (1–20, default 5) for
+the passages each answer gets. `KNOWLEDGE_STRATEGY` on the server sets the method for every knowledge base left on
+`auto`. A knowledge base with its own `strategy` keeps it.
 
 **Passages and embeddings.** Documents are split into passages with [chonkie](https://github.com/chonkie-inc/chonkie)'s
 semantic chunker (breaks where the meaning shifts; `KNOWLEDGE_CHONKIE=recursive|sentence|token` for others,
@@ -143,17 +144,22 @@ semantic chunker (breaks where the meaning shifts; `KNOWLEDGE_CHONKIE=recursive|
 `KNOWLEDGE_EMBEDDER`: `litellm` with `KNOWLEDGE_EMBED_MODEL` for any provider's model (`openai/text-embedding-3-small`,
 `voyage/voyage-3`, `cohere/embed-english-v3.0`, `gemini/text-embedding-004`, `ollama/nomic-embed-text`), `chonkie`
 for a small local model (`minishlab/potion-base-8M`, no key, in the Docker image), `sentence-transformers` for a
-local PyTorch model, or your own. Unset, the best available is used: SiliconFlow, then OpenAI, then chonkie's local
-model. The local model is cheap and offline but weaker on paraphrases ("somewhere to leave my car" vs "parking"); an
+local PyTorch model, or your own. Unset, the first that works is used: SiliconFlow, then an API model
+(`KNOWLEDGE_EMBED_MODEL`, or OpenAI's), then chonkie's local model, then sentence-transformers. With none of them,
+search matches words, not meaning, and the server logs a warning. The local model is cheap and offline but weaker on paraphrases ("somewhere to leave my car" vs "parking"); an
 API model or a sentence-transformers model does better there. Full context needs no embeddings.
 
 **Vector stores.** `KNOWLEDGE_VECTOR_STORE` picks where vectors live: `memory`, `lancedb` (a folder or S3), `qdrant`
 (`QDRANT_URL`), `chroma` (`CHROMA_URL`), `pgvector` (`KNOWLEDGE_PGVECTOR_URL` or `DATABASE_URL`), or your own. Each
-keeps one collection per embedding model, so switching re-embeds the documents. Every part can be replaced with your own ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)).
+keeps one collection per embedding model, so switching re-embeds the documents. LanceDB comes with
+`keelchat[knowledge]` (not with `api`). Qdrant needs `keelchat[qdrant]` and Chroma `keelchat[chroma]`. pgvector needs a
+Postgres with the `vector` extension. Without `QDRANT_URL` or `CHROMA_URL`, Qdrant and Chroma run embedded: in memory,
+or in the `KNOWLEDGE_INDEX_URI` folder (an `s3://` address is refused). Every part can be replaced with your own ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)).
 
 **Where it runs.** Without `KNOWLEDGE_URL`, the API indexes and searches knowledge bases itself, so a single deploy
-(Render, Fly.io, `scripts/try.sh`) needs nothing else; the index is in memory and rebuilt from the documents after a
-restart. For larger sets or several servers, run the Knowledge Service (`scripts/knowledge.sh`, `KNOWLEDGE_URL`), which
+(Render, Fly.io, `scripts/try.sh`) needs no other service. Uploaded documents are kept under `KEELCHAT_DATA_ROOT` (the
+Docker image and `scripts/try.sh` set it) or in `KEELCHAT_UPLOADS_BUCKET`; without either, uploads return 501. The
+index is in memory and rebuilt from the documents after a restart. For larger sets or several servers, run the Knowledge Service (`scripts/knowledge.sh`, `KNOWLEDGE_URL`), which
 can keep its index in LanceDB on S3.
 
 ## Answer questions about data
@@ -198,7 +204,7 @@ Then ask in plain words:
 > Build a returns desk for a shoe store. Get the order number and what went wrong, answer refund questions from the
 > help centre, speak English and Spanish, and never promise refund amounts. Try a few customers before you save.
 
-Claude uses the same tools the console does (`whoami`, `get_schema`, `list_bot_types`, `draft_policy`,
+Claude uses the same tools the console does (`whoami`, `get_schema`, `list_bot_types`, `list_agents`, `draft_policy`,
 `create_agent`, `get_policy`, `check_readiness`, `try_conversation`, `save_version`, `activate_version`). It acts only
 in the key's tenant, and only builds that pass are saved.
 
