@@ -17,19 +17,21 @@ components and contracts.
   (web/slack/sms/ ──▶│ Runtime.turn: lock · dedupe · pin policy · run Pipeline · save state │──▶ channel messages
    whatsapp)         │                                                                      │
                      │   Understand ─────▶ Decide ─────────────▶ Respond                    │
-                     │   pre-processors    Intent Detector       output guardrails          │
-                     │   (receiver,        Orchestrator          Response Generator         │
-                     │    opt-out,         ├─ nodes (steps)      channel adapter            │
-                     │    language,        ├─ planner                                       │
-                     │    shorthand,       └─ Tool Gateway ──▶ tools ──▶ HTTP backends      │
-                     │    entities,                           ActionRunner ─▶ actions       │
-                     │    input guardrails)                                                 │
+                     │   pre-processors    Intent Detector       Rewriter                   │
+                     │   (receiver,        Orchestrator          output guardrails          │
+                     │    opt-out,         ├─ nodes (steps)      Response Generator         │
+                     │    handoff request, ├─ planner            channel adapter            │
+                     │    language,        └─ Tool Gateway ──▶ tools ──▶ HTTP backends      │
+                     │    shorthand,                          ActionRunner ─▶ actions       │
+                     │    entities, input guardrails,                                       │
+                     │    confirm stop)                                                     │
                      │                                       Memory writer (async task)     │
                      └──────┬───────────────────────────┬───────────────────────┬──────────┘
                             ▼                           ▼                       ▼
-                     SessionStore                 MemoryStore            Knowledge Service
-                     (in-memory | Redis)      (in-memory | Postgres)   (own process: docs on S3,
-                                                                        LanceDB index, embedder)
+                     SessionStore                 MemoryStore            Knowledge
+                     (in-memory | Redis)      (in-memory | Postgres)   (in the API, or its own
+                                                                        process: documents,
+                                                                        vector index, embedder)
 ```
 
 | Component | Package | Responsibility |
@@ -65,8 +67,8 @@ charter text, which every prompt receives.
    policy, builds a `TurnContext` and runs the pipeline. Every stage is `async def run(ctx) -> ctx`; a stage can set
    the reply and short-circuit to Respond. Each sub-step is timed into the trace and `/v1/metrics`.
 3. **Understand** runs the registered pre-processors in order: receiver (loads non-stale memory into the context and the
-   gateway's sensitive-value scrubber), opt-out, language (detect, confirm before switching), shorthand expansion,
-   entity normalisation, input guardrails (`prompt_injection` always on).
+   gateway's sensitive-value scrubber), opt_out, handoff_request, language (detect, confirm before switching),
+   shorthand expansion, entity normalisation, input guardrails (`prompt_injection` always on), confirm_stop.
 4. **Decide**
    - The **Intent Detector** (classify model, structured output, few-shots from `intent_examples.yaml`) returns a *list*
      of intents: `new_answer` with fields, `edit` with the edited field, `enquiry` (optionally `on_step` or
@@ -81,9 +83,10 @@ charter text, which every prompt receives.
      answers with the model, confirm prefilled or remembered values, and reach tools only through the **Tool Gateway**
      (allow list, timeouts, retries, circuit breaker, sensitive-value scrub). Actions (`submit_application`) run only
      through `ActionRunner` with the candidate's own explicit submit.
-5. **Respond** runs output guardrails with step context (`pii` always on; allowed PII per field), renders in the session
-   language (tool text marked `translate=False` stays as posted), and the channel adapter splits or formats for its
-   limits.
+5. **Respond** runs four stages in order. The **Rewriter** words each step's goal in the charter's tone, then runs the
+   fact check and the step's verifier. **Output guardrails** run with step context (`pii` always on; allowed PII per
+   field). The **Response Generator** renders in the session language (tool text marked `translate=False` stays as
+   posted). The **channel stage** splits or formats the reply for the channel's limits.
 6. **After the reply** the state is saved with optimistic versioning and the **memory writer** runs as a background
    task: typed JSON-schema extraction per policy field, `from` fields copy validated answers, sensitive fields need
    consent and must be volunteered, flagged turns are never used, values decay by half-life.
@@ -114,15 +117,27 @@ cursor come from the archive and the rest from Postgres, so each is counted once
 the audit summary and the key metrics are SQL over that table; for key-metric questions the five tables are built from
 it in SQL, `audit` is dropped and the database is locked before the model's query runs.
 
-## 5. Knowledge Service
+## 5. Knowledge
 
-Runs as its own process (`keelchat knowledge serve`) and owns its sources. The runtime's
-`knowledge_search` tool is a thin HTTP client (`POST /search`). Inside: `DocumentStore` (S3 or memory),
-`VectorIndex` (LanceDB or memory; with an S3 bucket the index sits beside the documents at
-`s3://<bucket>/knowledge/index`, one copy every server shares, committed with S3 conditional writes), `Embedder` (SiliconFlow via litellm, or a hashed fake), a `SemanticChunker`
-(whole sentences grouped by embedding distance and paragraph breaks, size-capped; never a word count) and an
-`Indexer` per strategy. `contextual` and `raptor` call the generate model while indexing, so the service needs the same model
-configuration as the runtime when those strategies are selected.
+With `KNOWLEDGE_URL` unset, knowledge bases are indexed and searched inside the API. That is fine for one server.
+With it set, the Knowledge Service runs as its own process (`keelchat knowledge serve`) and owns its sources; the
+`knowledge_search` tool is then a thin HTTP client (`POST /search`). Either way the documents sit in a
+`DocumentStore` (S3 or memory), and search has four replaceable parts:
+
+- **Embedder** (`KNOWLEDGE_EMBEDDER`): `litellm` (any provider litellm reaches), `chonkie` (small local model),
+  `sentence-transformers`, `siliconflow`, `hash`, or your own. Unset, the first that works of SiliconFlow (with
+  its key), litellm (OpenAI's key or a named model), chonkie, sentence-transformers, then `hash`.
+- **Chunker** (`KNOWLEDGE_CHUNKER`): `chonkie` (the default when installed), `semantic` (whole sentences grouped by
+  embedding distance and paragraph breaks, size-capped), `sentences`, or your own.
+- **Indexer** (`KNOWLEDGE_STRATEGY`, or `strategy:` per knowledge base): `auto` picks `full_context` (the documents
+  fit in one prompt), `contextual`, `raptor` (long documents) or `simple` (no model to summarize with).
+  `contextual` and `raptor` call the generate model while indexing, so the service needs the same model
+  configuration as the runtime when they are used.
+- **VectorIndex** (`KNOWLEDGE_VECTOR_STORE`): `memory`, `lancedb`, `qdrant`, `chroma`, `pgvector`, or your own. With
+  an S3 bucket the LanceDB index sits beside the documents at `s3://<bucket>/knowledge/index`, one copy every server
+  shares, committed with S3 conditional writes.
+
+How to add your own part: [Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts).
 
 ### Datasets and the Analytics Service
 
@@ -160,16 +175,23 @@ The Analytics Service (`keelchat/analytics/`, `keelchat analytics serve`) answer
                  ┌─────────────────────────┐        ┌──────────────────────────┐
   browsers ─────▶│ API + console           │──HTTP─▶│ Knowledge Service        │
   channels ─────▶│ :8080                   │        │ :8080, one or more       │
-                 └─────┬──────────┬────────┘        │ servers                  │
-                       │          │                 └─────────┬────────────────┘
-                   Redis       Postgres          S3: documents + LanceDB index (shared)
-                 (sessions)    (memory)               SiliconFlow (embeddings)
-                         model provider: Anthropic / SiliconFlow / OpenRouter
+                 └──┬─────────┬─────────┬──┘        │ servers (optional)       │
+                    │         │         │           └─────────┬────────────────┘
+                    │         │         │                     │
+                  Redis    Postgres     │ HTTP       S3: documents + vector index (shared)
+               (sessions)  (memory,     ▼            embedder (any litellm provider, or local)
+                           versions, ┌──────────────────────────┐
+                           audit...) │ Analytics Service :8080  │
+                                     └──────────────────────────┘
+                 model provider: Anthropic, or any provider litellm supports
 ```
 
-One Docker image serves the API and the Knowledge and Analytics Services; they differ only in the process command,
-environment and volume. Any container host works. `scripts/dev.sh --knowledge` starts the same two processes locally, with in-process stores and
-fake backends for tools that have no URL.
+One `Dockerfile` builds the API (with the console), the Knowledge Service or the Analytics Service.
+`--build-arg EXTRAS=...` picks the dependencies (`api` by default, `knowledge`, or `analytics sandbox agentcore`), and
+the run command picks the service. `deploy/entrypoint.sh` only takes ownership of mounted volumes and drops root.
+Any container host works. Without `KNOWLEDGE_URL` the API indexes and searches documents itself, so one container is
+enough. `scripts/dev.sh --knowledge` starts the API, the Knowledge Service and the Vite console locally, with
+in-process stores and fake backends for tools that have no URL.
 
 ## 7. Boundaries and contracts
 

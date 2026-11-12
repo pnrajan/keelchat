@@ -334,3 +334,24 @@ async def test_tenant_tools_survive_restart_and_reach_other_replicas(policy_yaml
         assert (await b.post("/v1/agents", json={"yaml": yaml, "tenant": "acme"})).status_code == 201
         assert (await b.post("/v1/tenants/acme/tools", json=body)).status_code == 409  # still immutable after restart
     REGISTRY.remove_tool("ticket_lookup", "acme")
+
+
+def test_any_litellm_provider_works_with_its_own_key(monkeypatch):
+    """KEELCHAT_LLM=litellm takes any provider litellm supports: its usual key variable is enough, and a missing one is
+    named."""
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm_factory import llm_from_env
+
+    for v in ("OPENAI_API_KEY", "LITELLM_PROXY_URL", "HEADROOM_PROXY_URL", "OLLAMA_API_BASE"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setenv("KEELCHAT_LLM", "litellm")
+    monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "mistral/mistral-small-latest")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test")
+    assert isinstance(llm_from_env(), LiteLLMClient)
+    monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "ollama/llama3")
+    with pytest.raises(RuntimeError, match="OLLAMA_API_BASE"):
+        llm_from_env()
+    monkeypatch.delenv("SILICONFLOW_API_KEY", raising=False)
+    monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "siliconflow/Qwen/Qwen3.5-35B-A3B")
+    with pytest.raises(RuntimeError, match="needs SILICONFLOW_API_KEY"):
+        llm_from_env()

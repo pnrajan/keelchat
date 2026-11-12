@@ -16,8 +16,8 @@ from mcp.server.mcpserver.exceptions import ToolError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 INSTRUCTIONS = """Build goal-oriented chat agents on this keelchat server, for the tenant your key belongs to.
-Workflow: whoami → list_bot_types (or draft_policy from a description) → create_agent → get_policy / update_policy
-→ check_readiness until nothing blocks → try_conversation → save_version → activate_version to roll back.
+Workflow: whoami → list_bot_types (or draft_policy from a description) → create_agent → get_policy, then edit the
+YAML → check_readiness until nothing blocks → try_conversation → save_version → activate_version to roll back.
 Policies are YAML; get_schema lists every key, step and tool. Only valid builds are saved.
 Code fixes found by judging trial conversations: list_fix_tasks → get_fix_task → change the code (a failing test
 first) → update_fix_task with status done and a note; link a GitHub issue with `issue`."""

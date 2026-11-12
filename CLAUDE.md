@@ -7,7 +7,7 @@ auto-discovered registry. If a change conflicts with a rule here, stop and flag 
 
 - `uv run pytest tests/test_<area>.py`: run one area first. Tests call the real model.
 - `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`: full checks.
-- `uv run pytest --offline`: only the tests that need no model key. `-n0` runs them one at a time.
+- `uv run pytest --offline`: with no model key, runs the tests that need none and skips the rest. With a key in `.env`, runs everything. `-n0` runs tests one at a time.
 
 ## Done means
 

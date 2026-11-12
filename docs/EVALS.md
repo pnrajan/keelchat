@@ -1,8 +1,9 @@
 # Evaluation
 
 Harness: `keelchat.evals` (platform-owned; `pip install 'keelchat[evals]'`). Each team owns its eval set in
-`evals/<agent>/`: `replay.yaml` and `thresholds.yaml`. Everything specific to an agent lives in those two files; the
-harness hardcodes no scripts, personas or rubrics.
+`evals/<agent>/`: `replay.yaml` (cases you write), `thresholds.yaml` (the policy and the gates), and optionally
+`generated.yaml` (cases from `evals generate`) and `labels.yaml` (hand labels for `evals calibrate`). Everything
+specific to an agent lives in those files; the harness hardcodes no scripts, personas or rubrics.
 
 ## Offline (CI gate)
 
@@ -21,7 +22,8 @@ and fresh stores, so nothing is submitted or sent. The console's **Simulate** ta
 fixtures:                      # optional: what the fake tools return (default: built-in samples)
   passages:                    # knowledge_search results
     - {title: Returns, text: "Items can be returned within 30 days of delivery.", source: help/returns}
-  jobs: [...]                  # job_search results
+  jobs:                        # job_search results
+    - {id: j1, title: Store Associate, location: "Austin, TX", pay: "$18/h", description: Stocking and checkout.}
 cases:
   - name: happy_path           # a script: these messages, in order
     messages: ["hi", "yes", "ORD-12345", "it never arrived"]
@@ -113,7 +115,7 @@ Metric names:
 | `faithfulness`, `task_completion`, `pii_leakage`, `non_advice`, `role_violation`, `tool_correctness`, `argument_correctness` | each agent turn, with that turn's tool output as context | DeepEval |
 | a name under `rubrics:` | each conversation (ConversationalGEval with your criteria) | DeepEval |
 | `rule_followed` | each turn where a policy rule matched: the judge splits the rule's `then` into parts and quotes where the reply does each; code passes it only when every part that applies is done | judge (keelchat) |
-| `ragas.<Metric>` | each turn with output from a `context_tools` tool: `user_input`, `response`, `retrieved_contexts`. Reference-free ones work: `Faithfulness`, `ResponseGroundedness`, `ContextPrecisionWithoutReference`, `AnswerRelevancy` needs embeddings and is not supported | Ragas |
+| `ragas.<Metric>` | each turn with output from a `context_tools` tool: `user_input`, `response`, `retrieved_contexts`. Only metrics that need just a judge model work: `Faithfulness`, `ResponseGroundedness`, `ContextPrecisionWithoutReference`. A metric that needs embeddings or a reference is refused | Ragas |
 
 - **Gate**: each metric's average must reach its minimum; an unknown name fails the build (typo guard). A metric with
   nothing to score (no rule matched, no tool output) reports "no score produced" and fails, so a set that gates
@@ -153,8 +155,8 @@ Use them three ways:
    nothing is saved until you build it, run the tests and save a version.
 
 **Judge** (the tab after Rate) does the rating for you with a stronger model (`KEELCHAT_MODEL_CRITIC`): problems by turn,
-policy fixes applied in the editor, and code fixes kept for Claude Code (see FEATURES.md, *Judge a trial
-conversation*). Use it to find problems quickly; keep rating by hand to calibrate judges you trust in CI.
+policy fixes applied in the editor, and code fixes kept for Claude Code (see [Judge a trial
+conversation](FEATURES.md#judge-a-trial-conversation-with-a-stronger-model)). Use it to find problems quickly; keep rating by hand to calibrate judges you trust in CI.
 
 A conversation rated again after it grew (more chat) counts once in the downloads: its newest rating. Eval folders use
 the agent name with `_` for `-` (`support-assistant` → `evals/support_assistant/`).

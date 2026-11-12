@@ -177,3 +177,14 @@ def test_a_short_jwt_secret_is_refused(monkeypatch):
     monkeypatch.setenv("KEELCHAT_JWT_SECRET", "short")
     with pytest.raises(KeyConfigError, match="32"):
         new_key("acme", "x", ["read"], 1)
+
+
+def test_the_mcp_instructions_name_only_tools_that_exist():
+    import inspect
+    import re
+
+    from keelchat.api import mcp_server
+
+    tools = set(re.findall(r"@mcp\.tool\(\)\s+async def (\w+)\(", inspect.getsource(mcp_server)))
+    named = {w for w in re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", mcp_server.INSTRUCTIONS) if w not in {"bot_types"}}
+    assert named - tools == set(), f"instructions name tools that don't exist: {sorted(named - tools)}"

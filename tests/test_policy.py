@@ -293,3 +293,10 @@ def test_the_language_reference_names_every_key_the_build_accepts() -> None:
     keys |= set(s["$defs"]["QuestionKind"]["enum"]) | set(s["$defs"]["ConditionOp"]["enum"])
     missing = sorted(k for k in keys if f"`{k}`" not in doc)
     assert not missing, f"not defined in docs/POLICY_LANGUAGE.md: {missing}"
+
+
+def test_a_bad_memory_item_is_named_by_its_position():
+    with pytest.raises(PolicyValidationError) as e:
+        build("agent: a\ncharter: c\nmemory:\n  - name_of_pet\n  - {field: contact, extract: How to reach them, type: email}\n")
+    assert [x.path for x in e.value.errors] == ["memory[1].type"]
+    assert "unknown type 'email'" in e.value.errors[0].message

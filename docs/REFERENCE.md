@@ -63,7 +63,8 @@ With `KEELCHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry
 
 | Layout | Set |
 |---|---|
-| Direct | `KEELCHAT_LLM=anthropic` or `litellm` plus the provider key; model ids like `openai/gpt-4o-mini` or `siliconflow/<model>` |
+| Anthropic directly | `KEELCHAT_LLM=anthropic` and `ANTHROPIC_API_KEY` |
+| Any litellm provider | `KEELCHAT_LLM=litellm` and the provider's usual key variable: OpenAI (`OPENAI_API_KEY`), OpenRouter, SiliconFlow, Gemini (`GEMINI_API_KEY` for `gemini/...`), Bedrock, Ollama and others. Model ids are litellm's, like `openai/gpt-4o-mini` or `siliconflow/<model>` |
 | LiteLLM gateway | `LITELLM_PROXY_URL`, `LITELLM_PROXY_KEY`; model ids are the gateway's aliases |
 | Headroom → LiteLLM | add `HEADROOM_PROXY_URL`; context is compressed before the gateway |
 
@@ -100,9 +101,8 @@ Spark, Trino or your own DuckDB can read the same table. How it works: [ARCHITEC
 
 ## Configuration
 
-Everything is an environment variable, loaded from `.env`; [`.env.example`](../.env.example) documents most keys
-(not yet `KEELCHAT_MODEL_CRITIC`, `KEELCHAT_DUCKDB_EXTENSIONS` or `KEELCHAT_ALLOW_PRIVATE_TOOL_URLS`). Only
-the model provider is required; everything else runs in memory when unset.
+Everything is an environment variable, loaded from `.env`. [`.env.example`](../.env.example) lists the keys users
+set, with comments and defaults. Only the model provider is required; everything else runs in memory when unset.
 
 <details>
 <summary><b>All variables</b></summary>
@@ -111,23 +111,32 @@ the model provider is required; everything else runs in memory when unset.
 |---|---|
 | `KEELCHAT_LLM`, `*_API_KEY`, `KEELCHAT_MODEL_*` | provider, key and model tiers; a missing key raises, nothing falls back to a fake |
 | `KEELCHAT_API_KEY`, `KEELCHAT_JWT_SECRET` | the admin key; signed tenant keys |
+| `KEELCHAT_TENANT_KEYS` | fixed keys per tenant, `acme:key,globex:key2`; each reaches only its tenant (API, console and `/mcp`) |
+| `KEELCHAT_MCP_ALLOWED_HOSTS` | host names `/mcp` accepts, comma-separated; turns on its DNS-rebinding check. Unset: the key alone guards it |
+| `KEELCHAT_CLIENT_IP_HEADER` | the proxy header that carries the visitor's address (`Fly-Client-IP` on Fly.io), for the public widget's per-visitor rate limits. Unset: the connection's address, so behind a proxy every visitor shares one limit |
 | `REDIS_URL`, `DATABASE_URL` | Redis for sessions; Postgres for memory, versions, datasets, tools, audit, handoffs and rate limits. In-process when unset (`scripts/db.sh up` starts both) |
 | `KEELCHAT_CAPABILITY_PACKAGES`, `KEELCHAT_MCP_SERVERS` | extension packages and MCP servers to load capabilities from |
 | `KNOWLEDGE_URL`, `ANALYTICS_URL`, `KEELCHAT_DATA_ROOT`, `KEELCHAT_DATA_BUCKETS` | the Knowledge and Analytics Services, and where dataset sources may live. Without `KNOWLEDGE_URL`, knowledge bases are indexed and searched inside the API. The Docker image sets `KEELCHAT_DATA_ROOT=/data` |
-| `KNOWLEDGE_EMBEDDER`, `KNOWLEDGE_EMBED_MODEL`, `KNOWLEDGE_EMBED_DIM`, `KNOWLEDGE_EMBED_API_BASE` | the embedding model for knowledge search: `litellm`, `chonkie`, `sentence-transformers`, `siliconflow`, `hash`, a registered name or `package.module:Name`; unset, the best available ([Embeddings](FEATURES.md#answer-from-documents)) |
+| `KNOWLEDGE_EMBEDDER`, `KNOWLEDGE_EMBED_MODEL` | the embedding model for knowledge search: `litellm`, `chonkie`, `sentence-transformers`, `siliconflow`, `hash`, a registered name or `package.module:Name`; unset, the best available ([Embeddings](FEATURES.md#answer-from-documents)) |
+| `KNOWLEDGE_EMBED_DIM` | `litellm` embedder: the vector size, for a model whose size is not known |
+| `KNOWLEDGE_EMBED_API_BASE` | `litellm` embedder: the address of a compatible embedding server |
 | `KNOWLEDGE_CHUNKER`, `KNOWLEDGE_CHONKIE`, `KNOWLEDGE_CHUNK_SIZE`, `KNOWLEDGE_CHONKIE_MODEL` | how documents are split: `chonkie` (default when installed; `semantic`, `recursive`, `sentence` or `token`, size in tokens, the model its semantic chunker uses), `semantic`, `sentences`, or your own |
 | `KNOWLEDGE_VECTOR_STORE`, `QDRANT_URL`, `QDRANT_API_KEY`, `CHROMA_URL`, `KNOWLEDGE_PGVECTOR_URL` | where vectors are kept: `memory`, `lancedb`, `qdrant`, `chroma`, `pgvector`, or your own ([Knowledge search parts](ADDING_A_CAPABILITY.md#knowledge-search-parts)) |
 | `KNOWLEDGE_STRATEGY` | unset: each knowledge base picks its indexing method from its documents; set to use one method for all |
 | `KEELCHAT_SANDBOX` | `local` or `agentcore`: where statistics code runs; unset for SQL-only answers |
-| `KEELCHAT_UPLOADS_BUCKET` | S3 bucket for uploaded content and files; unset, a folder under `KEELCHAT_DATA_ROOT` |
+| `KEELCHAT_SANDBOX_MEMORY_MB`, `KEELCHAT_SANDBOX_CPU_S` | `local` sandbox limits per run (default 1024 MB, 60 s) |
+| `ANALYTICS_MAX_DATASETS`, `ANALYTICS_MEMORY_LIMIT`, `ANALYTICS_THREADS`, `ANALYTICS_STATS_CAP` | Analytics Service: datasets kept loaded (8), DuckDB memory (`2GB`) and threads (2), rows statistics are computed over (100000) |
+| `KEELCHAT_UPLOADS_BUCKET` | S3 bucket for uploaded content and files; unset, a folder under `KEELCHAT_DATA_ROOT`. Uploads need one of the two |
 | `KEELCHAT_EMBED_SECRET`, `KEELCHAT_PUBLIC_URL` | signs widget conversation tokens; the public address links point at |
 | `VOICE_STT_MODEL`, `VOICE_TTS_MODEL`, `TWILIO_AUTH_TOKEN` | voice in the widget; phone calls through Twilio |
+| `VOICE_STT_API_KEY`, `VOICE_STT_BASE_URL` | key and address for the speech-to-text model; unset, the provider's usual key |
 | `HANDOFF_URL`, `HANDOFF_TOKEN` | where `handoff_webhook` sends each handoff |
-| `MEM0_API_KEY` or `MEM0_QDRANT_URL` | user memory in mem0 instead of Postgres |
+| `MEM0_API_KEY` or `MEM0_QDRANT_URL` | user memory in mem0 instead of Postgres; self-hosted: `MEM0_COLLECTION` (`keelchat_memory`), `MEM0_HISTORY_DB` |
 | `AUDIT_RETENTION_DAYS`, `AUDIT_ARCHIVE_WAREHOUSE` | audit retention; an archive in an Apache Iceberg table on S3 |
 | `KEELCHAT_DUCKDB_EXTENSIONS` | where DuckDB's iceberg, httpfs and aws extensions are installed (the Docker image sets it), so dashboards read the archive without a download |
-| `SENTRY_DSN` | errors and traces per stage and model call; no message text is sent |
+| `SENTRY_DSN`, `SENTRY_RELEASE` | errors and traces per stage and model call; no message text is sent |
 | `KEELCHAT_TOOLS=fake` | development only: fake backends for tools whose URL is unset |
+| `KEELCHAT_ALLOW_PRIVATE_TOOL_URLS=1` | development only: lets tenant HTTP tools call private and loopback addresses |
 
 </details>
 
@@ -137,8 +146,10 @@ the model provider is required; everything else runs in memory when unset.
 docker build -t keelchat . && docker run -p 8080:8080 --env-file .env keelchat
 ```
 
-One image serves the API (with the console), the Knowledge Service or the Analytics Service; the process command
-picks which (`deploy/entrypoint.sh`). It runs as a non-root user and exposes `/health`. `docker-compose.yml` runs
+One `Dockerfile` builds the API (with the console), the Knowledge Service or the Analytics Service.
+`--build-arg EXTRAS=...` picks the dependencies: `api` (the default), `knowledge`, or `analytics sandbox agentcore`.
+The run command picks the service (examples at the top of the `Dockerfile`). `deploy/entrypoint.sh` only takes
+ownership of mounted volumes and drops root. The image runs as a non-root user and exposes `/health`. `docker-compose.yml` runs
 Redis, Postgres and an optional LiteLLM gateway next to it.
 
 ### Deploy from GitHub
@@ -166,7 +177,8 @@ gh variable set FLY_APP --body <your-app>
 
 From then on [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) deploys
 [`deploy/fly.toml`](../deploy/fly.toml) to that app after CI passes on `main`; **Actions → Deploy → Run workflow**
-deploys by hand. Without `FLY_API_TOKEN` it does nothing, and it refuses an app without `KEELCHAT_API_KEY`. The
+deploys by hand. Without `FLY_API_TOKEN` it does nothing, and it refuses an app without `KEELCHAT_API_KEY`.
+`deploy/fly.toml` sets `KEELCHAT_CLIENT_IP_HEADER=Fly-Client-IP`, so the widget's rate limits are per visitor. The
 `FLY_CONFIG` variable picks another config (`deploy/demo/fly.toml` is the public demo's).
 
 Elsewhere (Railway, Koyeb, Cloud Run, a VM): build the `Dockerfile`, serve port 8080, check `/health`, and set the
@@ -176,7 +188,7 @@ same variables.
 
 | Symptom | Fix |
 |---|---|
-| A reply says it can't do something "right now" ("I can't look that up right now…") | the tool's service is down or its URL is unset: start it (`./run.sh` starts Knowledge and Analytics), or run with `--fake-tools` |
+| A reply says it can't do something "right now" ("I can't look that up right now…") | the tool's service is down or its URL is unset: start it (`./run.sh` starts Knowledge and Analytics), or use fake tools (`./run.sh --fake-tools`, or `KEELCHAT_TOOLS=fake`) |
 | "The API no longer has this policy" or "This session is no longer on the server" | the API restarted with in-memory state: **Build & try** again and start a new session, or set `DATABASE_URL` and `REDIS_URL` |
 | API exits at start with a database error | `DATABASE_URL` names a missing database: `scripts/db.sh up`, or leave it empty |
 | **Save version** is disabled | the editor found problems; only valid builds are saved. Fix the marked lines |

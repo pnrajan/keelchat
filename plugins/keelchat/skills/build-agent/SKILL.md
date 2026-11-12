@@ -40,8 +40,9 @@ The `keelchat` MCP server acts as the tenant of the user's key (`KEELCHAT_KEY`).
   `optional: true`.
 - **Knowledge:** add `knowledge_search` to `tools` for side questions at any step, or a `knowledge` step when answering
   from documents is the main job. Analysis of tables is an `analytics` step naming a structured dataset.
-- **Guardrails:** prompt injection and PII always run. Add `sql_injection` on input and the advice checks
-  (`no_legal_advice`, `no_medical_advice`) and `profanity` on output when they fit the charter.
+- **Guardrails:** leave `guardrails` out and input gets `prompt_injection` and `sql_injection`, output `pii` and
+  `profanity`. A list you give replaces that stage's defaults (prompt injection and PII always run), so repeat the
+  ones you keep. Add the advice checks (`no_legal_advice`, `no_medical_advice`) on output when they fit the charter.
 - **Limits:** `reasks` (tries per question) and `digressions` (off-topic turns) decide when the agent gives up; 3 and 3
   are good defaults, fewer for SMS.
 - **Memory:** only fields the agent truly reuses, each with a `half_life`; `from: form_fill.<field>` copies a checked
@@ -64,7 +65,7 @@ flow:
       fields:
         - {name: order_number, ask: "What is your order number?", expect: An order number such as ORD-12345}
         - {name: issue, ask: "What went wrong with the order?", expect: A short description of the problem}
-guardrails: {input: [prompt_injection, sql_injection], output: [pii, no_legal_advice]}
+guardrails: {input: [prompt_injection, sql_injection], output: [pii, profanity, no_legal_advice]}
 limits: {reasks: 3, digressions: 3}
 memory:
   - {field: preferred_contact, extract: How they prefer to be contacted, type: email|phone|chat, half_life: 90d}

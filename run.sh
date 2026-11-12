@@ -18,7 +18,7 @@ fi
 set -a; . ./.env; set +a
 case "${KEELCHAT_LLM:-}" in
   anthropic) [ -n "${ANTHROPIC_API_KEY:-}" ] || { echo "ANTHROPIC_API_KEY is empty in .env" >&2; exit 1; } ;;
-  litellm) [ -n "${SILICONFLOW_API_KEY:-}${OPENROUTER_API_KEY:-}${OPENAI_API_KEY:-}" ] || { echo "no provider key in .env for KEELCHAT_LLM=litellm" >&2; exit 1; } ;;
+  litellm) ;;  # any provider litellm supports: the API names a missing key for KEELCHAT_MODEL_GENERATE when it starts
   *) echo "set KEELCHAT_LLM=anthropic|litellm in .env" >&2; exit 1 ;;
 esac
 

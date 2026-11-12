@@ -149,7 +149,7 @@ flowchart LR
 | [Run it locally](#run-it-locally) | 5 minutes | macOS, Linux or WSL 2, and a model key |
 | [Deploy to Render](#deploy-to-render) | 10 minutes | GitHub and Render accounts, and a model key |
 
-The package is also on PyPI: `pip install "keelchat[api]"` (Python 3.12+); add `qdrant` or `chroma` for those vector
+The package is also on PyPI: `pip install "keelchat[api]"` (Python 3.12+); add `knowledge` for LanceDB, or `qdrant` or `chroma`, for those vector
 stores.
 
 ### Try it in your browser
@@ -226,8 +226,8 @@ Save it as `my_bot.yaml` and build it:
 uv run keelchat build my_bot.yaml   # validate and compile; errors name the YAML path
 ```
 
-It chats within its charter, with the default limits and guardrails (prompt injection blocked, personal details
-removed from replies).
+It chats within its charter, with the default limits and guardrails (prompt injection and SQL injection blocked, personal details and
+profanity removed from replies).
 
 ### When you want more
 
@@ -247,7 +247,7 @@ flow:
       fields:
         - {name: order_number, ask: "What is your order number?", expect: "An order number in any format, such as ORD-12345 or #98765"}
         - {name: issue, ask: "What went wrong?", expect: "A short description", optional: true}
-guardrails: {input: [prompt_injection], output: [pii, no_legal_advice]}
+guardrails: {input: [prompt_injection, sql_injection], output: [pii, profanity, no_legal_advice, no_medical_advice]}
 limits: {reasks: 3, digressions: 3}
 handoff: {when: [user_request, max_reasks]}
 ```
@@ -313,7 +313,7 @@ async def slot_search(service: str, day: str = "") -> dict[str, list[str]]:
     return {"slots": await my_booking_api.free_slots(service, day)}
 ```
 
-Type hints become the schema; the docstring is what the model reads. Allow it with `tools: [slot_search]`.
+Type hints become the schema; the docstring is what the model reads. Load its package (`KEELCHAT_CAPABILITY_PACKAGES=my_caps`), then allow it with `tools: [slot_search]`.
 `uv run keelchat new package my_caps` writes a starter package with a tool, a step, a guardrail and a passing test.
 [Adding a capability](docs/ADDING_A_CAPABILITY.md) has the detail.
 
@@ -321,7 +321,7 @@ Type hints become the schema; the docstring is what the model reads. Allow it wi
 
 ```bash
 uv run keelchat evals generate my_bot.yaml           # a test set from the policy, in evals/<agent>/
-uv run keelchat evals check evals/support_assistant  # the checks every conversation must pass
+uv run keelchat evals check evals/support_assistant  # the folder is the agent name, with _ for -
 ```
 
 In the console, **Test → Judge** has a stronger model review a chat and propose fixes. [Evals](docs/EVALS.md) has the
@@ -337,7 +337,7 @@ setting:
 | Writing a bot from English | Cleaner YAML on the first try, fewer build repairs | `KEELCHAT_MODEL_GENERATE` |
 | Reviewing trial chats | Spots what went wrong on which turn and proposes fixes | `KEELCHAT_MODEL_CRITIC` |
 | Hard or risky steps | `high_stakes: true` steps use the large model and are always checked | the policy |
-| Checking plans before replying | `think: true` steps plan first; a separate model can check the plan | `KEELCHAT_MODEL_VERIFY` |
+| Checking replies and answers | A separate model checks each reply, and answers from documents or data, before they are sent | `KEELCHAT_MODEL_VERIFY` |
 | Judging test results | Scores scope and rule-following in evals | `EVALS_JUDGE_MODEL` |
 
 Classification and routine replies stay on `KEELCHAT_MODEL_CLASSIFY`. [Model routing](docs/REFERENCE.md#model-routing)

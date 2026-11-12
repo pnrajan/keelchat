@@ -7,11 +7,14 @@ of: a new capability (tool, node, guardrail, pre-processor, action), a runtime f
 
 ```bash
 git clone https://github.com/pnrajan/keelchat && cd keelchat
-cp .env.example .env            # a model provider key is required even for tests
+cp .env.example .env            # add a model provider key to run every test
 uv sync --all-extras
 uv run pre-commit install       # ruff + mypy on commit
 ./run.sh                        # console, API, Knowledge and Analytics Services
 ```
+
+With no model key, `uv run pytest --offline` runs the tests that need none and skips the rest. With a key in `.env`,
+everything runs.
 
 ## Before opening a pull request
 
@@ -27,6 +30,7 @@ uv run keelchat evals run        # when a policy, prompt or example agent change
   exact model wording. `tests/helpers.py:RecordingLLM` records every request.
 - A capability must pass the contract suite (`tests/test_registry.py`). See `docs/ADDING_A_CAPABILITY.md`.
 - A behaviour change to a flow needs a replay case in `evals/<agent>/replay.yaml`.
+- A new policy key must be in `docs/POLICY_LANGUAGE.md`, or a test fails.
 - Scope and ambiguity: follow `CLAUDE.md`; pick the simplest option and say so in the PR.
 
 ## Pull requests

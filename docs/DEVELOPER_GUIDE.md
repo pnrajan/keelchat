@@ -11,15 +11,17 @@ code you need, and debug what goes wrong. The deeper references are linked at ea
   Python, discovered at startup; a policy can only name what the registry has.
 - The **runtime** takes each message through **Understand → Decide → Respond**. Counting (re-asks, digressions,
   planner budget) happens in code; the model never decides when a conversation ends.
-- **Data services** run as separate processes and are reached through tools:
-  the Knowledge Service (documents, `knowledge_search`) and the Analytics Service (tables, `analytics_query`).
+- **Data services** are reached through tools. Knowledge (documents, `knowledge_search`) runs inside the API when
+  `KNOWLEDGE_URL` is unset; the Knowledge Service is optional. The Analytics Service (tables, `analytics_query`) is
+  always a separate process.
 - A **dataset** names where data lives (`structured` tables or `unstructured` documents). A flow step names its
   dataset in its config; the build checks it exists and has the right kind.
 
 ```
- browser ─► console :5173 ──/v1──► API :8000 ──► Knowledge Service :8001  (documents, vector index)
+ browser ─► console :5173 ──/v1──► API :8000 ──► Knowledge Service :8001  (optional: in the API when KNOWLEDGE_URL is unset)
                                       │      └─► Analytics Service :8002  (DuckDB + Vanna, sandbox for Python)
-                                      └─► Redis (sessions) · Postgres (memory, datasets)   — optional; in-memory if unset
+                                      └─► Redis (sessions) · Postgres (memory, versions, datasets, audit, handoffs,
+                                          tools, rate limits)   — optional; in-memory if unset
 ```
 
 Full component walkthrough: [`ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -67,6 +69,10 @@ The console drives these same calls; here they are with `curl` so you can see ea
 `KEELCHAT_API_KEY` set, add `-H "Authorization: Bearer $KEELCHAT_API_KEY"` to each call. Interactive docs:
 http://127.0.0.1:8000/docs.
 
+Run these against `./run.sh`. If you start the API yourself, set `KEELCHAT_DATA_ROOT=$PWD/examples/data` (dataset
+paths must be under it). For real answers, also set `ANALYTICS_URL` to a running Analytics Service. Without one,
+`KEELCHAT_TOOLS=fake` answers with sample data.
+
 **1. Register a dataset** (`./run.sh` already registers this one). Sources must sit under
 `KEELCHAT_DATA_ROOT`; the Analytics Service loads them now, so a bad file fails here, not mid-conversation.
 Registering an existing name replaces its sources, so list every table.
@@ -85,7 +91,7 @@ curl -s -X PUT localhost:8000/v1/tenants/default/datasets/sales -H 'content-type
 ```bash
 curl -s localhost:8000/v1/agents -H 'content-type: application/json' \
   -d "$(jq -n --rawfile y examples/sales_analyst.yaml '{yaml: $y}')"
-# → {"agent": "sales-analyst", "hash": "0d5c…", "mode": "flow", "allowed_tools": ["analytics_query"], "datasets": ["sales"]}
+# → {"agent": "sales-analyst", "tenant": "default", "hash": "0d5c…", "mode": "flow", "models": {…}, "allowed_tools": ["analytics_query"], "datasets": ["sales"]}
 ```
 
 **3. Open a session.** It pins the newest build of that agent (or `policy_hash`, if you pass one).
@@ -103,8 +109,9 @@ curl -s localhost:8000/v1/sessions/$SID/turns -H 'content-type: application/json
 ```
 
 An analytics answer also carries the full `AnalysisResult` as an item:
-`jq '.outbound.items[] | select(.type == "analysis_result") | .result'`. Its fields (input, data, assumptions,
-findings, summary, recommendations) are described in [`ARCHITECTURE.md`](ARCHITECTURE.md#datasets-and-the-analytics-service).
+`jq '.outbound.items[] | select(.type == "analysis_result") | .result'`. Its fields are `schema_version`, `status`,
+`input`, `data`, `assumptions`, `outcome` (with `findings` and `statistics`), `summary`, `recommendations`,
+`verification` and `error_kind`. Findings are at `.result.outcome.findings`. More in [`ARCHITECTURE.md`](ARCHITECTURE.md#datasets-and-the-analytics-service).
 
 **5. Inspect and clean up.**
 
@@ -156,7 +163,7 @@ before they reach a log line or a tool.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | "… is unavailable right now" in a reply | the tool's backend URL is unset and fakes are off | start the service, or run with `--fake-tools` |
-| Build fails with `unknown dataset` | the dataset is not registered for that tenant | register it first (step 1); the error suggests close names |
+| Build fails with `unregistered dataset 'sales' (known: [...])` | the dataset is not registered for that tenant | register it first (step 1); the error suggests close names |
 | Registration returns 422 | the source is outside `KEELCHAT_DATA_ROOT`, missing, empty, or unreadable | the message names the reason |
 | API exits at start with a database error | `DATABASE_URL` names a database that does not exist | `scripts/db.sh up` and its URL, or leave it empty |
 | "This session is no longer on the server" | the API restarted and sessions were in memory | build again and start a new session |
@@ -173,7 +180,8 @@ before they reach a log line or a tool.
 ## Checks before a pull request
 
 The commands are in [`CONTRIBUTING.md`](../CONTRIBUTING.md#before-opening-a-pull-request). Use `uv run pytest -k <name>`
-for one area (e.g. `-k analytics`), and `--offline` to run only the tests that don't call the model.
+for one area (e.g. `-k analytics`). With no model key, `--offline` runs the tests that don't need one and skips the
+rest; with a key in `.env` it runs everything.
 
 Tests run in parallel against your provider, which may rate-limit them; run the live console and the test suite at
 different times. Capability changes must also pass `tests/test_registry.py` (the contract suite). PR rules:
