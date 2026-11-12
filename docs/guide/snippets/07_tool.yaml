@@ -1,0 +1,9 @@
+agent: order-tracker
+charter: >
+  Tell customers where their order is. Short and friendly.
+  Out of scope: refunds, payments, anything not about deliveries.
+mode: planner
+tools: [order_status]
+limits: {planner_calls: 3}
+handoff:
+  when: [user_request, tool_unavailable]

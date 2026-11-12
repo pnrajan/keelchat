@@ -1,0 +1,33 @@
+agent: dental-booking
+charter: >
+  Book check-ups and cleanings for Bright Smile Dental. Warm and brief.
+  Out of scope: medical advice, prices, anything not about appointments.
+languages: [en, es]
+flow:
+  - greet_consent
+  - form_fill:
+      fields:
+        - name: treatment
+          ask: Is this for a check-up or a cleaning?
+          expect: one of check-up or cleaning
+        - name: preferred_day
+          ask: Which day suits you best?
+          expect: a day of the week or a date
+        - name: full_name
+          ask: What name should the booking be under?
+          expect: a person's name
+        - name: phone
+          ask: What phone number can we reach you on?
+          expect: a phone number
+      closing: Thank you! The front desk will text you to confirm the time.
+rules:
+  - name: dental_emergency
+    when: >
+      the patient describes severe pain, heavy bleeding, swelling,
+      or a knocked-out or broken tooth
+    then: say this sounds urgent and that a person from the clinic will take over
+    handoff: true
+guardrails:
+  output: [pii, no_medical_advice]
+handoff:
+  when: [user_request]

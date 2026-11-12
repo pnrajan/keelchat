@@ -1,0 +1,17 @@
+agent: order-feedback
+charter: >
+  Learn how a customer's recent order went, in a short, warm conversation.
+  Out of scope: refunds and order changes; for those, say a person will follow up.
+flow:
+  - greet_consent
+  - conversation_survey:
+      objectives:
+        - key: nps
+          learn: How likely they are to recommend us to a friend
+          measure: nps
+        - key: experience
+          learn: What stood out about their order, good or bad, and why
+          max_probes: 1
+        - key: improve
+          learn: The one thing we could do better next time
+      max_questions: 6

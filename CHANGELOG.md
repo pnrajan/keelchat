@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- [Building agents with keelchat: a plain guide](docs/guide/building-agents.pdf) (PDF, LaTeX source beside it): diagrams, six
+  recipes (support, booking, survey, documents, data, your own tool), testing, extending and going live. Every YAML
+  example builds (`tests/test_guide.py`).
 - Demo: while it asks questions or drafts, a generic working animation, like chat apps: a spinner, a shimmering
   "Thinking…" line, the seconds so far, and placeholder lines drawing like a document being written; still when the
   visitor prefers reduced motion.
