@@ -38,34 +38,30 @@ function typing(where) {
   return el.lastChild;
 }
 
-// "Working on it", the way chat apps show it: a shimmering status line that moves through the steps of the job, the
-// steps already passed, and the seconds so far. The server doesn't stream, so steps advance on a schedule and the last
-// one holds until the reply arrives. Returns the bubble to fill, and stop() to clear the timers.
-function working(where, steps) {
+// "Working on it", the way chat apps show it: a spinner, a shimmering line, the seconds so far, and placeholder lines
+// that draw themselves like a document being written. The server doesn't report progress, so nothing here claims a
+// step: the line just changes from time to time, and says it's nearly there after a while. Returns the bubble to fill,
+// and stop() to clear the timers.
+function working(where, lines) {
   const bubble = add(where, "bot", "").lastChild;
   bubble.className = "msg work";
   bubble.setAttribute("role", "status");
-  bubble.innerHTML = '<div class="now"><span class="spin" aria-hidden="true"></span><span class="label"></span><span class="time"></span></div><ol></ol>';
-  const label = bubble.querySelector(".label"), time = bubble.querySelector(".time"), done = bubble.querySelector("ol");
+  bubble.innerHTML = '<div class="now"><span class="spin" aria-hidden="true"></span><span class="label"></span><span class="time"></span></div>'
+    + '<div class="sketch" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>';
+  const label = bubble.querySelector(".label"), time = bubble.querySelector(".time");
   const start = Date.now();
-  let i = 0;
-  label.textContent = steps[0][0];
+  label.textContent = lines[0];
   const tick = setInterval(() => {
     const s = Math.floor((Date.now() - start) / 1000);
     time.textContent = s >= 3 ? `${s}s` : "";
-    while (i < steps.length - 1 && s >= steps[i + 1][1]) {
-      done.append(Object.assign(document.createElement("li"), { className: "fade", textContent: steps[i][0].replace(/…$/, "") }));
-      label.textContent = steps[++i][0];
-      bubble.scrollIntoView({ block: "end", behavior: "smooth" });
-    }
-    if (s >= 45 && i === steps.length - 1) label.textContent = steps[i][0].replace(/…$/, "") + ", nearly there…";
+    label.textContent = s >= 40 ? "Nearly there…" : lines[Math.floor(s / 6) % lines.length];
   }, 250);
   return { bubble, stop: () => clearInterval(tick) };
 }
 
-//: what the visitor sees while the model works: [message, seconds after which it shows]
-const ASKING = [["Reading your description…", 0], ["Matching it to what a bot can do…", 4], ["Finding what's still open…", 10], ["Writing questions and options…", 18]];
-const DRAFTING = [["Writing your bot…", 0], ["Adding steps and questions…", 4], ["Adding rules and handover…", 9], ["Checking it builds…", 15], ["Finding what it needs connected…", 22]];
+//: what the visitor reads while the model works: general, never a step the server hasn't reported
+const ASKING = ["Thinking…", "Reading your description…", "Thinking about what your bot needs…"];
+const DRAFTING = ["Writing your bot…", "Thinking…", "Putting it together…"];
 
 async function post(path, body, token) {
   const r = await fetch(path, {
@@ -186,7 +182,7 @@ async function make(message) {
       }
     }
     if (w) w.bubble.parentElement.remove();
-    w = working("make", yaml ? [["Making your change…", 0], ["Checking it still builds…", 8]] : DRAFTING);
+    w = working("make", yaml ? ["Making your change…", "Thinking…"] : DRAFTING);
     const out = w.bubble;
     const draft = await post("/demo/draft", { text: message, yaml, ...(answers ? { questions, answers } : {}) });
     w.stop();

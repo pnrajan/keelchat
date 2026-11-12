@@ -59,15 +59,20 @@
   .work .label { background: linear-gradient(90deg, var(--muted) 0%, var(--fg) 45%, var(--muted) 90%); background-size: 200% 100%;
                  -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 1.8s linear infinite }
   .work .time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; margin-left: auto }
-  .work ol { list-style: none; margin: 0; padding: 0 0 0 24px; display: flex; flex-direction: column; gap: 2px }
-  .work li { color: var(--muted); font-size: 13px }
-  .work li::before { content: "✓"; color: var(--accent); margin-right: 8px }
-  .work li.fade { animation: in .3s ease-out }
+  .work .sketch { display: flex; flex-direction: column; gap: 7px; padding: 4px 0 2px 24px; max-width: 420px }
+  .work .sketch i { display: block; height: 8px; border-radius: 4px; background: var(--soft); position: relative; overflow: hidden;
+                    transform-origin: left; animation: draw 2.4s ease-in-out infinite }
+  .work .sketch i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--line), transparent);
+                           animation: sweep 1.6s linear infinite }
+  .work .sketch i:nth-child(1) { width: 55% } .work .sketch i:nth-child(2) { width: 85%; margin-left: 14px; animation-delay: .2s }
+  .work .sketch i:nth-child(3) { width: 70%; margin-left: 14px; animation-delay: .4s } .work .sketch i:nth-child(4) { width: 40%; animation-delay: .6s }
+  .work .sketch i:nth-child(5) { width: 78%; margin-left: 14px; animation-delay: .8s }
   @keyframes spin { to { transform: rotate(360deg) } }
   @keyframes shine { from { background-position: 100% 0 } to { background-position: -100% 0 } }
-  @keyframes in { from { opacity: 0; transform: translateY(-2px) } }
+  @keyframes draw { 0% { transform: scaleX(.15); opacity: .4 } 50%, 100% { transform: scaleX(1); opacity: 1 } }
+  @keyframes sweep { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
   @media (prefers-reduced-motion: reduce) {
-    .work .spin, .work .label, .work li.fade, .typing span { animation: none }
+    .work .spin, .work .label, .work .sketch i, .work .sketch i::after, .typing span { animation: none }
     .work .label { color: var(--fg); background: none }
   }
 
