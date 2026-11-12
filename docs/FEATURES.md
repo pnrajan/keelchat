@@ -17,7 +17,7 @@ The features behind a policy, with the YAML that turns each one on. Start with t
 
 `frontend/` is a React console for building and testing bots, served at `/console/` once built.
 
-<p align="center"><img src="assets/compose.jpg" alt="Compose: a dental clinic's booking bot written from two sentences, read back in plain words (what it asks, when it hands an emergency to a person), with Try it, Save, and a box to ask for changes" width="900"></p>
+<p align="center"><img src="assets/compose.jpg" alt="Compose: a dental clinic's booking bot written from a description and read back in plain words (what it asks, when it hands an emergency to a person), with Try it, Save, a box to ask for changes, and Knowledge base, Fine-tune and Show YAML below" width="900"></p>
 
 Drafting a bot from a description is the job where a stronger model shows most: set `KEELCHAT_MODEL_GENERATE` to one for
 cleaner YAML on the first try. The README lists [where else it helps](../README.md#where-a-stronger-model-helps).
