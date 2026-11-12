@@ -52,7 +52,7 @@ Say what the bot should do in a sentence or two. keelchat drafts the policy, tel
 when it hands over, and takes changes in plain words ("also ask for a phone number"). The result is one short YAML
 file you can review and keep in git.
 
-<img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/compose.jpg" width="900" alt="Compose: a dental clinic's booking bot written from two sentences, read back in plain words (what it asks, when it hands an emergency to a person), with Try it, Save, and a box to ask for changes" />
+<img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/compose.jpg" width="900" alt="Compose: a dental clinic's booking bot written from a description and read back in plain words (what it asks, when it hands an emergency to a person), with Try it, Save, a box to ask for changes, and Knowledge base, Fine-tune and Show YAML below" />
 
 </td>
 </tr>
@@ -160,7 +160,9 @@ to chat with it (its tools answer with sample data), and see what it needs conne
 link can start a draft:
 [`?describe=Book haircuts and ask for a phone number`](https://keelchat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).
 
-<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-make.jpg" width="560" alt="The demo: a dental booking bot described in one sentence, its YAML with Try this bot, Copy and Download, and what it needs connecting: a booking calendar (Google Calendar, Calendly, Outlook, Acuity), a patient records system, an SMS sender, a model key, somewhere for handed-over chats, and where people talk to it" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-ask.jpg" width="560" alt="The demo after a description: what it understood (a dental clinic bot that collects the treatment, preferred day and phone number and passes emergencies to staff), then five questions with options to click, each with a line on what it decides, and Build my bot or Skip" /></p>
+
+<p align="center"><img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/demo-make.jpg" width="560" alt="The demo: the drafted dental booking bot's YAML with Try this bot, Copy and Download, and what it needs connecting: a booking request notifier and a practice calendar suggested for this bot, a model key, somewhere for handed-over chats, and where people talk to it" /></p>
 
 ### Run it locally
 

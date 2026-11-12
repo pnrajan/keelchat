@@ -30,6 +30,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Releases publish to PyPI from GitHub with Trusted Publishing (`.github/workflows/release.yml`); steps in
   CONTRIBUTING.md.
 
+### Changed
+
+- README and docs screenshots re-taken from the current console and demo: Compose shows the Knowledge base panel; a new
+  image shows the demo's questions before drafting.
+
 ### Fixed
 
 - pgvector finds a small knowledge base beside a large one (iterative index scans), and takes embeddings over 2000
