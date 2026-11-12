@@ -122,13 +122,33 @@ async def draft_policy(llm: LLMClient, models: ModelConfig, description: str, te
     return await _until_it_builds(llm, models, "policy_draft", SYSTEM, messages, tenant, datasets)
 
 
-CLARIFY = """You help someone describe a customer-facing chatbot before its policy is written. Read their description
-and ask the few questions whose answers would most change the bot: what it must collect, what should happen in a
-situation that needs a person (emergencies, complaints, refunds), what it must never do, which languages, how it should
-sound, what happens once it's done. Skip anything the description already settles. Each question has 2-5 short options
-a person can click, written in their terms (no YAML words); mark `multi` when several can apply. Give each option the
-plain sentence it adds to the description. Ask 2-5 questions, most important first; none if the description is
-already complete. Never ask for names, keys, URLs or anything private."""
+CLARIFY = """You help someone describe a customer-facing chatbot so that its policy (a YAML file) can be written well.
+The capabilities below are what a policy can express. For THIS description, work out which details the policy will need
+that the description leaves open, and which of them would change the bot most. Ask about those only: 2-5 questions,
+most important first, or none when nothing important is open. Nothing is a required topic; skip what the description
+already settles or what doesn't matter for this bot.
+For each question: `ask` in the person's own terms; `why`, one line of guidance on what the answer decides or what to
+weigh; 2-5 `options` that make sense for this particular business (not generic placeholders), each with the plain
+sentence it `adds` to the description; `multi` when several can apply together.
+Also `understood`: one or two sentences on what you take the bot to be for, so the person can correct you.
+Nothing shown to the person uses policy or YAML words. Never ask for names of people, keys, URLs or private data."""
+
+
+def capabilities(tenant: str = "default") -> str:
+    """A short view of what a policy can express (keys, steps, tools, guardrails), for questions before drafting."""
+    REGISTRY.discover()
+    return json.dumps(
+        {
+            "policy keys": "agent, charter (purpose, tone, out of scope), languages, flow (steps), tools, rules (when X then Y; "
+            "may hand to a person), handoff (when a person takes over), guardrails, limits (re-asks, detours), memory "
+            "(what to remember about a person, with consent), small_talk",
+            "steps": {n: REGISTRY.node(n).description.split("\n")[0] for n in REGISTRY.node_names()},
+            "tools": REGISTRY.tool_names(tenant),
+            "guardrails": REGISTRY.guardrail_names(),
+        },
+        indent=1,
+    )
+
 
 #: questions shown at most, and options per question
 CLARIFY_MAX, OPTIONS_MAX = 5, 5
@@ -136,14 +156,15 @@ CLARIFY_MAX, OPTIONS_MAX = 5, 5
 CLARIFY_SCHEMA = {
     "type": "object",
     "properties": {
+        "understood": {"type": "string", "description": "one or two sentences: what the bot is for, as you understand it"},
         "questions": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "id": {"type": "string", "description": "short lowercase id, e.g. emergencies"},
+                    "id": {"type": "string", "description": "short lowercase id"},
                     "ask": {"type": "string", "description": "the question, in plain words"},
-                    "why": {"type": "string", "description": "one short line: what the answer changes in the bot"},
+                    "why": {"type": "string", "description": "one line of guidance: what the answer decides, or what to weigh"},
                     "multi": {"type": "boolean"},
                     "options": {
                         "type": "array",
@@ -159,9 +180,9 @@ CLARIFY_SCHEMA = {
                 },
                 "required": ["id", "ask", "options"],
             },
-        }
+        },
     },
-    "required": ["questions"],
+    "required": ["understood", "questions"],
 }
 
 
@@ -181,16 +202,23 @@ class Question:
     options: list[Option]
 
 
+@dataclass(frozen=True)
+class Clarification:
+    #: what the model takes the bot to be for, for the person to correct
+    understood: str
+    questions: list[Question]
+
+
 def _clean(text: object, limit: int) -> str:
     return " ".join(str(text or "").split())[:limit]
 
 
-async def clarify(llm: LLMClient, models: ModelConfig, description: str) -> list[Question]:
-    """The questions worth asking before drafting, each with options to click. Checked in code: unique ids, 2 to
+async def clarify(llm: LLMClient, models: ModelConfig, description: str, tenant: str = "default") -> Clarification:
+    """What the model understood, and the questions it judges worth asking before drafting (none are fixed: it reads
+    the description against what a policy can express), each with options to click. Checked in code: unique ids, 2 to
     OPTIONS_MAX options each, at most CLARIFY_MAX questions; anything malformed is dropped."""
-    req = LLMRequest(
-        "policy_clarify", models.generate, CLARIFY, [{"role": "user", "content": untrusted("description", description)}], max_tokens=2000, effort="medium"
-    )
+    content = f"Capabilities:\n{capabilities(tenant)}\n\n" + untrusted("description", description)
+    req = LLMRequest("policy_clarify", models.generate, CLARIFY, [{"role": "user", "content": content}], max_tokens=2500, effort="medium")
     out = await llm.structured(req, CLARIFY_SCHEMA)
     questions: list[Question] = []
     for raw in out.get("questions") or []:
@@ -209,7 +237,7 @@ async def clarify(llm: LLMClient, models: ModelConfig, description: str) -> list
         if len(questions) == CLARIFY_MAX:
             break
     log.info("questions before drafting", count=len(questions))
-    return questions
+    return Clarification(_clean(out.get("understood"), 400), questions)
 
 
 def with_answers(description: str, answers: Mapping[str, list[str]], questions: list[Question]) -> str:

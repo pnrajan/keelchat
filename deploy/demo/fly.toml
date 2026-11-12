@@ -23,11 +23,11 @@ swap_size_mb = 512  # the app uses about 220 MB of the 256; swap absorbs bursts 
   KEELCHAT_DEMO_DAILY = "300"
   # models, through OpenRouter (the key is a Fly secret: scripts/demo.sh --secrets). Chat on a small fast model; writing
   # bots on a strong reasoning model (it picks the clarifying questions and writes the YAML: the step that matters most),
-  # at about ten cents a draft (KEELCHAT_DEMO_DRAFTS_DAILY caps the day)
+  # at a few cents a draft (KEELCHAT_DEMO_DRAFTS_DAILY caps the day)
   KEELCHAT_LLM = "litellm"
   KEELCHAT_MODEL_GENERATE = "openrouter/anthropic/claude-haiku-5.5"
   KEELCHAT_MODEL_CLASSIFY = "openrouter/anthropic/claude-haiku-5.5"
-  KEELCHAT_DEMO_DRAFT_MODEL = "openrouter/anthropic/claude-opus-5.5"
+  KEELCHAT_DEMO_DRAFT_MODEL = "openrouter/anthropic/claude-sonnet-5.5"
 
 [processes]
   app = "uvicorn examples.demo.app:create_app --factory --host 0.0.0.0 --port 8080"

@@ -96,12 +96,13 @@ function needs(list, items) {
 
 // The questions as chips: one choice (or several, when `multi`), or the visitor's own words. Resolves with the answers,
 // or null to skip them.
-function ask(into, questions) {
+function ask(into, questions, understood) {
   return new Promise((resolve) => {
     const answers = {};
     into.className = "msg ask";
     into.replaceChildren();
-    into.append(Object.assign(document.createElement("p"), { textContent: "A few choices first, so the bot fits. Pick what applies; skip any." }));
+    if (understood) into.append(Object.assign(document.createElement("p"), { textContent: understood }));
+    into.append(Object.assign(document.createElement("p"), { className: "why", textContent: "A few choices so the bot fits. Pick what applies, or answer in your own words; skip any." }));
     for (const q of questions) {
       const set = document.createElement("fieldset");
       set.append(Object.assign(document.createElement("legend"), { textContent: q.ask }));
@@ -144,12 +145,12 @@ function ask(into, questions) {
 async function make(message) {
   add("make", "you", message);
   let out = typing("make");
-  let questions = [], answers = null;
+  let questions = [], understood = "", answers = null;
   try {
     if (!yaml) {  // a first draft: ask what the description leaves open
-      ({ questions } = await post("/demo/clarify", { text: message }).catch(() => ({ questions: [] })));
+      ({ questions, understood } = await post("/demo/clarify", { text: message }).catch(() => ({ questions: [], understood: "" })));
       if (questions.length) {
-        answers = await ask(out, questions);  // sending stays off until they build or skip
+        answers = await ask(out, questions, understood);  // sending stays off until they build or skip
         out = typing("make");
       }
     }
