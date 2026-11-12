@@ -154,7 +154,8 @@ stores.
 
 ### Try it in your browser
 
-In the [demo](https://keelchat-demo.fly.dev), with no sign-in, describe a bot and get its YAML. Press **Try this bot**
+In the [demo](https://keelchat-demo.fly.dev), with no sign-in, describe a bot, click through a few questions about
+what your description leaves open (emergencies, what to collect, languages), and get its YAML. Press **Try this bot**
 to chat with it (its tools answer with sample data), and see what it needs connecting before real people use it. A
 link can start a draft:
 [`?describe=Book haircuts and ask for a phone number`](https://keelchat-demo.fly.dev/?describe=Book+haircuts+and+ask+for+a+phone+number).

@@ -1,6 +1,7 @@
 // The demo landing page: "Make a bot" drafts YAML from a description (POST /demo/draft); "Try this bot" puts the draft
 // up to chat with (POST /demo/try); "Try a bot" chats through the public chat API, with the support assistant until then.
-// ?describe=... (from the GitHub Pages site) sends that description straight away.
+// ?describe=... (from the GitHub Pages site) sends that description straight away. Before a first draft, a few questions
+// with options to click (POST /demo/clarify) fill in what the description leaves open.
 let EMBED = document.body.dataset.embed;
 const $ = (id) => document.getElementById(id);
 const text = $("text"), send = $("send");
@@ -93,11 +94,66 @@ function needs(list, items) {
   }
 }
 
+// The questions as chips: one choice (or several, when `multi`), or the visitor's own words. Resolves with the answers,
+// or null to skip them.
+function ask(into, questions) {
+  return new Promise((resolve) => {
+    const answers = {};
+    into.className = "msg ask";
+    into.replaceChildren();
+    into.append(Object.assign(document.createElement("p"), { textContent: "A few choices first, so the bot fits. Pick what applies; skip any." }));
+    for (const q of questions) {
+      const set = document.createElement("fieldset");
+      set.append(Object.assign(document.createElement("legend"), { textContent: q.ask }));
+      if (q.why) set.append(Object.assign(document.createElement("p"), { className: "why", textContent: q.why }));
+      const pick = Object.assign(document.createElement("div"), { className: "pick" });
+      const buttons = q.options.map((o) => {
+        const b = Object.assign(document.createElement("button"), { type: "button", textContent: o.label });
+        b.setAttribute("aria-pressed", "false");
+        b.onclick = () => {
+          const on = b.getAttribute("aria-pressed") !== "true";
+          if (!q.multi) buttons.forEach((x) => x.setAttribute("aria-pressed", "false"));
+          b.setAttribute("aria-pressed", String(on));
+          answers[q.id] = buttons.filter((x) => x.getAttribute("aria-pressed") === "true").map((x) => x.textContent);
+          if (on && !q.multi) other.value = "";
+        };
+        return b;
+      });
+      const other = Object.assign(document.createElement("input"), { placeholder: "Or in your words", maxLength: 200 });
+      other.setAttribute("aria-label", `${q.ask} (your own answer)`);
+      other.oninput = () => {
+        if (!q.multi) buttons.forEach((x) => x.setAttribute("aria-pressed", "false"));
+        const picked = buttons.filter((x) => x.getAttribute("aria-pressed") === "true").map((x) => x.textContent);
+        answers[q.id] = other.value.trim() ? [...picked, other.value.trim()] : picked;
+      };
+      pick.append(...buttons, other);
+      set.append(pick);
+      into.append(set);
+    }
+    const row = Object.assign(document.createElement("div"), { className: "row" });
+    const go = Object.assign(document.createElement("button"), { type: "button", className: "solid", textContent: "Build my bot" });
+    const skip = Object.assign(document.createElement("button"), { type: "button", className: "ghost", textContent: "Skip, just build it" });
+    go.onclick = () => { go.disabled = skip.disabled = true; resolve(answers); };
+    skip.onclick = () => { go.disabled = skip.disabled = true; resolve(null); };
+    row.append(go, skip);
+    into.append(row);
+    into.scrollIntoView({ block: "end", behavior: "smooth" });
+  });
+}
+
 async function make(message) {
   add("make", "you", message);
-  const out = typing("make");
+  let out = typing("make");
+  let questions = [], answers = null;
   try {
-    const draft = await post("/demo/draft", { text: message, yaml });
+    if (!yaml) {  // a first draft: ask what the description leaves open
+      ({ questions } = await post("/demo/clarify", { text: message }).catch(() => ({ questions: [] })));
+      if (questions.length) {
+        answers = await ask(out, questions);  // sending stays off until they build or skip
+        out = typing("make");
+      }
+    }
+    const draft = await post("/demo/draft", { text: message, yaml, ...(answers ? { questions, answers } : {}) });
     yaml = draft.yaml;
     if (draft.suggested) suggested = draft.suggested;
     result(out, draft);
