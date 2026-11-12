@@ -25,7 +25,7 @@ from keelchat.api.app import create_app as create_api
 from keelchat.api.public import client_ip
 from keelchat.logging import get_logger
 from keelchat.policy.compiler import build
-from keelchat.policy.drafter import draft_policy, edit_policy
+from keelchat.policy.drafter import Option, Question, clarify, draft_policy, edit_policy, with_answers
 from keelchat.policy.errors import PolicyValidationError
 from keelchat.runtime.llm import LLMError
 from keelchat.runtime.runtime import Runtime
@@ -51,12 +51,36 @@ DRAFT_MODEL = os.getenv("KEELCHAT_DEMO_DRAFT_MODEL", "")
 log = get_logger("demo")
 
 
+class OptionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: str = Field(max_length=60)
+    adds: str = Field(max_length=300)
+
+
+class QuestionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(max_length=40)
+    ask: str = Field(max_length=200)
+    why: str = Field(default="", max_length=200)
+    multi: bool = False
+    options: list[OptionIn] = Field(max_length=5)
+
+
+class ClarifyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    #: what the bot should do
+    text: str = Field(min_length=3, max_length=1_000)
+
+
 class DraftIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     #: what the bot should do, or the change to make to `yaml`
     text: str = Field(min_length=3, max_length=1_000)
     #: the visitor's current draft, when asking for a change
     yaml: str = Field(default="", max_length=20_000)
+    #: the questions /demo/clarify asked, and the options picked (question id → labels, or the visitor's own words)
+    questions: list[QuestionIn] = Field(default_factory=list, max_length=5)
+    answers: dict[str, list[str]] = Field(default_factory=dict, max_length=5)
 
 
 class TryIn(BaseModel):
@@ -92,6 +116,17 @@ def create_app() -> FastAPI:
 
     app.router.lifespan_context = lifespan
 
+    async def clarifying(body: ClarifyIn, request: Request) -> dict[str, object]:
+        """Questions to click before the draft, from the drafting model. Free of the draft limits but rate-limited."""
+        if not await rt.limits.take(f"clarify-ip:{client_ip(request)}", DRAFTS_PER_IP, 600):
+            raise HTTPException(429, "That's a lot of bots. Wait a few minutes and try again.")
+        try:
+            questions = await clarify(rt.llm, drafting, body.text)
+        except LLMError as e:  # no questions: the page drafts straight away
+            log.error("clarifying questions failed", error=str(e)[:300])
+            questions = []
+        return {"questions": [{"id": q.id, "ask": q.ask, "why": q.why, "multi": q.multi, "options": [o.__dict__ for o in q.options]} for q in questions]}
+
     async def draft(body: DraftIn, request: Request) -> dict[str, object]:
         """A policy from plain words, or the visitor's draft changed as asked. Checked by the build; never saved."""
         if not await rt.limits.take(f"draft-ip:{client_ip(request)}", DRAFTS_PER_IP, 600):
@@ -102,7 +137,9 @@ def create_app() -> FastAPI:
             d, _ = await edit_policy(rt.llm, drafting, body.yaml, body.text, "default", {})
             extra: list[Need] | None = None  # the page keeps the suggestions from the first draft
         else:
-            d, extra = await asyncio.gather(draft_policy(rt.llm, drafting, body.text, "default", {}), suggest(body.text))
+            asked = [Question(q.id, q.ask, q.why, q.multi, [Option(o.label, o.adds) for o in q.options]) for q in body.questions]
+            described = with_answers(body.text, {k: v[:5] for k, v in body.answers.items()}, asked)
+            d, extra = await asyncio.gather(draft_policy(rt.llm, drafting, described, "default", {}), suggest(described))
         return {
             "yaml": d.yaml,
             "errors": [{"path": e.path, "message": e.message} for e in d.errors],
@@ -145,6 +182,7 @@ def create_app() -> FastAPI:
     app.router.routes[:0] = [
         APIRoute("/", lambda: HTMLResponse(page), include_in_schema=False),
         APIRoute("/demo/app.js", lambda: Response(script, media_type="text/javascript"), include_in_schema=False),
+        APIRoute("/demo/clarify", clarifying, methods=["POST"], include_in_schema=False),
         APIRoute("/demo/draft", draft, methods=["POST"], include_in_schema=False),
         APIRoute("/demo/try", try_it, methods=["POST"], include_in_schema=False),
     ]

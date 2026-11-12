@@ -53,3 +53,81 @@ def test_a_draft_can_be_put_up_to_chat_with_and_a_broken_one_is_refused(monkeypa
 
         broken = c.post("/demo/try", json={"yaml": "agent: x\nflow: [no_such_step]\n"})
         assert broken.status_code == 422 and "doesn't build" in broken.json()["detail"]
+
+
+# --- questions to click before the first draft -------------------------------------------------------------------
+
+
+def test_chosen_options_are_added_to_the_description_in_question_order() -> None:
+    from keelchat.policy.drafter import Option, Question, with_answers
+
+    qs = [
+        Question(
+            "emergencies",
+            "What about emergencies?",
+            "",
+            False,
+            [Option("Hand to a person", "Emergencies go to a person."), Option("Give a number", "Give the clinic number.")],
+        ),
+        Question("collect", "What to collect?", "", True, [Option("Phone", "Ask for a phone number."), Option("Email", "Ask for an email.")]),
+    ]
+    out = with_answers("Book dental appointments.", {"collect": ["Email", "Phone"], "emergencies": ["Give a number", "Hand to a person"], "nope": ["x"]}, qs)
+    # one pick on a single-choice question
+    assert out == "Book dental appointments.\n\nDetails:\n- Give the clinic number.\n- Ask for an email.\n- Ask for a phone number."
+    assert with_answers("Book.", {"collect": ["Only on weekdays"]}, qs) == "Book.\n\nDetails:\n- What to collect? Only on weekdays"  # their own words
+    assert with_answers("Book.", {}, qs) == "Book."
+
+
+async def test_malformed_questions_from_the_model_are_dropped() -> None:
+    from typing import Any
+
+    from keelchat.policy.drafter import CLARIFY_MAX, clarify
+    from keelchat.runtime.llm import LLMClient, LLMRequest, ModelConfig
+
+    class Canned(LLMClient):
+        async def complete(self, req: LLMRequest) -> str:
+            raise AssertionError("not used")
+
+        async def structured(self, req: LLMRequest, schema: dict[str, Any]) -> dict[str, Any]:
+            ok = {"ask": "Which languages?", "options": [{"label": "English", "adds": "English only."}, {"label": "Both", "adds": "English and Spanish."}]}
+            return {
+                "questions": [
+                    {"id": "Languages!", **ok},
+                    {"id": "languages", **ok},  # duplicate id
+                    {"id": "one", "ask": "One option?", "options": [{"label": "Only", "adds": "x"}]},  # too few options
+                    {"id": "blank", "ask": "", "options": ok["options"]},  # no question
+                    "not a question",
+                    *({"id": f"q{i}", **ok} for i in range(10)),
+                ]
+            }
+
+    qs = await clarify(Canned(), ModelConfig(), "Answer questions about our shop.")
+    assert qs[0].id == "languages" and [o.label for o in qs[0].options] == ["English", "Both"]
+    assert len(qs) == CLARIFY_MAX and len({q.id for q in qs}) == CLARIFY_MAX
+
+
+async def test_the_drafting_model_asks_what_the_description_leaves_open() -> None:
+    from keelchat.policy.drafter import clarify
+    from keelchat.runtime.llm import ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+
+    qs = await clarify(llm_from_env(), ModelConfig.from_env(), "Book dental appointments for our clinic.")
+    assert 2 <= len(qs) <= 5 and all(2 <= len(q.options) <= 5 and q.ask for q in qs)
+
+
+def test_the_demo_asks_first_and_drafts_with_the_answers(monkeypatch: pytest.MonkeyPatch) -> None:
+    import yaml as pyyaml
+    from fastapi.testclient import TestClient
+
+    from examples.demo.app import create_app
+
+    for k in ("KNOWLEDGE_S3_BUCKET", "KNOWLEDGE_INDEX_URI"):
+        monkeypatch.delenv(k, raising=False)
+    text = "Answer questions about our bike shop."
+    with TestClient(create_app()) as c:
+        r = c.post("/demo/clarify", json={"text": text})
+        assert r.status_code == 200 and isinstance(r.json()["questions"], list)
+        lang = {"id": "languages", "ask": "Which languages?", "multi": False, "options": [{"label": "Both", "adds": "The bot speaks English and Spanish."}]}
+        d = c.post("/demo/draft", json={"text": text, "questions": [lang], "answers": {"languages": ["Both"]}}).json()
+    assert not d["errors"], d["errors"]
+    assert "es" in pyyaml.safe_load(d["yaml"]).get("languages", [])  # the picked option reached the draft

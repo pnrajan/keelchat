@@ -122,6 +122,108 @@ async def draft_policy(llm: LLMClient, models: ModelConfig, description: str, te
     return await _until_it_builds(llm, models, "policy_draft", SYSTEM, messages, tenant, datasets)
 
 
+CLARIFY = """You help someone describe a customer-facing chatbot before its policy is written. Read their description
+and ask the few questions whose answers would most change the bot: what it must collect, what should happen in a
+situation that needs a person (emergencies, complaints, refunds), what it must never do, which languages, how it should
+sound, what happens once it's done. Skip anything the description already settles. Each question has 2-5 short options
+a person can click, written in their terms (no YAML words); mark `multi` when several can apply. Give each option the
+plain sentence it adds to the description. Ask 2-5 questions, most important first; none if the description is
+already complete. Never ask for names, keys, URLs or anything private."""
+
+#: questions shown at most, and options per question
+CLARIFY_MAX, OPTIONS_MAX = 5, 5
+
+CLARIFY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "short lowercase id, e.g. emergencies"},
+                    "ask": {"type": "string", "description": "the question, in plain words"},
+                    "why": {"type": "string", "description": "one short line: what the answer changes in the bot"},
+                    "multi": {"type": "boolean"},
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "label": {"type": "string", "description": "2-6 words"},
+                                "adds": {"type": "string", "description": "the sentence this choice adds to the description"},
+                            },
+                            "required": ["label", "adds"],
+                        },
+                    },
+                },
+                "required": ["id", "ask", "options"],
+            },
+        }
+    },
+    "required": ["questions"],
+}
+
+
+@dataclass(frozen=True)
+class Option:
+    label: str
+    #: the sentence this choice adds to the description
+    adds: str
+
+
+@dataclass(frozen=True)
+class Question:
+    id: str
+    ask: str
+    why: str
+    multi: bool
+    options: list[Option]
+
+
+def _clean(text: object, limit: int) -> str:
+    return " ".join(str(text or "").split())[:limit]
+
+
+async def clarify(llm: LLMClient, models: ModelConfig, description: str) -> list[Question]:
+    """The questions worth asking before drafting, each with options to click. Checked in code: unique ids, 2 to
+    OPTIONS_MAX options each, at most CLARIFY_MAX questions; anything malformed is dropped."""
+    req = LLMRequest(
+        "policy_clarify", models.generate, CLARIFY, [{"role": "user", "content": untrusted("description", description)}], max_tokens=2000, effort="medium"
+    )
+    out = await llm.structured(req, CLARIFY_SCHEMA)
+    questions: list[Question] = []
+    for raw in out.get("questions") or []:
+        if not isinstance(raw, dict):
+            continue
+        qid = re.sub(r"[^a-z0-9_]+", "_", _clean(raw.get("id"), 40).lower()).strip("_") or f"q{len(questions) + 1}"
+        options = [
+            Option(_clean(o.get("label"), 60), _clean(o.get("adds"), 300))
+            for o in (raw.get("options") or [])
+            if isinstance(o, dict) and _clean(o.get("label"), 60) and _clean(o.get("adds"), 300)
+        ][:OPTIONS_MAX]
+        ask = _clean(raw.get("ask"), 200)
+        if not ask or len(options) < 2 or any(q.id == qid for q in questions):
+            continue
+        questions.append(Question(qid, ask, _clean(raw.get("why"), 200), bool(raw.get("multi")), options))
+        if len(questions) == CLARIFY_MAX:
+            break
+    log.info("questions before drafting", count=len(questions))
+    return questions
+
+
+def with_answers(description: str, answers: Mapping[str, list[str]], questions: list[Question]) -> str:
+    """The description plus the sentence each chosen option adds, in question order. Unknown ids and labels are ignored
+    (they come from a browser); an answer may also be the person's own words ("other")."""
+    lines = []
+    for q in questions:
+        picked = answers.get(q.id) or []
+        for label in picked[: len(q.options) if q.multi else 1]:
+            match = next((o for o in q.options if o.label == label), None)
+            lines.append(match.adds if match else f"{q.ask} {_clean(label, 300)}")
+    return description.strip() + ("\n\nDetails:\n" + "\n".join(f"- {line}" for line in lines) if lines else "")
+
+
 EDIT = """You change an agent policy (YAML) as the owner asks. Reply with the whole changed YAML only.
 - The reply is the policy file itself: top-level keys, never nested under another key.
 - Do exactly what is asked and nothing else: keep every other key, step, field, rule and comment as written, and the

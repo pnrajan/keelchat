@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Demo: before the first draft, the drafting model asks 2-5 questions about what the description leaves open, each
+  with options to click (or your own words); the answers go into the draft. The demo drafts with Claude Opus 5.5
+  through OpenRouter. `keelchat.policy.drafter.clarify` and `with_answers`.
 - chonkie splits documents into passages (semantic by default) and provides a small local embedding model, used when
   no API embedding model is set; included in the `api` and `knowledge` extras and the Docker image.
 - Vector stores for Qdrant, Chroma and pgvector (`KNOWLEDGE_VECTOR_STORE`), and `keelchat.testing.check_vector_store`
