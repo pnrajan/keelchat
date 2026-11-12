@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Demo: while it asks questions or drafts, a status line moves through the steps (with a shimmer, the steps done and the
+  seconds so far), like chat apps; still when the visitor prefers reduced motion.
 - Demo: before the first draft, the drafting model reads the description against what a policy can express, says
   what it understood, and asks 2-5 questions it judges matter most for that bot (no fixed topics), each with a line of
   guidance and options to click (or your own words); the answers go into the draft. Drafting uses Claude Sonnet 5.5

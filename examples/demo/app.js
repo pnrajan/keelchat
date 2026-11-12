@@ -38,6 +38,35 @@ function typing(where) {
   return el.lastChild;
 }
 
+// "Working on it", the way chat apps show it: a shimmering status line that moves through the steps of the job, the
+// steps already passed, and the seconds so far. The server doesn't stream, so steps advance on a schedule and the last
+// one holds until the reply arrives. Returns the bubble to fill, and stop() to clear the timers.
+function working(where, steps) {
+  const bubble = add(where, "bot", "").lastChild;
+  bubble.className = "msg work";
+  bubble.setAttribute("role", "status");
+  bubble.innerHTML = '<div class="now"><span class="spin" aria-hidden="true"></span><span class="label"></span><span class="time"></span></div><ol></ol>';
+  const label = bubble.querySelector(".label"), time = bubble.querySelector(".time"), done = bubble.querySelector("ol");
+  const start = Date.now();
+  let i = 0;
+  label.textContent = steps[0][0];
+  const tick = setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000);
+    time.textContent = s >= 3 ? `${s}s` : "";
+    while (i < steps.length - 1 && s >= steps[i + 1][1]) {
+      done.append(Object.assign(document.createElement("li"), { className: "fade", textContent: steps[i][0].replace(/…$/, "") }));
+      label.textContent = steps[++i][0];
+      bubble.scrollIntoView({ block: "end", behavior: "smooth" });
+    }
+    if (s >= 45 && i === steps.length - 1) label.textContent = steps[i][0].replace(/…$/, "") + ", nearly there…";
+  }, 250);
+  return { bubble, stop: () => clearInterval(tick) };
+}
+
+//: what the visitor sees while the model works: [message, seconds after which it shows]
+const ASKING = [["Reading your description…", 0], ["Matching it to what a bot can do…", 4], ["Finding what's still open…", 10], ["Writing questions and options…", 18]];
+const DRAFTING = [["Writing your bot…", 0], ["Adding steps and questions…", 4], ["Adding rules and handover…", 9], ["Checking it builds…", 15], ["Finding what it needs connected…", 22]];
+
 async function post(path, body, token) {
   const r = await fetch(path, {
     method: "POST",
@@ -100,6 +129,7 @@ function ask(into, questions, understood) {
   return new Promise((resolve) => {
     const answers = {};
     into.className = "msg ask";
+    into.removeAttribute("role");
     into.replaceChildren();
     if (understood) into.append(Object.assign(document.createElement("p"), { textContent: understood }));
     into.append(Object.assign(document.createElement("p"), { className: "why", textContent: "A few choices so the bot fits. Pick what applies, or answer in your own words; skip any." }));
@@ -144,23 +174,28 @@ function ask(into, questions, understood) {
 
 async function make(message) {
   add("make", "you", message);
-  let out = typing("make");
-  let questions = [], understood = "", answers = null;
+  let questions = [], understood = "", answers = null, w = null;
   try {
     if (!yaml) {  // a first draft: ask what the description leaves open
+      w = working("make", ASKING);
       ({ questions, understood } = await post("/demo/clarify", { text: message }).catch(() => ({ questions: [], understood: "" })));
+      w.stop();
       if (questions.length) {
-        answers = await ask(out, questions, understood);  // sending stays off until they build or skip
-        out = typing("make");
+        answers = await ask(w.bubble, questions, understood);  // sending stays off until they build or skip
+        w = null;
       }
     }
+    if (w) w.bubble.parentElement.remove();
+    w = working("make", yaml ? [["Making your change…", 0], ["Checking it still builds…", 8]] : DRAFTING);
+    const out = w.bubble;
     const draft = await post("/demo/draft", { text: message, yaml, ...(answers ? { questions, answers } : {}) });
+    w.stop();
     yaml = draft.yaml;
     if (draft.suggested) suggested = draft.suggested;
     result(out, draft);
     text.placeholder = PLACEHOLDER.change;
   } catch (e) {
-    out.parentElement.remove();
+    if (w) { w.stop(); w.bubble.parentElement.remove(); }
     add("make", "note", e.message);
   }
 }
