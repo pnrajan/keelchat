@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from examples.demo.needs import from_policy
 from keelchat.policy.compiler import build
 from tests.conftest import ROOT
@@ -32,8 +34,11 @@ def test_the_landing_page_yaml_builds() -> None:
     assert build(html.unescape(re.sub(r"<[^>]+>", "", shown.group(0)))).agent == "support-assistant"
 
 
-def test_a_draft_can_be_put_up_to_chat_with_and_a_broken_one_is_refused() -> None:
+def test_a_draft_can_be_put_up_to_chat_with_and_a_broken_one_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     from fastapi.testclient import TestClient
+
+    for k in ("KNOWLEDGE_S3_BUCKET", "KNOWLEDGE_INDEX_URI"):  # the demo's knowledge index stays in memory in tests
+        monkeypatch.delenv(k, raising=False)
 
     from examples.demo.app import create_app
 

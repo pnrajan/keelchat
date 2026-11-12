@@ -14,14 +14,20 @@ from typing import Any
 #: modules with optional built-in parts (they import their libraries only when a part is built)
 BUILTIN_MODULES = ("keelchat.knowledge.chonkie_parts", "keelchat.knowledge.stores")
 _builtins_loaded = False
+#: True while BUILTIN_MODULES import: their registrations never replace a part a user registered under that name
+_loading_builtins = False
 
 
 def load_builtins() -> None:
-    global _builtins_loaded
+    global _builtins_loaded, _loading_builtins
     if not _builtins_loaded:
         _builtins_loaded = True
-        for name in BUILTIN_MODULES:
-            importlib.import_module(name)
+        _loading_builtins = True
+        try:
+            for name in BUILTIN_MODULES:
+                importlib.import_module(name)
+        finally:
+            _loading_builtins = False
 
 
 class Plugins[T]:
@@ -40,6 +46,8 @@ class Plugins[T]:
             if isinstance(obj, type) and not issubclass(obj, self.base):
                 article = "an" if self.base.__name__[0] in "AEIOU" else "a"
                 raise TypeError(f"@{self.kind}({name!r}) needs {article} {self.base.__name__} subclass, got {obj.__name__}")
+            if _loading_builtins and name in self.factories:
+                return obj  # a user's part of the same name, registered first, stays in use
             self.factories[name] = obj
             return obj
 

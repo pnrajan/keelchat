@@ -26,6 +26,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- pgvector finds a small knowledge base beside a large one (iterative index scans), and takes embeddings over 2000
+  dimensions; tables are created by one process at a time.
+- Qdrant and Chroma refuse an `s3://` index address instead of writing to a local folder named after it.
+- A re-index that failed part-way embeds the documents still missing; a changed method is applied after a restart.
+- An embedding model litellm can't route (an older `.env`'s SiliconFlow model name, no key) no longer breaks indexing;
+  embedding failures return 502 with a short reason.
+- A vector store, chunker or embedder you register under a built-in name is kept.
+- A vector store, chunker or embedder you register under a built-in name is kept.
+- Tests that build the knowledge service no longer read `KNOWLEDGE_S3_BUCKET` from `.env`, so they never write to a
+  real bucket. A local Qdrant no longer warns about filter indexes.
 - A knowledge base whose documents were kept but whose vectors were missing (a new vector store or embedding model) is
   embedded again instead of being skipped as unchanged.
 - A nested object sent by the model as a JSON string is read as the object; a plan cut off mid-way is asked for again.

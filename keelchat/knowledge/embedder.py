@@ -25,6 +25,21 @@ from keelchat.logging import get_logger
 log = get_logger("embedder")
 
 
+class EmbeddingError(RuntimeError):
+    """The embedding model could not embed (unreachable, refused, misconfigured). The provider's own message is logged,
+    never shown to users."""
+
+
+def litellm_provider(model: str) -> str | None:
+    """The provider litellm routes `model` to, or None when it can't tell (e.g. `Qwen/Qwen3-Embedding-0.6B`)."""
+    import litellm
+
+    try:
+        return str(litellm.get_llm_provider(model)[1])
+    except Exception:  # litellm raises its own BadRequestError subclass for an unknown provider
+        return None
+
+
 class Embedder(ABC):
     """Turns texts into vectors of one fixed size. Similar meanings must land near each other (cosine)."""
 
@@ -123,14 +138,18 @@ class LiteLLMEmbedder(Embedder):
 
         out: list[list[float]] = []
         for i in range(0, len(texts), self.batch):
-            resp: Any = await litellm.aembedding(
-                model=self.model,
-                input=texts[i : i + self.batch],
-                **({"api_key": self.api_key} if self.api_key else {}),
-                **({"api_base": self.api_base} if self.api_base else {}),
-                timeout=30.0,  # a stalled request fails instead of hanging indexing or search
-                num_retries=2,
-            )
+            try:
+                resp: Any = await litellm.aembedding(
+                    model=self.model,
+                    input=texts[i : i + self.batch],
+                    **({"api_key": self.api_key} if self.api_key else {}),
+                    **({"api_base": self.api_base} if self.api_base else {}),
+                    timeout=30.0,  # a stalled request fails instead of hanging indexing or search
+                    num_retries=2,
+                )
+            except Exception as e:  # litellm raises provider-specific subclasses of its own exceptions
+                log.error("embedding failed", model=self.model, error=f"{e.__class__.__name__}: {str(e)[:200]}")
+                raise EmbeddingError(f"the embedding model {self.model} could not embed ({e.__class__.__name__})") from e
             out.extend([list(map(float, d["embedding"])) for d in resp["data"]])
         if out:
             self.dim = len(out[0])
@@ -198,7 +217,7 @@ def embedder_from_env() -> Embedder:
     if not choice:
         if os.getenv("SILICONFLOW_API_KEY"):
             choice = "siliconflow"
-        elif model or os.getenv("OPENAI_API_KEY"):
+        elif (model and litellm_provider(model)) or (not model and os.getenv("OPENAI_API_KEY")):
             choice = "litellm"
         elif _chonkie_installed():
             choice = "chonkie"
@@ -207,6 +226,10 @@ def embedder_from_env() -> Embedder:
         else:
             log.warning("no embedding model configured: knowledge search matches words, not meaning (set KNOWLEDGE_EMBEDDER)")
             return FakeEmbedder()
+        if model and choice in ("chonkie", "sentence-transformers") and not litellm_provider(model):
+            # e.g. the SiliconFlow model name in an older .env, with no SiliconFlow key: ignored rather than failing
+            log.warning("KNOWLEDGE_EMBED_MODEL names no provider litellm knows; using the local default model", model=model, embedder=choice)
+            model = None
     try:
         made = embedders.make(choice, model)
     except ValueError as e:

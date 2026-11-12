@@ -35,9 +35,11 @@ def _chunk(cid: str, doc: str, dataset: str, level: int = 0, text: str = "") -> 
     )
 
 
-async def check_vector_store(store: VectorIndex) -> None:
+async def check_vector_store(store: VectorIndex, *, crowd: int = 600) -> None:
     """Checks, in order: an empty store; nearest first with whole chunks back; one dataset per search; the level cap;
-    an upsert of the same chunk id replaces it; count per dataset; delete removes a document's chunks only."""
+    an upsert of the same chunk id replaces it; count per dataset; `doc_ids` (when the store reports it); delete
+    removes a document's chunks only; and a small dataset is still found when another one with `crowd` vectors nearer
+    the query fills the store (approximate indexes that filter after the search fail this)."""
     assert await store.count() == 0, "the store must start empty"
     assert await store.search(_unit(1, 0, 0, 0), k=3, dataset="t/a") == [], "searching an empty store returns no hits"
 
@@ -67,6 +69,9 @@ async def check_vector_store(store: VectorIndex) -> None:
         "count in all scopes and per dataset"
     )
 
+    have = await store.doc_ids("t/a")
+    assert have is None or have == {"d1", "d2"}, f"doc_ids lists the documents with chunks in a dataset: {have}"
+
     await store.delete_doc("d1")
     assert {h.chunk.id for h in await store.search(_unit(1, 0, 0, 0), k=10, dataset="t/a")} == {"d2:0"}, "delete_doc removes every chunk of that document"
     assert await store.count("t/b") == 1, "delete_doc leaves other documents alone"
@@ -74,3 +79,15 @@ async def check_vector_store(store: VectorIndex) -> None:
         await store.delete_doc(doc)
     await store.delete_doc("missing")  # deleting a document with no chunks is not an error
     assert await store.count() == 0, "empty again after deleting every document"
+
+    # one tenant's large knowledge base must not hide another's: every crowd vector is nearer the query than the target
+    crowd_chunks = [_chunk(f"big:{i}", f"big{i // 50}", "t/big") for i in range(crowd)]
+    crowd_vectors = [_unit(1, 0.001 * (i % 50), 0.001 * (i // 50), 0) for i in range(crowd)]
+    for i in range(0, crowd, 200):
+        await store.upsert(crowd_chunks[i : i + 200], crowd_vectors[i : i + 200])
+    await store.upsert([_chunk("small:0", "small", "t/small")], [_unit(0.5, 0, 0, 0.866)])
+    found = await store.search(_unit(1, 0, 0, 0), k=3, dataset="t/small")
+    assert [h.chunk.id for h in found] == ["small:0"], f"a small dataset is found beside a large one: got {[h.chunk.id for h in found]}"
+    for doc in {c.doc_id for c in crowd_chunks} | {"small"}:
+        await store.delete_doc(doc)
+    assert await store.count() == 0, "empty again at the end"

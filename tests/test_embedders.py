@@ -226,7 +226,10 @@ async def test_your_own_chunker_indexing_method_and_vector_store_are_used(monkey
     try:
         for k, v in {"KNOWLEDGE_EMBEDDER": "hash", "KNOWLEDGE_CHUNKER": "lines", "KNOWLEDGE_STRATEGY": "shouty", "KNOWLEDGE_VECTOR_STORE": "listy"}.items():
             monkeypatch.setenv(k, v)
+        for k in ("KNOWLEDGE_S3_BUCKET", "KNOWLEDGE_INDEX_URI"):  # documents stay in memory, never in a real bucket
+            monkeypatch.delenv(k, raising=False)
         svc = service_from_env()
+        assert type(svc.docs).__name__ == "InMemoryDocumentStore"
         assert isinstance(svc.index, Listy) and isinstance(svc.chunker, Lines) and svc.strategy == "shouty"
         await svc.add(Document.create("faq", "We open at 7am.\nParking is free behind the shop.", ""))
         hits = await svc.search("parking", k=1)
@@ -375,3 +378,32 @@ def test_building_parts_reads_no_settings(monkeypatch):
     monkeypatch.setenv("KNOWLEDGE_CHUNKER", "not_installed.module:Nope")
     svc = KnowledgeService(InMemoryDocumentStore(), InMemoryIndex(), FakeEmbedder(), make_indexer("simple", FakeEmbedder()))
     assert isinstance(svc.chunker, SemanticChunker)
+
+
+def test_your_part_keeps_a_built_in_name(monkeypatch):
+    """A store registered as "pgvector" before the optional built-ins load is the one used, not the built-in."""
+    import sys
+
+    from keelchat import VectorIndex, VectorStoreConfig, vector_store
+    from keelchat.knowledge import plugins
+    from keelchat.knowledge.vectorstore import InMemoryIndex, vector_stores
+
+    vector_stores.names()  # load the built-ins once, so there is one to set aside
+    original = vector_stores.factories["pgvector"]
+    vector_stores.factories.pop("pgvector")
+    loaded = plugins._builtins_loaded
+    try:
+        plugins._builtins_loaded = False  # as in a fresh process, where the built-ins load on first lookup
+        monkeypatch.delitem(sys.modules, "keelchat.knowledge.stores")  # so loading them runs their registrations again
+
+        @vector_store("pgvector")
+        class Mine(InMemoryIndex):
+            def __init__(self, cfg: VectorStoreConfig):
+                super().__init__()
+
+        made = vector_stores.make("pgvector", VectorStoreConfig(None, "chunks_x", 4))
+        assert isinstance(made, Mine) and isinstance(made, VectorIndex)
+        assert "keelchat.knowledge.stores" in sys.modules  # the built-ins did load, and left "pgvector" alone
+    finally:
+        vector_stores.factories["pgvector"] = original
+        plugins._builtins_loaded = loaded
