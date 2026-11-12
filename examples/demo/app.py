@@ -121,11 +121,12 @@ def create_app() -> FastAPI:
         if not await rt.limits.take(f"clarify-ip:{client_ip(request)}", DRAFTS_PER_IP, 600):
             raise HTTPException(429, "That's a lot of bots. Wait a few minutes and try again.")
         try:
-            questions = await clarify(rt.llm, drafting, body.text)
+            c = await clarify(rt.llm, drafting, body.text)
         except LLMError as e:  # no questions: the page drafts straight away
             log.error("clarifying questions failed", error=str(e)[:300])
-            questions = []
-        return {"questions": [{"id": q.id, "ask": q.ask, "why": q.why, "multi": q.multi, "options": [o.__dict__ for o in q.options]} for q in questions]}
+            return {"understood": "", "questions": []}
+        questions = [{"id": q.id, "ask": q.ask, "why": q.why, "multi": q.multi, "options": [o.__dict__ for o in q.options]} for q in c.questions]
+        return {"understood": c.understood, "questions": questions}
 
     async def draft(body: DraftIn, request: Request) -> dict[str, object]:
         """A policy from plain words, or the visitor's draft changed as asked. Checked by the build; never saved."""

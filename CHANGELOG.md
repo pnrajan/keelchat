@@ -6,8 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Demo: before the first draft, the drafting model asks 2-5 questions about what the description leaves open, each
-  with options to click (or your own words); the answers go into the draft. The demo drafts with Claude Opus 5.5
+- Demo: before the first draft, the drafting model reads the description against what a policy can express, says
+  what it understood, and asks 2-5 questions it judges matter most for that bot (no fixed topics), each with a line of
+  guidance and options to click (or your own words); the answers go into the draft. Drafting uses Claude Sonnet 5.5
   through OpenRouter. `keelchat.policy.drafter.clarify` and `with_answers`.
 - chonkie splits documents into passages (semantic by default) and provides a small local embedding model, used when
   no API embedding model is set; included in the `api` and `knowledge` extras and the Docker image.

@@ -101,7 +101,7 @@ async def test_malformed_questions_from_the_model_are_dropped() -> None:
                 ]
             }
 
-    qs = await clarify(Canned(), ModelConfig(), "Answer questions about our shop.")
+    qs = (await clarify(Canned(), ModelConfig(), "Answer questions about our shop.")).questions
     assert qs[0].id == "languages" and [o.label for o in qs[0].options] == ["English", "Both"]
     assert len(qs) == CLARIFY_MAX and len({q.id for q in qs}) == CLARIFY_MAX
 
@@ -111,8 +111,8 @@ async def test_the_drafting_model_asks_what_the_description_leaves_open() -> Non
     from keelchat.runtime.llm import ModelConfig
     from keelchat.runtime.llm_factory import llm_from_env
 
-    qs = await clarify(llm_from_env(), ModelConfig.from_env(), "Book dental appointments for our clinic.")
-    assert 2 <= len(qs) <= 5 and all(2 <= len(q.options) <= 5 and q.ask for q in qs)
+    c = await clarify(llm_from_env(), ModelConfig.from_env(), "Book dental appointments for our clinic.")
+    assert c.understood and 2 <= len(c.questions) <= 5 and all(2 <= len(q.options) <= 5 and q.ask for q in c.questions)
 
 
 def test_the_demo_asks_first_and_drafts_with_the_answers(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -126,7 +126,7 @@ def test_the_demo_asks_first_and_drafts_with_the_answers(monkeypatch: pytest.Mon
     text = "Answer questions about our bike shop."
     with TestClient(create_app()) as c:
         r = c.post("/demo/clarify", json={"text": text})
-        assert r.status_code == 200 and isinstance(r.json()["questions"], list)
+        assert r.status_code == 200 and isinstance(r.json()["questions"], list) and "understood" in r.json()
         lang = {"id": "languages", "ask": "Which languages?", "multi": False, "options": [{"label": "Both", "adds": "The bot speaks English and Spanish."}]}
         d = c.post("/demo/draft", json={"text": text, "questions": [lang], "answers": {"languages": ["Both"]}}).json()
     assert not d["errors"], d["errors"]
