@@ -351,3 +351,7 @@ def test_any_litellm_provider_works_with_its_own_key(monkeypatch):
     monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "ollama/llama3")
     with pytest.raises(RuntimeError, match="OLLAMA_API_BASE"):
         llm_from_env()
+    monkeypatch.delenv("SILICONFLOW_API_KEY", raising=False)
+    monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "siliconflow/Qwen/Qwen3.5-35B-A3B")
+    with pytest.raises(RuntimeError, match="needs SILICONFLOW_API_KEY"):
+        llm_from_env()

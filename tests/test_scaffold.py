@@ -51,6 +51,10 @@ async def test_new_package_registers_passes_contract_and_builds(tmp_path: Path, 
 
 def test_the_new_package_tests_pass_when_run_from_its_own_folder(tmp_path: Path) -> None:
     """As a developer runs them: pytest from the package folder, with none of keelchat's own pytest settings."""
+    from tests.conftest import MODEL_ERROR
+
+    if MODEL_ERROR:  # its step check calls the model
+        pytest.skip(f"needs a model: {MODEL_ERROR}")
     import os
     import subprocess
     import sys

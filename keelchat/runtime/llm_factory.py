@@ -61,13 +61,19 @@ def llm_from_env() -> LLMClient:
 
         model = ModelConfig.from_env().generate
         settings = litellm_settings(model)
-        if not settings["api_key"] and not (settings["model_name"].startswith("openai/") and os.getenv("OPENAI_API_KEY")):
-            import litellm
+        own = {"siliconflow/": "SILICONFLOW_API_KEY", "openrouter/": "OPENROUTER_API_KEY"}  # routed by keelchat itself
+        named = next((k for prefix, k in own.items() if model.startswith(prefix)), None)
+        gateway = bool(os.getenv("LITELLM_PROXY_URL") or os.getenv("HEADROOM_PROXY_URL"))
+        if not settings["api_key"] and not gateway:
+            missing = named
+            if not named and not (settings["model_name"].startswith("openai/") and os.getenv("OPENAI_API_KEY")):
+                import litellm
 
-            # any provider litellm supports, with its usual variables (GEMINI_API_KEY, AWS_*, OLLAMA_API_BASE, ...)
-            env = litellm.validate_environment(str(settings["model_name"]))
-            if not env.get("keys_in_environment"):
-                missing = ", ".join(env.get("missing_keys") or []) or "the provider key"
+                # any provider litellm supports, with its usual variables (GEMINI_API_KEY, AWS_*, OLLAMA_API_BASE, ...)
+                env = litellm.validate_environment(str(settings["model_name"]))
+                if not env.get("keys_in_environment"):
+                    missing = ", ".join(env.get("missing_keys") or []) or "the provider key"
+            if missing:
                 raise RuntimeError(f"KEELCHAT_LLM=litellm needs {missing} for KEELCHAT_MODEL_GENERATE={model} (or LITELLM_PROXY_URL)")
         return LiteLLMClient()  # key and base per request (litellm_settings): each model may use another provider
     raise RuntimeError("no LLM configured: set KEELCHAT_LLM=anthropic|litellm and the provider key (see .env / README)")
