@@ -149,14 +149,19 @@ class KnowledgeService:
             else:
                 strategy, why = spec.strategy, "Chosen when the knowledge base was made."
             indexer = self._indexer(strategy)  # before anything is removed: an unknown method changes nothing
+            for d in docs:  # what each stored document was indexed with: a restart or another server sees a change
+                d.metadata["index_method"] = strategy
             keep = {d.id for d in docs}
             stored = await self.docs.ids(dataset.ref)  # names only: nothing is downloaded
-            prev = self._methods.get(dataset.ref)
-            for old in stored if prev and prev[0] != strategy else stored - keep:  # a new method re-indexes everything
+            prev = self._methods[dataset.ref][0] if dataset.ref in self._methods else await self._stored_method(dataset.ref, stored)
+            for old in stored if prev is not None and prev != strategy else stored - keep:  # a new method re-indexes everything
                 await self.remove(old, dataset.ref)
             stored = await self.docs.ids(dataset.ref)
-            if stored and indexer.retrieval == "vectors" and await self.index.count(dataset.ref) == 0:
-                stored = set()  # documents kept but no vectors (a new vector store or embedder table): embed them again
+            if stored and indexer.retrieval == "vectors":
+                # documents kept but their vectors missing (a new vector store or embedder table, or a run that failed
+                # part-way): embed those again; a store that can't list its documents is refilled only when empty
+                have = await self.index.doc_ids(dataset.ref)
+                stored = stored & have if have is not None else (stored if await self.index.count(dataset.ref) else set())
             # ids come from the content: a document already stored is unchanged, so it is not embedded again (a
             # restart, another replica, or a new version that only changed the description)
             n = sum([await (self.add(d) if indexer is self.indexer else self.add(d, indexer)) for d in docs if d.id not in stored])
@@ -164,6 +169,14 @@ class KnowledgeService:
             self._methods[dataset.ref] = (strategy, why)
             log.info("dataset indexed", dataset=dataset.ref, version=dataset.version, documents=len(docs), chunks=n, strategy=strategy)
             return n
+
+    async def _stored_method(self, ref: str, stored: set[str]) -> str | None:
+        """The method a dataset's stored documents were indexed with (one is read); None if unknown (older documents)."""
+        if not stored:
+            return None
+        doc = await self.docs.get(next(iter(sorted(stored))), ref)
+        method = (doc.metadata.get("index_method") if doc else None) or None
+        return str(method) if method else None
 
     async def drop_dataset(self, ref: str, version: str | None = None) -> int:
         """Remove a dataset's documents and vectors. Waits for an indexing run of the dataset, so it cannot add them

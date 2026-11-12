@@ -33,6 +33,7 @@ from keelchat.channels.whatsapp_cloud import WhatsAppSender
 from keelchat.datasets.models import NAME_PATTERN, Dataset, DatasetIn, IndexStrategy, UnstructuredDataset
 from keelchat.datasets.sources import SourceRejected, check_sources
 from keelchat.evals.case import ReplayCase
+from keelchat.knowledge.embedder import EmbeddingError
 from keelchat.knowledge.service import KnowledgeService, local_service_from_env
 from keelchat.logging import configure, get_logger
 from keelchat.policy.compiler import CompiledPolicy, build
@@ -941,6 +942,8 @@ def create_app(
         except OSError as e:
             log.error("dataset documents unreadable", tenant=tenant, dataset=name, error=e.__class__.__name__)
             raise HTTPException(422, "a document could not be read") from None
+        except EmbeddingError:  # logged where it happened; the provider's message is never shown
+            raise HTTPException(502, "the embedding model could not be reached; check KNOWLEDGE_EMBEDDER and its key") from None
         except ToolError as e:
             log.error("dataset could not be loaded", tenant=tenant, dataset=name, error=str(e))
             raise HTTPException(422, f"the {ds.kind} data service could not load this dataset") from None

@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from keelchat.api.keys import require_service_key
 from keelchat.datasets.models import Dataset
 from keelchat.datasets.sources import SourceRejected
+from keelchat.knowledge.embedder import EmbeddingError
 from keelchat.knowledge.models import Document, Passage, Strategy
 from keelchat.knowledge.service import KnowledgeService, service_from_env
 from keelchat.logging import configure, get_logger
@@ -97,7 +98,7 @@ def create_app(service: KnowledgeService | None = None) -> FastAPI:
     async def health() -> Health:
         return Health(
             strategy=svc.strategy,
-            embedder=type(svc.embedder).__name__,
+            embedder=svc.embedder.id,
             dim=svc.embedder.dim,
             documents=await svc.document_count(),
             chunks=await svc.index.count(),
@@ -127,6 +128,8 @@ def create_app(service: KnowledgeService | None = None) -> FastAPI:
     async def search(body: SearchIn) -> SearchOut:
         try:
             return SearchOut(results=await svc.search(body.query, k=body.k, dataset=body.dataset))
+        except EmbeddingError:
+            raise HTTPException(502, "embedding model unavailable") from None
         except (SourceRejected, OSError, ValueError) as e:
             log.error("dataset unavailable", dataset=body.dataset.ref if body.dataset else "", error=f"{e.__class__.__name__}: {e}")
             raise HTTPException(422, "dataset sources unavailable") from None
@@ -138,6 +141,8 @@ def create_app(service: KnowledgeService | None = None) -> FastAPI:
             chunks = await svc.index_dataset(body, register=True)
             method, why = svc.method(body.ref) or (svc.strategy, "")
             return {"dataset": body.ref, "version": body.version, "chunks": chunks, "strategy": method, "why": why}
+        except EmbeddingError:
+            raise HTTPException(502, "embedding model unavailable") from None
         except (SourceRejected, OSError, ValueError) as e:
             log.error("dataset index failed", dataset=body.ref, error=f"{e.__class__.__name__}: {e}")
             raise HTTPException(422, str(e) if isinstance(e, SourceRejected | ValueError) else "source_unreadable") from None

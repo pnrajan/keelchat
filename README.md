@@ -111,8 +111,8 @@ Slack, phone.
 
 ### Yours to run and extend
 
-Apache-2.0, one Docker image. A tool, step, guardrail or channel is one decorated Python function or class, or an
-MCP server.
+Apache-2.0, one Docker image, on PyPI. A tool, step, guardrail or channel is one decorated Python function or class,
+or an MCP server; so is each part of knowledge search.
 
 </td>
 </tr>
@@ -149,7 +149,8 @@ flowchart LR
 | [Run it locally](#run-it-locally) | 5 minutes | macOS, Linux or WSL 2, and a model key |
 | [Deploy to Render](#deploy-to-render) | 10 minutes | GitHub and Render accounts, and a model key |
 
-The package is also on PyPI: `pip install keelchat` (Python 3.12+).
+The package is also on PyPI: `pip install "keelchat[api]"` (Python 3.12+); add `qdrant` or `chroma` for those vector
+stores.
 
 ### Try it in your browser
 
@@ -266,6 +267,11 @@ question, it says so instead of guessing. Several bots can share one.
   choose the method and how many passages each answer gets.
 - **Nothing extra to run:** the server indexes and searches knowledge bases itself, so a Render or Fly.io deploy
   answers from documents. For large sets, run the separate Knowledge Service.
+- **Passages and embeddings:** documents are split with [chonkie](https://github.com/chonkie-inc/chonkie)'s semantic
+  chunker and embedded with any provider's model through litellm (OpenAI, Voyage, Cohere, Gemini, Bedrock, Ollama),
+  or a small local model with no key.
+- **Your vector store:** in memory, LanceDB, Qdrant, Chroma or Postgres with pgvector, set with
+  `KNOWLEDGE_VECTOR_STORE`.
 - **From the API or YAML:** `POST /v1/tenants/{t}/documents`, or register documents already in a folder or S3 with
   `PUT /v1/tenants/{t}/datasets/{name}`, then:
 
@@ -274,7 +280,23 @@ question, it says so instead of guessing. Several bots can share one.
     - knowledge: {dataset: help_centre}
   ```
 
-[Answer from documents](docs/FEATURES.md#answer-from-documents) has the detail.
+Every part (embedding model, chunker, indexing method, vector store) can be replaced with your own: subclass the
+interface, register it, and pick it with a setting. `keelchat.testing.check_vector_store` checks a store of your own
+against the rules search relies on.
+
+```python
+from keelchat import VectorIndex, VectorStoreConfig, vector_store
+
+
+@vector_store("mystore")  # KNOWLEDGE_VECTOR_STORE=mystore
+class MyStore(VectorIndex):
+    def __init__(self, cfg: VectorStoreConfig): ...
+
+    # upsert, search, delete_doc, count
+```
+
+[Answer from documents](docs/FEATURES.md#answer-from-documents) and
+[Knowledge search parts](docs/ADDING_A_CAPABILITY.md#knowledge-search-parts) have the detail.
 
 ## Add a tool
 
@@ -349,7 +371,7 @@ Claude drafts the policy, tries a few conversations and shows you the result bef
 | write and tune a bot | [Writing an agent](docs/WRITING_AN_AGENT.md) |
 | look up a policy key | [The policy language](docs/POLICY_LANGUAGE.md) |
 | use the console, channels, memory, handoff, documents, Claude Code | [Features](docs/FEATURES.md) |
-| add a tool, step, guardrail or channel | [Adding a capability](docs/ADDING_A_CAPABILITY.md) |
+| add a tool, step, guardrail, channel, or knowledge search part | [Adding a capability](docs/ADDING_A_CAPABILITY.md) |
 | test and measure quality | [Evals](docs/EVALS.md) |
 | look up the CLI, API, settings, deployment | [Reference](docs/REFERENCE.md) |
 | understand the runtime | [Architecture](docs/ARCHITECTURE.md) |

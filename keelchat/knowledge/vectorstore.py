@@ -33,6 +33,11 @@ class VectorIndex(ABC):
     async def count(self, dataset: str | None = None) -> int:
         """Chunks in every scope, or in one ("" = the shared corpus)."""
 
+    async def doc_ids(self, dataset: str) -> set[str] | None:
+        """The documents with chunks in `dataset`, so documents whose vectors are missing (a new store, a failed run)
+        are embedded again. None: this store can't say, and only an empty dataset is re-embedded."""
+        return None
+
 
 @dataclass(frozen=True)
 class VectorStoreConfig:
@@ -74,6 +79,9 @@ class InMemoryIndex(VectorIndex):
 
     async def count(self, dataset: str | None = None) -> int:
         return sum(1 for c, _ in self._rows.values() if dataset is None or c.dataset == dataset)
+
+    async def doc_ids(self, dataset: str) -> set[str] | None:
+        return {c.doc_id for c, _ in self._rows.values() if c.dataset == dataset}
 
 
 def _quote(value: str) -> str:
@@ -189,6 +197,16 @@ class LanceDBIndex(VectorIndex):
             return int(table.count_rows() if dataset is None else table.count_rows(f"dataset = '{_quote(dataset)}'"))
 
         return await asyncio.to_thread(_do)  # S3 I/O off the event loop
+
+    async def doc_ids(self, dataset: str) -> set[str] | None:
+        def _do() -> set[str]:
+            table, _ = self._ensure()
+            if table is None:
+                return set()
+            rows = table.search().where(f"dataset = '{_quote(dataset)}'").select(["doc_id"]).limit(None).to_list()
+            return {r["doc_id"] for r in rows}
+
+        return await asyncio.to_thread(_do)
 
 
 vector_stores.register("memory")(lambda cfg: InMemoryIndex())

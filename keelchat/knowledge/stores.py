@@ -17,6 +17,11 @@ from typing import Any
 
 from keelchat.knowledge.models import Chunk, Hit
 from keelchat.knowledge.vectorstore import VectorIndex, VectorStoreConfig, vector_store
+from keelchat.logging import get_logger
+
+log = get_logger("vector_stores")
+#: pgvector's HNSW index takes vectors of up to this many dimensions
+HNSW_MAX_DIM = 2000
 
 #: chunk fields kept beside each vector, so a search returns whole chunks
 _FIELDS = ("id", "doc_id", "title", "text", "context", "level", "strategy", "source", "dataset")
@@ -28,6 +33,19 @@ def _payload(c: Chunk) -> dict[str, Any]:
 
 def _chunk(p: dict[str, Any]) -> Chunk:
     return Chunk(**{f: p[f] for f in _FIELDS if f in p})
+
+
+def _local(kind: str, server_var: str, uri: str | None) -> str:
+    """A local folder for an embedded store, or in memory. An object-store address (s3://...) is refused: these stores
+    can't keep their files there, and a folder named after it would be lost on redeploy."""
+    if not uri:
+        return ":memory:"
+    if "://" in uri:
+        where = uri.split("?")[0]
+        raise ValueError(
+            f"KNOWLEDGE_VECTOR_STORE={kind} can't keep its index at {where}: set {server_var} to a {kind} server, or KNOWLEDGE_INDEX_URI to a local folder"
+        )
+    return uri
 
 
 def _point_id(chunk_id: str) -> str:
@@ -48,7 +66,7 @@ class QdrantIndex(VectorIndex):
             raise RuntimeError('KNOWLEDGE_VECTOR_STORE=qdrant needs `pip install "keelchat[qdrant]"`') from e
         remote = location.startswith(("http://", "https://"))
         kw: dict[str, Any] = {"url": location, "api_key": api_key} if remote else ({"location": location} if location == ":memory:" else {"path": location})
-        self.client, self.collection = AsyncQdrantClient(**kw), collection
+        self.client, self.collection, self.remote = AsyncQdrantClient(**kw), collection, remote
         self._ready = False
 
     async def _ensure(self, dim: int) -> None:
@@ -58,12 +76,13 @@ class QdrantIndex(VectorIndex):
             return
         if not await self.client.collection_exists(self.collection):
             await self.client.create_collection(self.collection, vectors_config=models.VectorParams(size=dim, distance=models.Distance.COSINE))
-            for field, schema in (
-                ("dataset", models.PayloadSchemaType.KEYWORD),
-                ("doc_id", models.PayloadSchemaType.KEYWORD),
-                ("level", models.PayloadSchemaType.INTEGER),
-            ):
-                await self.client.create_payload_index(self.collection, field, field_schema=schema)
+            if self.remote:  # filter indexes; local (in-memory or on-disk) Qdrant has none
+                for field, schema in (
+                    ("dataset", models.PayloadSchemaType.KEYWORD),
+                    ("doc_id", models.PayloadSchemaType.KEYWORD),
+                    ("level", models.PayloadSchemaType.INTEGER),
+                ):
+                    await self.client.create_payload_index(self.collection, field, field_schema=schema)
         self._ready = True
 
     def _filter(self, dataset: str | None, max_level: int | None = None, doc_id: str | None = None) -> Any:
@@ -104,11 +123,24 @@ class QdrantIndex(VectorIndex):
             return 0
         return int((await self.client.count(self.collection, count_filter=self._filter(dataset), exact=True)).count)
 
+    async def doc_ids(self, dataset: str) -> set[str] | None:
+        if not await self.client.collection_exists(self.collection):
+            return set()
+        out: set[str] = set()
+        offset: Any = None
+        while True:
+            points, offset = await self.client.scroll(
+                self.collection, scroll_filter=self._filter(dataset), limit=1000, offset=offset, with_payload=["doc_id"], with_vectors=False
+            )
+            out |= {str((p.payload or {}).get("doc_id", "")) for p in points}
+            if offset is None:
+                return out
+
 
 @vector_store("qdrant")
 def _qdrant(cfg: VectorStoreConfig) -> VectorIndex:
     """QDRANT_URL (+ QDRANT_API_KEY) for a server; else a local path in KNOWLEDGE_INDEX_URI; else in memory."""
-    return QdrantIndex(cfg.table, os.getenv("QDRANT_URL") or cfg.uri or ":memory:", os.getenv("QDRANT_API_KEY"))
+    return QdrantIndex(cfg.table, os.getenv("QDRANT_URL") or _local("qdrant", "QDRANT_URL", cfg.uri), os.getenv("QDRANT_API_KEY"))
 
 
 # ------------------------------------------------------------------------------------------------------------ Chroma
@@ -178,11 +210,15 @@ class ChromaIndex(VectorIndex):
         got = await asyncio.to_thread(self.col.get, where={"dataset": dataset}, include=[])
         return len(got["ids"])
 
+    async def doc_ids(self, dataset: str) -> set[str] | None:
+        got = await asyncio.to_thread(self.col.get, where={"dataset": dataset}, include=["metadatas"])
+        return {str(m.get("doc_id", "")) for m in got["metadatas"] or []}
+
 
 @vector_store("chroma")
 def _chroma(cfg: VectorStoreConfig) -> VectorIndex:
     """CHROMA_URL for a server; else a local folder in KNOWLEDGE_INDEX_URI; else in memory."""
-    return ChromaIndex(cfg.table, os.getenv("CHROMA_URL") or cfg.uri or ":memory:")
+    return ChromaIndex(cfg.table, os.getenv("CHROMA_URL") or _local("chroma", "CHROMA_URL", cfg.uri))
 
 
 # ---------------------------------------------------------------------------------------------------------- pgvector
@@ -219,7 +255,8 @@ class PgVectorIndex(VectorIndex):
             if await self._exists():
                 return
             pool = await self._db()
-            async with pool.acquire() as con:
+            async with pool.acquire() as con, con.transaction():
+                await con.execute("SELECT pg_advisory_xact_lock(hashtext($1))", self.table)  # one creator at a time
                 await con.execute("CREATE EXTENSION IF NOT EXISTS vector")
                 await con.execute(
                     f"CREATE TABLE IF NOT EXISTS {self.table} (id text PRIMARY KEY, doc_id text NOT NULL, title text, text text,"
@@ -228,7 +265,10 @@ class PgVectorIndex(VectorIndex):
                 )
                 await con.execute(f"CREATE INDEX IF NOT EXISTS {self.table}_ds ON {self.table} (dataset)")
                 await con.execute(f"CREATE INDEX IF NOT EXISTS {self.table}_doc ON {self.table} (doc_id)")
-                await con.execute(f"CREATE INDEX IF NOT EXISTS {self.table}_hnsw ON {self.table} USING hnsw (embedding vector_cosine_ops)")
+                if dim <= HNSW_MAX_DIM:
+                    await con.execute(f"CREATE INDEX IF NOT EXISTS {self.table}_hnsw ON {self.table} USING hnsw (embedding vector_cosine_ops)")
+                else:  # pgvector indexes vectors of up to 2000 dimensions: larger ones are searched exactly
+                    log.warning("pgvector: no vector index for this embedding size; searches scan the dataset", table=self.table, dim=dim)
             self._ready = True
 
     @staticmethod
@@ -254,16 +294,29 @@ class PgVectorIndex(VectorIndex):
     async def search(self, vector: list[float], k: int = 5, max_level: int | None = None, dataset: str = "") -> list[Hit]:
         if not await self._exists():
             return []
+        if not any(vector):
+            return []  # a zero vector has no direction: cosine is undefined
         pool = await self._db()
-        rows = await pool.fetch(
-            f"SELECT id, doc_id, title, text, context, level, strategy, source, dataset, 1 - (embedding <=> $1::vector) AS score"
-            f" FROM {self.table} WHERE dataset = $2 AND ($3::int IS NULL OR level <= $3) ORDER BY embedding <=> $1::vector LIMIT $4",
-            self._vec(vector),
-            dataset,
-            max_level,
-            k,
+        sql = (
+            "SELECT * FROM (SELECT id, doc_id, title, text, context, level, strategy, source, dataset,"
+            f" embedding <=> $1::vector AS distance FROM {self.table} WHERE dataset = $2 AND ($3::int IS NULL OR level <= $3)"
+            " ORDER BY embedding <=> $1::vector LIMIT $4) hits ORDER BY distance"
         )
-        return [Hit(chunk=_chunk(dict(r)), score=float(r["score"])) for r in rows]
+        async with pool.acquire() as con, con.transaction():
+            # the HNSW index is read first and the dataset filtered after: keep scanning until enough rows match
+            # (pgvector 0.8+), else widen the search, so a small dataset is not hidden by a large one
+            try:
+                async with con.transaction():
+                    await con.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
+            except Exception:  # older pgvector: no iterative scans
+                await con.execute("SET LOCAL hnsw.ef_search = 1000")
+            rows = await con.fetch(sql, self._vec(vector), dataset, max_level, k)
+        return [Hit(chunk=_chunk(dict(r)), score=1.0 - float(r["distance"])) for r in rows]
+
+    async def doc_ids(self, dataset: str) -> set[str] | None:
+        if not await self._exists():
+            return set()
+        return {r["doc_id"] for r in await (await self._db()).fetch(f"SELECT DISTINCT doc_id FROM {self.table} WHERE dataset = $1", dataset)}
 
     async def delete_doc(self, doc_id: str) -> None:
         if await self._exists():
