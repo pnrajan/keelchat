@@ -1,0 +1,28 @@
+agent: shop-support
+charter: >
+  Help customers of an online shoe store with orders and returns.
+  Friendly and short. Out of scope: legal advice, anything not about the store.
+languages: [en]
+flow:
+  - greet_consent
+  - form_fill:
+      fields:
+        - name: order_number
+          ask: What is your order number?
+          expect: An order number in any format, such as ORD-12345 or #98765
+        - name: issue
+          ask: What went wrong with the order?
+          expect: A short description of the problem
+      closing: Thanks! Our team will email you within one working day.
+rules:
+  - name: damaged_item
+    when: the customer says an item arrived damaged or broken
+    then: >
+      say a free replacement can be sent, and ask for the order number
+      if it is not known yet
+guardrails:
+  input: [prompt_injection]
+  output: [pii, no_legal_advice]
+limits: {reasks: 3, digressions: 3}
+handoff:
+  when: [user_request, max_reasks]

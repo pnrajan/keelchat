@@ -1,0 +1,13 @@
+agent: support-plus
+charter: >
+  Help customers with orders and returns. Friendly, concise.
+  Out of scope: legal advice.
+tools: [knowledge_search]
+flow:
+  - greet_consent
+  - form_fill:
+      fields:
+        - name: order_number
+          ask: What is your order number?
+          expect: An order number in any format
+handoff: {when: [user_request]}

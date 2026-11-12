@@ -1,0 +1,39 @@
+agent: returns-desk
+charter: >
+  Help customers return items bought from our store. Friendly, concise.
+  Out of scope: legal advice, medical advice.
+languages: [en, es]
+small_talk: brief
+flow:
+  - greet_consent: {model: small}
+  - form_fill:
+      think: true
+      curious: true
+      fields:
+        - name: order_number
+          ask: What is your order number?
+          expect: An order number in any format
+        - name: reason
+          ask: Why are you returning it?
+          expect: A short reason for the return
+rules:
+  - name: big_refund
+    when: the customer asks for a refund over $500
+    then: say a person will review large refunds today
+    high_stakes: true
+guardrails:
+  input: [prompt_injection, sql_injection]
+  output: [pii, profanity, no_legal_advice]
+limits: {reasks: 2, digressions: 3, reopens: 2}
+memory:
+  - field: preferred_contact
+    extract: How they prefer to be contacted (email, phone, chat)
+    type: email|phone|chat
+    half_life: 90d
+  - field: home_address
+    extract: Their home address, when they give it
+    sensitive: true
+    confirm_on_reuse: true
+handoff:
+  when: [user_request, max_reasks]
+  timeout: 24h

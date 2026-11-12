@@ -1,0 +1,31 @@
+agent: store-survey
+charter: >
+  Run a short survey after an order. Warm, brief, one question at a time.
+  Out of scope: refunds and order changes; for those, say a person will follow up.
+languages: [en]
+flow:
+  - greet_consent
+  - survey:
+      questions:
+        - key: nps
+          kind: scale
+          prompt: How likely are you to recommend us to a friend?
+          scale_min: 0
+          scale_max: 10
+          min_label: not at all
+          max_label: extremely likely
+        - key: what_went_wrong
+          prompt: What could we have done better?
+          expectation: what went wrong and how it affected them
+          max_probes: 2
+          ask_if: {question: nps, op: lte, value: "6"}
+        - key: best_part
+          prompt: What did you like most about your order?
+          ask_if: {question: nps, op: gte, value: "7"}
+        - key: channel
+          kind: single_choice
+          prompt: How did you first hear about us?
+          options: [Search engine, Social media, A friend, Other]
+      closing: Thank you, that really helps us.
+handoff:
+  when: [user_request]

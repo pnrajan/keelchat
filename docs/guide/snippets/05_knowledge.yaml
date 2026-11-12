@@ -1,0 +1,11 @@
+agent: help-centre
+charter: >
+  Answer customers' questions about delivery, returns and warranties
+  from our help centre. Short, friendly answers.
+  Out of scope: anything the help centre does not cover.
+languages: [en]
+flow:
+  - knowledge:
+      dataset: help_centre
+handoff:
+  when: [user_request]

@@ -1,0 +1,3 @@
+agent: order-tracker
+charter: Tell customers where their order is.
+tools: [order_status]

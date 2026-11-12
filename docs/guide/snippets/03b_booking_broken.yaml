@@ -1,0 +1,13 @@
+agent: dental-booking
+charter: Book check-ups and cleanings for Bright Smile Dental.
+flow:
+  - form_fill:
+      fields:
+        - name: full_name
+          ask: What name should the booking be under?
+          expect: a person's name
+rules:
+  - name: dental_emergency
+    when: the patient describes a knocked-out tooth
+    then: say a person will take over now
+    handoff: true

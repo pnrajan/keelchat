@@ -371,6 +371,7 @@ Claude drafts the policy, tries a few conversations and shows you the result bef
 
 | To… | Read |
 |---|---|
+| start from zero, with diagrams and recipes | [Building agents with keelchat: a plain guide (PDF)](docs/guide/building-agents.pdf) |
 | write and tune a bot | [Writing an agent](docs/WRITING_AN_AGENT.md) |
 | look up a policy key | [The policy language](docs/POLICY_LANGUAGE.md) |
 | use the console, channels, memory, handoff, documents, Claude Code | [Features](docs/FEATURES.md) |
