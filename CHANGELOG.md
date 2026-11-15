@@ -64,6 +64,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- README speaks to one reader, the developer: install, key, build, serve in four lines up top; the browser demo and
+  Compose follow; Status says keelchat is self-hosted by design and points at what stays stable.
 - OpenRouter is the default model provider. With `KEELCHAT_LLM` unset, the provider follows the key that is set:
   `ANTHROPIC_API_KEY` means Anthropic directly as before; `OPENROUTER_API_KEY` alone means litellm on
   `openrouter/moonshotai/kimi-k2.5` to write and `openrouter/anthropic/claude-haiku-5.5` to classify, so a deploy with
