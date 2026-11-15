@@ -152,7 +152,7 @@ elif interactive; then
 MENU
   printf '  [1-4, Enter for 1] '; read -r choice
   case "${choice:-1}" in
-    1) var=OPENROUTER_API_KEY; llm=litellm; gen=openrouter/anthropic/claude-haiku-5.5; cls=openrouter/anthropic/claude-haiku-5.5 ;;
+    1) var=OPENROUTER_API_KEY; llm=litellm; gen=openrouter/moonshotai/kimi-k2.5; cls=openrouter/anthropic/claude-haiku-5.5 ;;
     2) var=ANTHROPIC_API_KEY; llm=anthropic; gen=claude-opus-5-5; cls=claude-haiku-5-5 ;;
     3) var=SILICONFLOW_API_KEY; llm=litellm; gen=siliconflow/Qwen/Qwen3.5-35B-A3B; cls=$gen ;;
     *) var='' ;;
