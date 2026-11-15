@@ -11,14 +11,18 @@ from keelchat.runtime.context import TurnContext
 log = get_logger("guardrails")
 
 
-async def run_guardrails(names: list[str], text: str, ctx: TurnContext) -> list[tuple[str, GuardResult]]:
+async def run_guardrails(names: list[str], text: str, ctx: TurnContext, stage: str) -> list[tuple[str, GuardResult]]:
+    """`stage` is the caller's: a name the registry no longer has (drift since the build) counts as a failed check of
+    that stage, so it fails closed on input and open on output like any other guardrail error."""
+
     async def one(name: str) -> tuple[str, GuardResult]:
-        spec = REGISTRY.guardrail(name)
         try:
+            spec = REGISTRY.guardrail(name)
             r = await asyncio.wait_for(spec.cls().check(text, ctx.guard), timeout=spec.cls.timeout_s)
         except Exception as e:  # input guardrails fail closed, output guardrails fail open
             log.error("guardrail error", guardrail=name, error=f"{e.__class__.__name__}: {e}")
-            r = GuardResult(flagged=(spec.stage == "input"), reason=f"{name} errored")
+            ctx.errors.append(f"guardrail {name} errored: {e.__class__.__name__}")
+            r = GuardResult(flagged=(stage == "input"), reason=f"{name} errored")
         return name, r
 
     return list(await asyncio.gather(*(one(n) for n in names)))

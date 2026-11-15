@@ -49,8 +49,13 @@ async def salary_lookup(title: str, location: str = "") -> dict[str, str]:
 ```
 
 Input schema comes from the type hints, output schema from the return hint. Raise `ToolError(name, kind, message)`
-for failures. `retries` is how many times the gateway retries after a timeout or error (default 1). After three failed calls in a
-row the tool's circuit opens for 30 seconds, and calls fail fast until then. A write tool
+for failures. `retries` is how many times the gateway retries after a timeout or any error (default 1). After three failed calls in a
+row the tool's circuit opens for 30 seconds for that tenant in that process, across turns, and calls fail fast until
+then. An argument named `tenant`, `user_id`, `session_id` or `agent` is always set from the server's context, never
+from the caller. A result longer than 16,000 characters is cut before it enters a prompt. A call with the wrong tool name, a
+tool the policy doesn't allow, or bad arguments is rejected with a `fix` written by code (each wrong field, and the
+arguments the tool takes); the planner gets it and may call again, up to `tool_corrections` (2) times per tool per
+turn, then the tool is dropped for that turn. The planner never calls a write tool. A write tool
 (`side_effects="write"`) is not retried unless you pass `retries` yourself. Don't retry anything that isn't safe to
 repeat. Never open sockets outside the function the gateway calls. Tool output goes into
 prompts as data, never as instructions. Anything that changes something (book, pay, submit) is an
@@ -68,7 +73,9 @@ KEELCHAT_MCP_SERVERS="tm=https://talent.example.com/mcp, time=npx -y @modelconte
 
 A target starting with `http` is a streamable-HTTP endpoint; anything else is a command started over stdio. Servers
 are contacted once at startup, each bounded by a timeout; one that is down or misconfigured is logged and skipped.
-A tool the server marks destructive is a write: never retried and never offered to the planner. Each call opens its
+A tool is a write unless the server marks it `readOnlyHint`, and always when it marks it `destructiveHint` (MCP's own
+default); writes are never retried and never offered to the planner. The hint is the server's word, not proof: a
+tool that must never have side effects is one you don't list. Each call opens its
 own session, so a stdio server starts its command per call; prefer HTTP servers in production. Reference the tools
 in a policy as `tools: [tm.career_navigation]`.
 
@@ -164,6 +171,10 @@ async def withdraw_application(application_id: str) -> dict[str, str]: ...
 
 Not a tool: the gateway rejects it from nodes and the planner. It runs only through `ActionRunner` when the
 candidate's own action proves it (`InboundMessage.action` from the channel, or an explicit reply a node maps to it).
+A node that offers one shows what will happen and records a `PendingAction` on the session (operation id, action,
+hash of the exact arguments, expiry); the confirmation runs only that operation, once (`form_fill`'s review and
+submit is the model to copy). Declare `operation_id: str = ""` to receive the operation's id as an idempotency key;
+the runner sets it, a caller cannot. On a timeout, treat the outcome as unknown: do not resend on your own.
 
 ## Pre-processor
 
@@ -316,6 +327,7 @@ from keelchat import check_capability
 await check_capability("tool", "salary_lookup", fake_impl)
 ```
 
-It checks: schemas are valid JSON Schema, a fake call succeeds, the gateway timeout is honored, no socket is opened
-outside the Tool Gateway, actions are rejected without the candidate's action, and pre-processors return the context. `tests/test_registry.py` runs it over everything registered. Then reference the
+It checks: schemas are valid JSON Schema, a fake call succeeds, the gateway timeout is honored, the tool's own code
+opens no socket during the fake call (a best-effort check, not a security boundary: code that runs in process is
+trusted), actions are rejected without the candidate's action, and pre-processors return the context. `tests/test_registry.py` runs it over everything registered. Then reference the
 name in a policy and run `keelchat build`.

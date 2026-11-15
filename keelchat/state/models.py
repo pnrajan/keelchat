@@ -41,6 +41,36 @@ class StepState(BaseModel):
     reopen_count: int = 0
 
 
+PendingStatus = Literal["pending", "done", "unknown", "failed"]
+
+
+class PendingAction(BaseModel):
+    """A business action the user was shown and asked to confirm. The confirmation is bound to exactly this: the
+    action, these arguments (by hash), this session, within `expires_at`; it is used once. `id` is the operation's
+    durable id and the idempotency key the action receives. `unknown` is a timeout whose outcome nobody has seen:
+    it is never retried on its own."""
+
+    id: str = Field(default_factory=lambda: new_id("op"))
+    action: str
+    args_hash: str
+    issued_at: datetime = Field(default_factory=now)
+    expires_at: datetime
+    status: PendingStatus = "pending"
+    result_id: str | None = None
+
+    @staticmethod
+    def hash_args(args: dict[str, Any]) -> str:
+        import json
+
+        return hashlib.sha256(json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:24]
+
+    def expired(self, at: datetime | None = None) -> bool:
+        return (at or now()) >= self.expires_at
+
+    def matches(self, action: str, args: dict[str, Any]) -> bool:
+        return self.action == action and self.args_hash == self.hash_args(args)
+
+
 class OpenQuestion(BaseModel):
     step: str
     field: str
@@ -79,6 +109,8 @@ class SessionState(BaseModel):
     digressions: int = 0
     nudges: int = 0
     open_question: OpenQuestion | None = None
+    #: the business action shown for confirmation, if any: "submit" authorises exactly this one, once, until it expires
+    pending_action: PendingAction | None = None
     consent: bool | None = None
     completed: bool = False
     exited: bool = False

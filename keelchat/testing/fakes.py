@@ -56,9 +56,9 @@ class FakeTools:
         hits = [p for p in self.passages if any(w in (p["text"] + p["title"]).lower() for w in q.split() if len(w) > 3)]
         return hits or self.passages[:1]
 
-    async def submit_application(self, job_id: str, answers: dict[str, str]) -> dict[str, Any]:
+    async def submit_application(self, job_id: str, answers: dict[str, str], operation_id: str = "") -> dict[str, Any]:
         await self._gate("submit_application", {"job_id": job_id, "answers": answers})
-        self.submitted.append({"job_id": job_id, "answers": answers})
+        self.submitted.append({"job_id": job_id, "answers": answers, "operation_id": operation_id})
         return {"application_id": f"app_{len(self.submitted)}", "job_id": job_id}
 
     async def handoff_webhook(

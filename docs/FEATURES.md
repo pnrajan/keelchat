@@ -47,7 +47,7 @@ The runtime produces one channel-neutral message; each channel owns its own limi
 
 | Channel | How it connects |
 |---|---|
-| **Website widget** | publish an agent (`POST /v1/tenants/{t}/agents/{agent}/embeds`) and paste the one-line `<script>` it returns. Only the sites you list can show it |
+| **Website widget** | publish an agent (`POST /v1/tenants/{t}/agents/{agent}/embeds`) and paste the one-line `<script>` it returns. Only the sites you list can show it. To serve `widget.js` from a CDN, add `data-host="https://your-keelchat-host"` to the tag |
 | **Link and installable app** | the same publish returns `app_url`: a full-screen chat that installs on a phone. `?score=8` starts a survey with a clicked score |
 | **WhatsApp** | WhatsApp Cloud API: `POST .../embeds/{id}/whatsapp` stores the number's token encrypted; Meta calls `/v1/public/whatsapp/{id}` (signature checked); choices go out as list messages |
 | **Phone** | set a Twilio number's voice webhook to `/v1/public/phone/embeds/{id}`; Twilio listens and speaks, and each answer is a turn (signature checked) |

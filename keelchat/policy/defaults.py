@@ -19,6 +19,9 @@ class Defaults(BaseModel):
     memory_half_life: Duration = timedelta(days=180)
     stale_memory_threshold: float = 0.25
     planner_step_budget: int = 6
+    #: per tool per turn: how often the planner may correct a rejected call (wrong arguments, unknown tool) before that
+    #: tool is dropped for the rest of the turn; counted in code
+    tool_corrections: int = 2
     token_budget: int = 20_000
     latency_target_s: float = 4.0
     language_switch: str = "explicit ask or two confident turns, then confirm"

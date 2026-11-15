@@ -74,3 +74,34 @@ async def audit_window(events: list[AuditEvent], tenant: str, since: datetime = 
     store = InMemoryAuditStore()
     await store.append(events)
     return await audit_db(store, tenant, since)
+
+
+class ScriptedLLM(RecordingLLM):
+    """Deterministic where it matters: a purpose with a script answers from it in order (a value that is an exception
+    is raised); every other request goes to the real model. For control-flow and failure tests of the runtime, where a
+    canned model reply is the point and the real model would only add noise."""
+
+    def __init__(self, scripts: dict[str, list[Any]], inner: LLMClient | None = None):
+        super().__init__(inner)
+        self.scripts = {k: list(v) for k, v in scripts.items()}
+
+    def _next(self, req: LLMRequest) -> Any:
+        script = self.scripts.get(req.purpose)
+        if not script:
+            return None
+        value = script.pop(0)
+        if isinstance(value, BaseException):
+            raise value
+        return value
+
+    async def complete(self, req: LLMRequest) -> str:
+        if (value := self._next(req)) is not None:
+            self.calls.append(req)
+            return str(value)
+        return await super().complete(req)
+
+    async def structured(self, req: LLMRequest, schema: dict[str, Any]) -> dict[str, Any]:
+        if (value := self._next(req)) is not None:
+            self.calls.append(req)
+            return dict(value)
+        return await super().structured(req, schema)

@@ -19,7 +19,7 @@ class InputGuardrails(PreProcessor):
 
     async def run(self, ctx: TurnContext) -> TurnContext:
         ctx.guard.language = ctx.language
-        results = await run_guardrails(ctx.policy.defaults.input_guardrails, ctx.text, ctx)
+        results = await run_guardrails(ctx.policy.defaults.input_guardrails, ctx.text, ctx, "input")
         flagged = [(n, r) for n, r in results if r.flagged]
         if flagged:
             ctx.input_flagged = True

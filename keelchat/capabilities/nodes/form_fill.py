@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 from typing import Any
 
 from pydantic import Field
 
 from keelchat.capabilities.nodes.common import affirm, affirm_failed, answers_for, tool_failed
+from keelchat.logging import get_logger
 from keelchat.registry.core import CapabilityConfig, Node, NodeResult, node
 from keelchat.runtime.context import TurnContext
 from keelchat.runtime.llm import LLMRequest
+from keelchat.state.models import PendingAction, SessionState, now
+
+log = get_logger("form_fill")
+#: how long a shown application stays confirmable by "submit"; after that the review is shown again
+CONFIRM_WINDOW_S = 15 * 60
 
 EXPECT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -187,6 +194,13 @@ class FormFill(Node[FormFillConfig]):
             )
         lines = "\n".join(f"- {_label(k)}: {v}" for k, v in st.fields.items() if v is not None)
         ask = f"Here is your application for {job.get('title')}:\n{lines}\nReply 'submit' to send it, or tell me what to change."
+        # "submit" will authorise exactly what is shown here: the same action and arguments, once, within the window
+        args = self._submit_args(st)
+        pending = st.pending_action
+        if pending is None or pending.status != "pending" or pending.expired() or not pending.matches("submit_application", args):
+            st.pending_action = PendingAction(
+                action="submit_application", args_hash=PendingAction.hash_args(args), expires_at=now() + timedelta(seconds=CONFIRM_WINDOW_S)
+            )
         return NodeResult(
             prefix + ask,
             goal="Show the application summary exactly as listed and ask them to reply 'submit' or say what to change.",
@@ -288,21 +302,64 @@ class FormFill(Node[FormFillConfig]):
                 goal = "Acknowledge their answer in a few words, without repeating it back."
         return self._next(ctx, prefix, allowed, goal)
 
-    async def _submit(self, ctx: TurnContext) -> NodeResult:
-        st = ctx.state
+    @staticmethod
+    def _submit_args(st: SessionState) -> dict[str, Any]:
         job = st.outputs.get("selected_job") or {}
-        answers = {k: str(v) for k, v in st.fields.items() if v is not None}
-        assert ctx.services.actions is not None
-        res = await ctx.services.actions.run("submit_application", {"job_id": job.get("id", ""), "answers": answers}, ctx.candidate_action)
-        if not res.ok:
-            tool_failed(ctx, "submit_application", res.error_kind)
+        return {"job_id": job.get("id", ""), "answers": {k: str(v) for k, v in st.fields.items() if v is not None}}
+
+    async def _submit(self, ctx: TurnContext) -> NodeResult:
+        """Runs the confirmed operation, and only that one: the pending action must be the one shown, unexpired, for
+        these exact arguments, and not already used. Anything else gets the review again, never a submission."""
+        st = ctx.state
+        args, pending = self._submit_args(st), st.pending_action
+        if pending is not None and pending.action == "submit_application" and pending.status == "done":
+            ctx.decide("step", "submit_replayed", reason=pending.id, ref="form_fill", ok=False)
             return NodeResult(
-                "I couldn't submit right now; your answers are saved and we'll retry.",
-                goal="Say sending failed for now; their answers are saved and it will be retried.",
+                f"That application was already submitted (id {pending.result_id or pending.id}); I won't send it twice.",
+                goal="Say the application was already submitted, give its id, and that it will not be sent again.",
                 outputs={"form": dict(st.fields)},
                 complete=True,
             )
-        rid = (res.data or {}).get("application_id", "")
+        if pending is not None and pending.action == "submit_application" and pending.status == "unknown":
+            ctx.decide("step", "submit_outcome_unknown", reason=pending.id, ref="form_fill", ok=False)
+            return NodeResult(
+                "I'm still confirming whether your earlier submission went through, so I won't send it again. A person will check.",
+                goal="Say you are still confirming whether the earlier submission went through and will not send it again.",
+                outputs={"form": dict(st.fields)},
+                complete=True,
+            )
+        if pending is None or pending.status != "pending" or pending.expired() or not pending.matches("submit_application", args):
+            why = "expired" if pending is not None and pending.expired() else "changed"
+            log.warning("submit confirmation not bound to what is shown; review again", reason=why)
+            ctx.decide("step", f"submit_confirmation_{why}", ref="form_fill", ok=False)
+            r = self._review(ctx, "", set())
+            lead = (
+                "That confirmation had expired, so here is the application again. "
+                if why == "expired"
+                else "The application changed since you last saw it, so here it is again. "
+            )
+            r.text = lead + r.text
+            r.goal = ("Say the confirmation expired" if why == "expired" else "Say the application changed since they last saw it") + ", then " + r.goal
+            return r
+        assert ctx.services.actions is not None
+        res = await ctx.services.actions.run("submit_application", args, ctx.candidate_action, operation_id=pending.id)
+        if not res.ok:
+            tool_failed(ctx, "submit_application", res.error_kind)
+            if res.error_kind == "timeout":  # nobody knows whether it went through: never retried on its own
+                pending.status = "unknown"
+                return NodeResult(
+                    "I couldn't confirm whether your application went through. I won't send it again; a person will check and get back to you.",
+                    goal="Say you could not confirm whether it went through, that it will not be sent twice, and that a person will check.",
+                    outputs={"form": dict(st.fields)},
+                    complete=True,
+                )
+            pending.status = "failed"  # a clear failure: the review is shown again and a fresh confirmation can resend
+            r = self._review(ctx, "", set())
+            r.text = "I couldn't submit right now. " + r.text
+            r.goal = "Say sending failed just now, then " + r.goal
+            return r
+        pending.status, pending.result_id = "done", str((res.data or {}).get("application_id", "") or "")
+        rid = pending.result_id
         return NodeResult(
             f"Submitted! Your application id is {rid}.",
             goal="Confirm the application was sent and give its id.",

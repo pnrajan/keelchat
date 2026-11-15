@@ -31,11 +31,29 @@ async def test_policy_update_does_not_change_live_session(policy_yaml):
 
 
 async def test_retired_policy(policy_yaml):
+    """Retirement is the emergency stop: it overrides the session's pin at once, cached policy or not."""
     rt, _ = await make_runtime(policy_yaml)
     s = await rt.start_session("hiring-agent", "u1")
-    await rt.policies.retire(s.policy_hash)
     assert (await say(rt, s.id, "hi")).outbound.text
+    await rt.policies.retire(s.policy_hash)
+    with pytest.raises(PolicyRetired):
+        await say(rt, s.id, "hi")
     rt.policies.by_hash.clear()
+    with pytest.raises(PolicyRetired):
+        await say(rt, s.id, "hi")
+
+
+async def test_a_pinned_session_fails_closed_when_its_yaml_no_longer_compiles_to_its_hash(policy_yaml, monkeypatch):
+    """After a restart the pinned policy is rebuilt from its saved YAML. If the registry, defaults or model ids have
+    changed since, the rebuild has a new hash: that is not the policy the session was pinned to, so the turn is refused
+    (law 7) instead of running the session on different behaviour under the old hash."""
+    rt, _ = await make_runtime(policy_yaml)
+    await rt.save_version(build(policy_yaml), policy_yaml)
+    s = await rt.start_session("hiring-agent", "u1")
+    rt.policies.by_hash.clear()  # a restart: the pinned build is gone from memory
+    assert (await say(rt, s.id, "hi")).state.policy_hash == s.policy_hash  # rebuilt to the same hash, fine
+    rt.policies.by_hash.clear()
+    monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "openai/not-the-pinned-model")  # model ids are part of the hash
     with pytest.raises(PolicyRetired):
         await say(rt, s.id, "hi")
 

@@ -6,6 +6,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The planner–verifier loop closes: the verifier returns a typed verdict (`issue`, `unmet`, `evidence`,
+  `repairable`, unsupported claims) that goes back to the planner as data on its next step; the planner can call a
+  tool, recalculate, revise, or `ask` the user one question. A missing, late or malformed verdict approves nothing;
+  the same issue twice stops the loop; a grounded but incomplete draft is delivered as a partial answer with the gap
+  named; a policy violation stops the path. Deterministic tests in `tests/test_planner_loop.py` (`ScriptedLLM`).
+- A tool that failed enters the prompt as `unavailable`; its error kind and text stay in the logs, so a bot never tells
+  the user "configuration error" or "circuit open". The gap named in a partial answer is a short phrase about the ask,
+  or a generic one, never the verifier's commentary.
+- A confirmed action is bound to what was shown: `form_fill` records a `PendingAction` (operation id, argument hash,
+  15-minute window) at the review; "submit" runs only that operation, once; a changed or expired confirmation shows
+  the review again; a timeout leaves the outcome `unknown` and is never resent on its own; actions that declare
+  `operation_id` receive it as an idempotency key.
+- Closed gaps the architecture audit confirmed: output guardrails run one after another so redactions compose and a
+  block is final; a guardrail missing from the registry fails closed on input and open on output; tool circuit
+  breakers are per tenant and per process and outlive the turn; a tool result is cut at 16,000 characters before it
+  enters a prompt; identity arguments (`tenant`, `user_id`, `session_id`, `agent`) on tools and actions come from the
+  server, never the caller; an MCP tool is a write unless the server says `readOnlyHint`; the contract suite's socket
+  guard raises only in the task that asked for it; a retired policy stops its sessions at once, cached or not, and a
+  pinned policy whose YAML no longer compiles to its hash fails closed; the handoff inbox withholds sensitive memory
+  values; in-flight memory writes are drained at shutdown. `docs/ARCHITECTURE_GUIDE.md` states the delivery
+  guarantees and the remaining limits plainly.
+- Wrong tool calls correct themselves: the Tool Gateway rejects a wrong name, a tool the policy doesn't allow, or bad
+  arguments with a `fix` written by code (each wrong field and the arguments the tool takes). The planner calls again
+  with it, up to 2 times per tool per turn (counted in code), then drops the tool. The planner refuses write tools in
+  code before the gateway.
 - [Building agents with keelchat: a plain guide](docs/guide/building-agents.pdf) (PDF, LaTeX source beside it): diagrams, six
   recipes (support, booking, survey, documents, data, your own tool), testing, extending and going live. Every YAML
   example builds (`tests/test_guide.py`).
@@ -36,6 +61,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `widget.js` takes `data-host`: the address the chat runs from, when the script itself is served from a CDN.
 - Docs checked against the code and corrected throughout (policy defaults, guardrail defaults, memory types,
   architecture, knowledge search, the API walkthrough, extension examples). A plugin README; complete policies in the
   docs are built by `tests/test_docs.py`.

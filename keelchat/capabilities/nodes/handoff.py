@@ -16,6 +16,7 @@ from typing import Any
 from keelchat.logging import get_logger
 from keelchat.registry.core import REGISTRY, EmptyConfig, Node, NodeResult, node
 from keelchat.runtime.context import TurnContext
+from keelchat.runtime.decide.tool_gateway import scrub
 from keelchat.state.models import Handoff as HandoffRecord
 from keelchat.state.models import HandoffLine, SessionState, now
 
@@ -84,7 +85,9 @@ def _transcript(ctx: TurnContext) -> list[HandoffLine]:
     turns = [HandoffLine(role=t.role, text=t.text, at=t.created_at) for t in ctx.state.turns if not t.flagged][-TRANSCRIPT_TURNS:]
     if not ctx.input_flagged:
         turns.append(HandoffLine(role="user", text=ctx.text))
-    return turns
+    # sensitive memory values leave the runtime for no one, the inbox included (the notify tool is scrubbed by the gateway)
+    withheld = scrub({"t": [x.text for x in turns]}, ctx.sensitive_values)["t"]
+    return [HandoffLine(role=x.role, text=t, at=x.at) for x, t in zip(turns, withheld, strict=True)]
 
 
 def _lines(lines: list[HandoffLine]) -> list[dict[str, str]]:
@@ -103,7 +106,7 @@ class Handoff(Node[EmptyConfig]):
         then_ask = f" {q.ask}" if q else ""
         if h is None or inbox is None:
             return NodeResult("I can't connect you with a person here." + then_ask, goal="Say you can't connect them with a person in this chat.")
-        fields = {k: str(v) for k, v in st.fields.items() if v is not None}
+        fields = scrub({k: str(v) for k, v in st.fields.items() if v is not None}, ctx.sensitive_values)
         opened = st.data.get("handoff")
         if opened:  # already with a person: this message goes to the same handoff
             new = _transcript(ctx)[-1:] if not ctx.input_flagged else []
