@@ -7,6 +7,7 @@ import asyncio
 import socket
 from collections.abc import Awaitable, Callable
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from keelchat.datasets.models import Dataset, DatasetIn, DatasetKind, DocumentSource, StructuredDataset, TableSource, UnstructuredDataset
@@ -43,19 +44,35 @@ def _valid_json_schema(schema: dict[str, Any]) -> bool:
     return isinstance(schema, dict) and ("type" in schema or "$ref" in schema or "anyOf" in schema or "oneOf" in schema or schema == {})
 
 
+#: true inside a `no_network` block, in that task only: the socket patch is process-wide but raises only here, so a
+#: contract check on a live server (a tenant registration) never trips the request, database or model calls beside it
+_NO_NETWORK: ContextVar[bool] = ContextVar("keelchat_no_network", default=False)
+_REAL_SOCKET = socket.socket
+_ACTIVE_BLOCKS = 0
+
+
+def _guarded_socket(*a: Any, **k: Any) -> Any:
+    if _NO_NETWORK.get():
+        raise ContractViolation("direct network access outside the Tool Gateway")
+    return _REAL_SOCKET(*a, **k)
+
+
 @contextmanager
 def no_network() -> Any:
-    """Any socket creation during the block raises. Tools go through the gateway with fakes; nothing else touches the network."""
-    real = socket.socket
-
-    def blocked(*a: Any, **k: Any) -> Any:
-        raise ContractViolation("direct network access outside the Tool Gateway")
-
-    socket.socket = blocked  # type: ignore[misc,assignment]
+    """Any socket creation during the block, in this task, raises. Tools go through the gateway with fakes; nothing else
+    touches the network. This is a best-effort check of a tool's own code, not a security boundary: a tool can catch
+    the error, use a socket it already holds, or resolve names without one."""
+    global _ACTIVE_BLOCKS
+    token = _NO_NETWORK.set(True)
+    _ACTIVE_BLOCKS += 1
+    socket.socket = _guarded_socket  # type: ignore[misc,assignment]
     try:
         yield
     finally:
-        socket.socket = real  # type: ignore[misc]
+        _NO_NETWORK.reset(token)
+        _ACTIVE_BLOCKS -= 1
+        if _ACTIVE_BLOCKS == 0:
+            socket.socket = _REAL_SOCKET  # type: ignore[misc]
 
 
 MINIMAL = """

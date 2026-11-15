@@ -18,12 +18,18 @@ class OutputGuardrails:
         if ctx.node_result is None:
             return ctx
         text = ctx.node_result.text
-        for name, r in await run_guardrails(ctx.policy.defaults.output_guardrails, text, ctx):
+        # One at a time, each on the text the previous one left: redactions compose instead of the last flagged check
+        # replacing the others' work on the original, and a block ends the chain (nothing later can restore the text).
+        for name in ctx.policy.defaults.output_guardrails:
+            ((_, r),) = await run_guardrails([name], text, ctx, "output")
             if not r.flagged:
                 continue
             log.warning("output flagged", guardrail=name, reason=r.reason, step=ctx.guard.step, field=ctx.guard.field)
             ctx.errors.append(f"output guardrail {name}: {r.reason}")
             ctx.decide("guardrail", "redacted_output" if r.redacted is not None else "blocked_output", reason=r.reason, ref=name)
-            text = r.redacted if r.redacted is not None else BLOCKED.get(ctx.language, BLOCKED["en"])
+            if r.redacted is None:
+                text = BLOCKED.get(ctx.language, BLOCKED["en"])
+                break
+            text = r.redacted
         ctx.node_result.text = text
         return ctx

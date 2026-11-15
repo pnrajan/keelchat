@@ -89,8 +89,10 @@ async def list_tools(alias: str, target: str, *, timeout_s: float) -> list[ToolS
     for t in listed.tools:
         name = f"{alias}.{t.name}"
         hints = t.annotations
-        # MCP's own hint: a destructive tool is a write (no retries, never offered to the planner)
-        writes = bool(hints is not None and hints.destructive_hint)
+        # MCP's own default is "may have side effects" unless the server says readOnlyHint; a destructive hint is a
+        # write whatever else it says. Writes get no retries and are never offered to the planner. The hint is the
+        # server's word, not proof: a tenant who needs a stronger guarantee lists the tool nowhere.
+        writes = hints is None or not hints.read_only_hint or bool(hints.destructive_hint)
         specs.append(
             ToolSpec(
                 name=name,

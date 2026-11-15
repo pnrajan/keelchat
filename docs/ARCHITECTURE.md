@@ -87,7 +87,8 @@ charter text, which every prompt receives.
    fact check and the step's verifier. **Output guardrails** run with step context (`pii` always on; allowed PII per
    field). The **Response Generator** renders in the session language (tool text marked `translate=False` stays as
    posted). The **channel stage** splits or formats the reply for the channel's limits.
-6. **After the reply** the state is saved with optimistic versioning and the **memory writer** runs as a background
+6. **After the reply is composed** the state is saved with optimistic versioning, the reply is handed to the channel,
+   and the **memory writer** runs as a background
    task: typed JSON-schema extraction per policy field, `from` fields copy validated answers, sensitive fields need
    consent and must be volunteered, flagged turns are never used, values decay by half-life.
 

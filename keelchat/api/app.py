@@ -610,6 +610,7 @@ def create_app(
         finally:
             for task in tasks:
                 task.cancel()
+            await rt.drain()  # in-flight memory writes finish before the process goes
 
     async def export_audit() -> None:
         """With an archive (AUDIT_ARCHIVE_WAREHOUSE): settled audit records are copied to it hourly."""

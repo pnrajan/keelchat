@@ -27,6 +27,10 @@ log = get_logger("gateway")
 ToolImpl = Callable[..., Awaitable[Any]]
 
 
+#: the most of one tool result that enters a prompt; the rest is cut with a marker the model can see
+PROMPT_DATA_MAX_CHARS = 16_000
+
+
 @dataclass
 class ToolResult:
     tool: str
@@ -37,14 +41,45 @@ class ToolResult:
     attempts: int = 0
     ms: float = 0.0
     translate: bool = True
+    #: for a call the caller can correct (wrong arguments, a tool that isn't there): what to change, written by code
+    #: from the tool's own schema and the allow list; never the tool's or a provider's error text
+    fix: str = ""
 
     def as_prompt_data(self) -> str:
-        body = json.dumps(self.data, default=_dump) if self.ok else json.dumps({"error": self.error_kind or "failed"})
+        if self.ok:
+            body = json.dumps(self.data, default=_dump)
+            if len(body) > PROMPT_DATA_MAX_CHARS:  # a backend cannot grow the prompt without bound
+                body = body[:PROMPT_DATA_MAX_CHARS] + f" …[truncated: {PROMPT_DATA_MAX_CHARS} of {len(body)} chars]"
+        else:
+            body = json.dumps({"error": self.error_kind or "failed", **({"fix": self.fix} if self.fix else {})})
         return untrusted("tool_output", body, tool=self.tool)
+
+
+def _arg_fix(e: ValidationError, spec: ToolSpec) -> str:
+    """What was wrong with each argument, and the arguments the tool takes, from its input model."""
+    problems = []
+    for err in e.errors()[:6]:
+        where = ".".join(str(x) for x in err["loc"]) or "arguments"
+        problems.append(f"`{where}`: {err['msg'].lower()}")
+    props = spec.input_model.model_json_schema().get("properties", {})
+    required = set(spec.input_model.model_json_schema().get("required", []))
+    takes = ", ".join(f"{n} ({p.get('type') or 'value'}{', required' if n in required else ''})" for n, p in props.items())
+    return "; ".join(problems) + f". {spec.name} takes: {takes}."
 
 
 def _dump(o: Any) -> Any:
     return o.model_dump(mode="json") if isinstance(o, BaseModel) else str(o)
+
+
+def with_trusted(validated: dict[str, Any], model: type[BaseModel], context: dict[str, str]) -> dict[str, Any]:
+    """Identity arguments come from the server's context, never from the caller: for every argument the tool takes
+    whose name is in `context` (tenant, user_id, session_id, agent), the context value replaces whatever was given."""
+    for key, value in context.items():
+        if key in model.model_fields and validated.get(key) != value:
+            if key in validated:
+                log.warning("identity argument replaced with the trusted value", argument=key)
+            validated[key] = value
+    return validated
 
 
 def to_plain(data: Any) -> Any:
@@ -95,6 +130,9 @@ class ToolGateway:
     sensitive_values: set[str] = dc_field(default_factory=set)
     #: the policy's datasets, resolved for this tenant: a dataset argument may only name one of these
     datasets: dict[str, Dataset] = dc_field(default_factory=dict)
+    #: trusted identity from the server (tenant, user_id, session_id, agent): an argument of that name is set from here
+    #: after validation, whatever the caller (a node or the model) put in it
+    context: dict[str, str] = dc_field(default_factory=dict)
     _breakers: dict[str, _Breaker] = dc_field(default_factory=dict)
     calls: list[tuple[str, dict[str, Any]]] = dc_field(default_factory=list)
     rejected: list[tuple[str, str]] = dc_field(default_factory=list)
@@ -132,11 +170,15 @@ class ToolGateway:
         try:
             spec = self.spec(name)
         except RegistryError:
-            return ToolResult(name, False, error=f"unknown tool {name!r}", error_kind="unknown")
+            fix = f"there is no tool {name!r}; use one of: {', '.join(sorted(self.allowed))}"
+            return ToolResult(name, False, error=f"unknown tool {name!r}", error_kind="unknown", fix=fix)
         if name not in self.allowed:
             log.warning("tool not allowed", tool=name)
             self.rejected.append((name, "not_allowed"))
-            return ToolResult(name, False, error=f"tool {name!r} is not in this agent's allow list", error_kind="not_allowed", translate=spec.translate)
+            fix = f"{name} is not allowed for this agent; use one of: {', '.join(sorted(self.allowed))}"
+            return ToolResult(
+                name, False, error=f"tool {name!r} is not in this agent's allow list", error_kind="not_allowed", translate=spec.translate, fix=fix
+            )
         b = self._breaker(name)
         if self._open(b):
             log.warning("circuit open", tool=name)
@@ -145,13 +187,19 @@ class ToolGateway:
             # only the arguments actually given: omitted ones take the tool's own default, never an explicit null
             validated = spec.input_model.model_validate(scrub(args, self.sensitive_values)).model_dump(exclude_unset=True)
         except ValidationError as e:
-            return ToolResult(name, False, error=f"invalid arguments: {e.error_count()} error(s)", error_kind="invalid_args", translate=spec.translate)
+            return ToolResult(
+                name, False, error=f"invalid arguments: {e.error_count()} error(s)", error_kind="invalid_args", translate=spec.translate, fix=_arg_fix(e, spec)
+            )
+        validated = with_trusted(validated, spec.input_model, self.context)
         if spec.dataset is not None and validated.get("dataset") is not None:
             ds = self.datasets.get(validated["dataset"])
             if ds is None or ds.kind != spec.dataset:
                 log.warning("dataset not allowed", tool=name, dataset=validated["dataset"])
                 self.rejected.append((name, "dataset_not_allowed"))
-                return ToolResult(name, False, error=f"dataset {validated['dataset']!r} is not available to this agent", error_kind="dataset_not_allowed")
+                fix = f"use one of these datasets: {', '.join(sorted(self.datasets)) or 'none'}"
+                return ToolResult(
+                    name, False, error=f"dataset {validated['dataset']!r} is not available to this agent", error_kind="dataset_not_allowed", fix=fix
+                )
             validated["dataset"] = ds
         if spec.repairs:  # the decorator's values are the default and the maximum: a caller (or the planner) can only lower them
             asked = validated.get("repairs") or {}
@@ -193,9 +241,13 @@ class ActionRunner:
 
     impls: dict[str, ToolImpl] = dc_field(default_factory=dict)
     sensitive_values: set[str] = dc_field(default_factory=set)
+    #: trusted identity from the server, applied like the gateway's (see `with_trusted`)
+    context: dict[str, str] = dc_field(default_factory=dict)
     calls: list[tuple[str, dict[str, Any]]] = dc_field(default_factory=list)
 
-    async def run(self, name: str, args: dict[str, Any], candidate_action: str | None) -> ToolResult:
+    async def run(self, name: str, args: dict[str, Any], candidate_action: str | None, *, operation_id: str | None = None) -> ToolResult:
+        """`operation_id` is the confirmed operation's durable id; an action that declares an `operation_id` argument
+        receives it as its idempotency key, from here and never from the caller's `args`."""
         t0 = time.perf_counter()
         if not REGISTRY.has_action(name):
             return ToolResult(name, False, error=f"unknown action {name!r}", error_kind="unknown")
@@ -207,6 +259,9 @@ class ActionRunner:
             validated = spec.input_model.model_validate(scrub(args, self.sensitive_values)).model_dump()
         except ValidationError as e:
             return ToolResult(name, False, error=f"invalid arguments: {e.error_count()} error(s)", error_kind="invalid_args")
+        validated = with_trusted(validated, spec.input_model, self.context)
+        if "operation_id" in spec.input_model.model_fields:
+            validated["operation_id"] = operation_id or ""
         impl = self.impls.get(name, spec.fn)
         self.calls.append((name, validated))
         try:

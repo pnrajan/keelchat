@@ -243,3 +243,22 @@ async def test_with_no_report_back_the_assistant_takes_over_after_the_timeout(po
     assert r.route != "handoff" and not r.state.exited
     assert "timed_out" in {e.decision for e in await rt.audit.query("default", session_id=s.id, kinds=["handoff"])}
     assert (await rt.handoffs.get("default", h.id)).status == "open"  # the ticket stays for the team to see
+
+
+async def test_sensitive_memory_never_reaches_the_inbox(policy_yaml):
+    """What the inbox stores is what a person reads: a remembered sensitive value (consented, stored) is withheld from
+    the transcript and the fields, as it is from the notify tool."""
+    from keelchat.state.models import MemoryRecord
+
+    rt, _ = await make_runtime(with_handoff(policy_yaml, when=["user_request"]))
+    await rt.memory_store.upsert(
+        MemoryRecord(tenant="default", user_id="u1", agent="hiring-agent", item="gender", value="nonbinary", sensitive=True, half_life_s=86400 * 180)
+    )
+    s = await rt.start_session("hiring-agent", "u1")
+    await say(rt, s.id, "hello")
+    await say(rt, s.id, "yes")
+    await say(rt, s.id, "As a nonbinary person I'd rather talk to a human about this, please.")
+    tickets = await rt.handoffs.list("default")
+    assert tickets, "no handoff opened"
+    text = " ".join(x.text for x in tickets[0].transcript) + " ".join(tickets[0].fields.values())
+    assert "nonbinary" not in text and "[withheld]" in text, text

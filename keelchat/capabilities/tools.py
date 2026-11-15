@@ -97,9 +97,11 @@ async def analytics_query(
 
 
 @action("submit_application", by="candidate", timeout_s=10.0)
-async def submit_application(job_id: str, answers: dict[str, str]) -> Receipt:
-    """Submit an application. Runs only from the candidate's own submit action."""
-    data = await _post("submit_application", "JOB_SEARCH_URL", "/apply", {"job_id": job_id, "answers": answers}, 10.0)
+async def submit_application(job_id: str, answers: dict[str, str], operation_id: str = "") -> Receipt:
+    """Submit an application. Runs only from the candidate's own submit action. `operation_id` is the runtime's
+    durable id for this confirmed operation: the backend may use it as an idempotency key."""
+    payload = {"job_id": job_id, "answers": answers, **({"operation_id": operation_id} if operation_id else {})}
+    data = await _post("submit_application", "JOB_SEARCH_URL", "/apply", payload, 10.0)
     return Receipt.model_validate(data)
 
 

@@ -20,7 +20,7 @@ from keelchat.runtime.audit import events_for, llm_events
 from keelchat.runtime.context import ChannelMessage, InboundMessage, OutboundMessage, Services, StageTrace, TurnContext
 from keelchat.runtime.decide.intent_detector import IntentDetector
 from keelchat.runtime.decide.orchestrator import Orchestrator
-from keelchat.runtime.decide.tool_gateway import ActionRunner, ToolGateway
+from keelchat.runtime.decide.tool_gateway import ActionRunner, ToolGateway, _Breaker
 from keelchat.runtime.llm import LLMClient, ModelConfig, small_only
 from keelchat.runtime.pipeline import CompositeStage, Pipeline
 from keelchat.runtime.respond.channel import ChannelStage
@@ -111,6 +111,12 @@ class TurnResult:
         }
 
 
+def trusted_context(policy: CompiledPolicy, state: SessionState) -> dict[str, str]:
+    """Identity as the server knows it, for the Tool Gateway and ActionRunner: a tool or action argument with one of
+    these names takes this value, never one a node or the model supplied."""
+    return {"tenant": policy.tenant, "user_id": state.user_id, "session_id": state.id, "agent": policy.agent}
+
+
 class Runtime:
     def __init__(
         self,
@@ -158,6 +164,9 @@ class Runtime:
         self.memory_writer = MemoryWriter(self.memory_store, self.llm, self.models)
         self.metrics = metrics or Metrics()
         self.gateway_kwargs = gateway_kwargs or {}
+        #: tool circuit breakers, per tenant, shared by every turn this process runs: a tool that keeps failing stays
+        #: open across turns and sessions of that tenant, and one tenant's failing backend never opens another's
+        self._breakers: dict[str, dict[str, _Breaker]] = {}
         self._tasks: set[asyncio.Task[Any]] = set()
         m = self.metrics
         self.pipeline = Pipeline(
@@ -227,16 +236,24 @@ class Runtime:
     async def _pinned(self, state: SessionState) -> CompiledPolicy | None:
         """The policy a session is pinned to; after a restart or on another replica it is rebuilt from the saved version
         with that hash (law 7: a conversation keeps the policy it started on)."""
+        if await self.policies.is_retired(state.policy_hash):  # retirement overrides the pin, cached or not
+            return None
         policy = await self.policies.get(state.policy_hash)
-        if policy is not None or await self.policies.is_retired(state.policy_hash):
+        if policy is not None:
             return policy
         for v in await self.versions.versions(state.tenant, state.agent):
             if v.hash == state.policy_hash:
                 try:
-                    return await self._compiled(v)
+                    policy = await self._compiled(v)
                 except PolicyValidationError as e:
                     log.error("pinned version no longer builds", agent=v.agent, version=v.version, errors=[x.path for x in e.errors])
                     return None
+                if policy.hash != v.hash:  # the same YAML now compiles differently (registry, defaults or models changed): not the pinned policy
+                    log.error(
+                        "pinned version rebuilt with a new hash; session fails closed", agent=v.agent, version=v.version, saved=v.hash, policy_hash=policy.hash
+                    )
+                    return None
+                return policy
         return None
 
     async def _activate(self, v: PolicyVersion, policy: CompiledPolicy) -> None:
@@ -395,7 +412,16 @@ class Runtime:
         for name in policy.datasets:  # read every turn: a re-registered dataset's new sources apply at once
             if (ds := await self.datasets.get(policy.tenant, name)) is not None:
                 resolved[name] = ds
-        return ToolGateway(set(policy.allowed_tools), dict(self.tool_impls), tenant=policy.tenant, datasets=resolved, **self.gateway_kwargs)
+        breakers = self._breakers.setdefault(policy.tenant, {})
+        return ToolGateway(
+            set(policy.allowed_tools),
+            dict(self.tool_impls),
+            tenant=policy.tenant,
+            datasets=resolved,
+            context=trusted_context(policy, state),
+            _breakers=breakers,
+            **self.gateway_kwargs,
+        )
 
     # ---------------------------------------------------------------- turns
     async def turn_from_payload(self, session_id: str, payload: dict[str, Any]) -> TurnResult:
@@ -454,7 +480,7 @@ class Runtime:
             models,
             gateway,
             self.metrics,
-            actions=ActionRunner(dict(self.tool_impls)),
+            actions=ActionRunner(dict(self.tool_impls), context=trusted_context(policy, state)),
             memory=self.memory_store,
             handoffs=self.handoffs,
             responses=self.responses,
