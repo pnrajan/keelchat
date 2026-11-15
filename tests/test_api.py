@@ -355,3 +355,21 @@ def test_any_litellm_provider_works_with_its_own_key(monkeypatch):
     monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "siliconflow/Qwen/Qwen3.5-35B-A3B")
     with pytest.raises(RuntimeError, match="needs SILICONFLOW_API_KEY"):
         llm_from_env()
+
+
+async def test_a_structured_call_cut_at_the_budget_is_retried_with_room_to_finish():
+    """A wordier model than the budget assumed stops mid-JSON (finish_reason length); the call is made again with a
+    larger budget instead of failing on the same one."""
+    from keelchat.runtime.decide.planner import VERIFY_SCHEMA, verify_system
+    from keelchat.runtime.llm import LLMRequest, ModelConfig
+    from keelchat.runtime.llm_factory import llm_from_env
+
+    req = LLMRequest(
+        "verify_grounded",
+        ModelConfig.from_env().classify,
+        verify_system(["job_search → [{'title': 'Backend Engineer', 'pay': '$150k'}]"]),
+        [{"role": "user", "content": "Ask: what does it pay?\nDraft: The Backend Engineer role pays $150k."}],
+        max_tokens=40,  # too small for a seven-field verdict with a reason
+    )
+    out = await llm_from_env().structured(req, VERIFY_SCHEMA)
+    assert set(out) >= {"issue", "unsupported", "answers_ask"}, out

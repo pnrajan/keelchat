@@ -3,20 +3,23 @@
 model_list:
   - model_name: small
     litellm_params:
-      model: openai/Qwen/Qwen3.5-35B-A3B
-      api_base: os.environ/SILICONFLOW_BASE_URL
-      api_key: os.environ/SILICONFLOW_API_KEY
-      extra_body: {enable_thinking: false}
+      model: openrouter/anthropic/claude-haiku-5.5
+      api_key: os.environ/OPENROUTER_API_KEY
   - model_name: large
     litellm_params:
-      model: openai/Qwen/Qwen3.5-35B-A3B
-      api_base: os.environ/SILICONFLOW_BASE_URL
-      api_key: os.environ/SILICONFLOW_API_KEY
-      extra_body: {enable_thinking: false}
+      model: openrouter/anthropic/claude-sonnet-5.5
+      api_key: os.environ/OPENROUTER_API_KEY
   - model_name: large
     litellm_params:
       model: anthropic/claude-sonnet-5-5
       api_key: os.environ/ANTHROPIC_API_KEY
+  # SiliconFlow (OpenAI-compatible), if you prefer it for `small`:
+  # - model_name: small
+  #   litellm_params:
+  #     model: openai/Qwen/Qwen3.5-35B-A3B
+  #     api_base: os.environ/SILICONFLOW_BASE_URL
+  #     api_key: os.environ/SILICONFLOW_API_KEY
+  #     extra_body: {enable_thinking: false}
 
 litellm_settings:
   num_retries: 3

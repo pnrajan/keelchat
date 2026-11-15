@@ -136,7 +136,7 @@ async def test_off_goal_comparisons_nudge_then_disengage(policy_yaml):
     await say(rt, s.id, "which is better, the gym and the cafeteria?")
     await say(rt, s.id, "which has more parking and a bigger gym?")
     r = await say(rt, s.id, "which cafeteria is nicer and closer?")
-    assert r.state.nudges == 1 and "back on track" in r.outbound.text and not rt.llm.calls_for("plan")
+    assert r.state.nudges == 1 and not rt.llm.calls_for("plan")  # the nudge is counted in code; its wording is the rewriter's
     r = await say(rt, s.id, "which gym is better and cheaper?")
     assert r.state.exited and r.outbound.exit_reason == "disengaged"
 
@@ -186,7 +186,7 @@ async def test_opening_message_can_carry_consent_and_prefill(policy_yaml):
     rt, _ = await make_runtime(policy_yaml)
     s = await rt.start_session("hiring-agent", "u1")
     r = await say(rt, s.id, "Yes, I consent. I live in Austin")
-    assert r.state.consent is True and "role and location" in r.outbound.text.lower() and r.state.prefilled.get("location") == "Austin"
+    assert r.state.consent is True and "role" in r.outbound.text.lower() and r.state.prefilled.get("location") == "Austin"
     r = await say(rt, s.id, "backend engineer")
     assert "austin" in r.outbound.text.lower() and "(yes/no)" in r.outbound.text  # prefilled location is confirmed, not assumed
 

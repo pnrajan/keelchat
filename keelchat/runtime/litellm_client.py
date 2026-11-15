@@ -132,12 +132,19 @@ class LiteLLMClient(LLMClient):
         forced = "claude" not in req.model or _reasoning_off(req.model)
         choice: Any = {"type": "function", "function": {"name": name}} if forced else "auto"
         last: LLMError | None = None
-        for attempt in range(2):  # open-weight models occasionally emit a truncated/malformed tool call; one retry
+        budget = req.max_tokens
+        for attempt in range(2):  # a truncated or malformed tool call is asked for again, with room to finish
             resp = await self._call(
                 req,
                 tools=[{"type": "function", "function": {"name": name, "parameters": schema}}],
                 tool_choice=choice,
+                max_tokens=budget,
             )
+            if getattr(resp.choices[0], "finish_reason", None) == "length":  # stopped at the budget: whatever arrived (often `{}`) is not the answer
+                budget = min(budget * 2, req.max_tokens * 4)  # a wordier model needs more, up to four times the ask
+                last = LLMError(f"tool arguments were cut at max_tokens (attempt {attempt + 1})")
+                log.info("structured output cut at the budget; asking again with more", purpose=req.purpose, max_tokens=budget)
+                continue
             calls = resp.choices[0].message.tool_calls or []
             if not calls:
                 last = LLMError(f"model did not call {name}")
@@ -153,7 +160,7 @@ class LiteLLMClient(LLMClient):
             req.model,
             req.system + "\nReply with a single JSON object matching this schema and nothing else:\n" + json.dumps(schema),
             req.messages,
-            max_tokens=req.max_tokens,
+            max_tokens=budget,
             effort=req.effort,
             metadata=req.metadata,
         )
