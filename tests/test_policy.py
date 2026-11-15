@@ -311,3 +311,10 @@ def test_a_default_added_later_does_not_change_the_hash_of_an_unchanged_policy()
     assert "tool_corrections" in HASH_SINCE_ADDED
     assert "tool_corrections" not in _defaults_payload(DEFAULTS) and "reasks" in _defaults_payload(DEFAULTS)
     assert _defaults_payload(DEFAULTS.model_copy(update={"tool_corrections": 3}))["tool_corrections"] == 3
+    from keelchat.policy import compiler
+
+    try:  # a non-scalar knob (a duration dumps as "P180D") must also count as "at its default"
+        compiler.HASH_SINCE_ADDED = (*HASH_SINCE_ADDED, "memory_half_life")
+        assert "memory_half_life" not in _defaults_payload(DEFAULTS)
+    finally:
+        compiler.HASH_SINCE_ADDED = HASH_SINCE_ADDED

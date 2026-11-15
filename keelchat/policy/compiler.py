@@ -121,14 +121,15 @@ class CompiledPolicy(BaseModel):
         return {m.name for m in self.memory if m.sensitive}
 
 
-#: defaults added after policies were first saved: left out of the hash while at their default value, so an unchanged
-#: policy keeps the hash its sessions are pinned to (law 7); a policy that sets one is hashed with it
+#: defaults added after policies were first saved: left out of the hash while at the built-in value, so an unchanged
+#: policy keeps the hash its sessions are pinned to (law 7); a build whose Defaults set one differently is hashed with it
 HASH_SINCE_ADDED: tuple[str, ...] = ("tool_corrections",)
+_BUILT_IN: dict[str, Any] = DEFAULTS.model_dump(mode="json")  # compared in the same JSON form (durations, enums)
 
 
 def _defaults_payload(resolved: Defaults) -> dict[str, Any]:
     dump: dict[str, Any] = resolved.model_dump(mode="json")
-    return {k: v for k, v in dump.items() if k not in HASH_SINCE_ADDED or v != getattr(DEFAULTS, k)}
+    return {k: v for k, v in dump.items() if k not in HASH_SINCE_ADDED or v != _BUILT_IN[k]}
 
 
 def content_hash(payload: dict[str, Any]) -> str:

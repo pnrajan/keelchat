@@ -357,19 +357,34 @@ def test_any_litellm_provider_works_with_its_own_key(monkeypatch):
         llm_from_env()
 
 
-async def test_a_structured_call_cut_at_the_budget_is_retried_with_room_to_finish():
-    """A wordier model than the budget assumed stops mid-JSON (finish_reason length); the call is made again with a
-    larger budget instead of failing on the same one."""
-    from keelchat.runtime.decide.planner import VERIFY_SCHEMA, verify_system
-    from keelchat.runtime.llm import LLMRequest, ModelConfig
-    from keelchat.runtime.llm_factory import llm_from_env
+async def test_a_structured_call_cut_at_the_budget_is_retried_with_room_to_finish(monkeypatch):
+    """A wordier model than the budget assumed stops mid-JSON: reported as finish_reason length (arguments often `{}`)
+    or as arguments cut mid-string. Either way the call is made again with twice the budget, capped at four times."""
+    from types import SimpleNamespace
 
-    req = LLMRequest(
-        "verify_grounded",
-        ModelConfig.from_env().classify,
-        verify_system(["job_search → [{'title': 'Backend Engineer', 'pay': '$150k'}]"]),
-        [{"role": "user", "content": "Ask: what does it pay?\nDraft: The Backend Engineer role pays $150k."}],
-        max_tokens=40,  # too small for a seven-field verdict with a reason
-    )
-    out = await llm_from_env().structured(req, VERIFY_SCHEMA)
-    assert set(out) >= {"issue", "unsupported", "answers_ask"}, out
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm import LLMRequest
+
+    for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
+        monkeypatch.delenv(var, raising=False)
+
+    def reply(arguments: str, finish: str = "tool_calls") -> Any:
+        call = SimpleNamespace(function=SimpleNamespace(arguments=arguments))
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason=finish, message=SimpleNamespace(tool_calls=[call], content=""))])
+
+    class Scripted(LiteLLMClient):
+        def __init__(self, replies: list[Any]) -> None:
+            super().__init__()
+            self.replies, self.budgets = replies, []
+
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            self.budgets.append(kwargs["max_tokens"])
+            return self.replies.pop(0)
+
+    req = LLMRequest("t", "openrouter/anthropic/claude-haiku-5.5", "s", [], max_tokens=100)
+    cut = Scripted([reply("{}", "length"), reply('{"ok": true}')])
+    assert await cut.structured(req, {"type": "object"}) == {"ok": True} and cut.budgets == [100, 200]
+    torn = Scripted([reply('{"ok": tr'), reply('{"ok": true}')])
+    assert await torn.structured(req, {"type": "object"}) == {"ok": True} and torn.budgets == [100, 200]
+    twice = Scripted([reply("{}", "length"), reply("{}", "length"), SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"ok": 1}'))])])
+    assert await twice.structured(req, {"type": "object"}) == {"ok": 1} and twice.budgets == [100, 200, 400]  # JSON mode at the grown budget

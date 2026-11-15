@@ -152,8 +152,8 @@ def verify_system(tool_outputs: list[str], conversation: str = "", constraints: 
 
 
 def grounded(verdict: dict[str, Any]) -> bool:
-    """Decided in code from the verifier's list: nothing unsupported. The loop itself uses `VerifierFeedback.passed`,
-    which also requires `issue == "none"`; kept for callers that only hold a raw verdict."""
+    """Decided in code from the verifier's list: nothing unsupported. Unused since the loop moved to
+    `VerifierFeedback.passed` (which also requires `issue == "none"`); kept, not deleted, per the project rule."""
     return isinstance(verdict.get("unsupported"), list) and not verdict["unsupported"]
 
 

@@ -1,7 +1,8 @@
 /* keelchat website widget.
    <script src="https://YOUR-HOST/widget.js" data-agent="pk_..." async></script>
    Options: data-position="left|right", data-label="Chat with us", data-open="true".
-   data-host="https://YOUR-HOST": where the chat runs, when this file is served from somewhere else (a CDN).
+   data-host="https://YOUR-HOST": where the chat runs, when this file is served from somewhere else (a CDN); without a
+   scheme, https is assumed (write http:// explicitly for a local server).
    The chat runs in an iframe from YOUR-HOST: the host page's styles cannot change it and its scripts cannot read it. */
 (() => {
   const me = document.currentScript;

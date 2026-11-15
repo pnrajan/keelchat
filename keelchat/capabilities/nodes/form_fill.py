@@ -329,7 +329,8 @@ class FormFill(Node[FormFillConfig]):
                 complete=True,
             )
         if pending is None or pending.status != "pending" or pending.expired() or not pending.matches("submit_application", args):
-            why = "unbound" if pending is None else "expired" if pending.expired() else "changed"
+            bound = pending is not None and pending.status == "pending" and pending.action == "submit_application"
+            why = "unbound" if not bound else "expired" if pending.expired() else "changed"  # type: ignore[union-attr]
             log.warning("submit confirmation not bound to what is shown; review again", reason=why)
             ctx.decide("step", f"submit_confirmation_{why}", ref="form_fill", ok=False)
             r = self._review(ctx, "", set())
