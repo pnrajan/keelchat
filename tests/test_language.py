@@ -11,6 +11,7 @@ async def test_spanish_in_spanish_out_french_unsupported(policy_yaml):
     assert r.state.language == "es" and r.outbound.language == "es" and "Do you consent" not in r.outbound.text  # rendered in Spanish
     s2 = await rt.start_session("hiring-agent", "u2")
     r = await say(rt, s2.id, "Bonjour, je cherche un emploi à Paris", user="u2")
+    assert not r.errors, r.errors  # a policy outcome, not a failure: the eval harness's no_errors check must pass
     assert r.outbound.language == "en" and r.outbound.text == "Sorry, I can only help in English, Spanish." and r.state.language == "en"
 
 

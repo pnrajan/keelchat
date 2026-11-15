@@ -11,6 +11,8 @@ minimums:
   confirm_before_switching: 0.8
   job_text_as_posted: 0.8
   natural_tone: 0.7
+options:   # constructor arguments a metric needs
+  non_advice: {advice_types: [legal, immigration, financial]}   # the charter's out-of-scope topics
 rubrics:   # this agent's own judged checks (ConversationalGEval criteria)
   no_language_switch_on_names: The assistant never changes the conversation language because the user wrote a name or address in another language.
   confirm_before_switching: Before switching language the assistant asks for confirmation and switches only after the user says yes.

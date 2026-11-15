@@ -183,13 +183,15 @@ class TurnContext:
         self.node_result = NodeResult(text=text, goal=goal, items=items or [])
 
     def short_circuit_with(self, text: str, note: str = "") -> None:
-        """Reply with a fixed message (already in the session language) and skip to Respond; it is never rephrased."""
+        """Reply with a fixed message (already in the session language) and skip to Respond; it is never rephrased.
+        `note` says why, in the audit log: an unsupported language, an opt-out, a blocked input are outcomes the
+        policy chose, not errors (the eval harness's `no_errors` check reads `errors`)."""
         self.reply(text)
         assert self.node_result is not None
         self.node_result.fixed = True
         self.short_circuit = True
         if note:
-            self.errors.append(note)
+            self.decide("step", "short_circuit", reason=note)
 
     @property
     def language(self) -> str:
