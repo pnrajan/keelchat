@@ -2,7 +2,8 @@
 # No app name here: each deploy names its own (Fly app names are global). From a clone or your fork:
 #
 #   fly apps create <your-app>
-#   fly secrets set -a <your-app> KEELCHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
+#   fly secrets set -a <your-app> KEELCHAT_API_KEY=$(openssl rand -hex 24) OPENROUTER_API_KEY=...
+#   (another provider: set KEELCHAT_LLM and the two KEELCHAT_MODEL_* below, and its key, as in .env.example)
 #   fly deploy -c deploy/fly.toml -a <your-app> .
 #
 # To redeploy from GitHub when CI passes on main (your fork's .github/workflows/deploy.yml):
@@ -19,6 +20,10 @@ swap_size_mb = 512
 [env]
   # Fly's proxy puts the visitor's address here: per-visitor limits on the public chat widget need it
   KEELCHAT_CLIENT_IP_HEADER = "Fly-Client-IP"
+  # models through OpenRouter (the key is a secret): Kimi K2.5 writes, Claude Haiku 5.5 classifies
+  KEELCHAT_LLM = "litellm"
+  KEELCHAT_MODEL_GENERATE = "openrouter/moonshotai/kimi-k2.5"
+  KEELCHAT_MODEL_CLASSIFY = "openrouter/anthropic/claude-haiku-5.5"
 
 [http_service]
   internal_port = 8080

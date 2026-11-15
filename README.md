@@ -103,8 +103,8 @@ the policy or the code. Test sets are generated from the YAML.
 
 ### Any model, any channel
 
-Anthropic, or anything litellm reaches (OpenAI, Gemini, Bedrock, OpenRouter, Ollama). Web widget, WhatsApp, SMS,
-Slack, phone.
+OpenRouter by default (Kimi K2.5 writes, Claude Haiku 5.5 classifies), Anthropic directly, or anything litellm reaches
+(OpenAI, Gemini, Bedrock, Ollama). Web widget (also from a CDN), WhatsApp, SMS, Slack, phone.
 
 </td>
 <td width="50%" valign="top">
@@ -168,7 +168,7 @@ link can start a draft:
 
 ```bash
 git clone https://github.com/pnrajan/keelchat && cd keelchat
-./setup.sh        # checks for git, uv, Node 20+; offers to install what's missing; asks for your model key
+./setup.sh        # checks for git, uv, Node 20+; offers to install what's missing; asks for a model key (OpenRouter by default)
 scripts/try.sh    # opens the console with a sample bot, everything in memory
 ```
 
@@ -189,7 +189,7 @@ Run keelchat in your own Render account, on the free plan.
 
    [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pnrajan/keelchat)
 
-3. Sign in to Render, review the service it will create, enter your `ANTHROPIC_API_KEY` when asked, and approve.
+3. Sign in to Render, review the service it will create, enter your `OPENROUTER_API_KEY` when asked, and approve.
    The first build takes a few minutes.
 4. On the service's **Environment** page, copy `KEELCHAT_API_KEY`. Render generated it; it locks the console and API.
 5. Open `https://<service>.onrender.com`. The console asks for the key once.
@@ -201,8 +201,9 @@ Run keelchat in your own Render account, on the free plan.
 <details>
 <summary><b>Good to know:</b> other model providers, updates, sleeping</summary>
 
-- **Another model provider:** on the **Environment** page, set `KEELCHAT_LLM=litellm`, `KEELCHAT_MODEL_GENERATE`,
-  `KEELCHAT_MODEL_CLASSIFY` and the provider's key (e.g. `OPENROUTER_API_KEY`), as in [`.env.example`](.env.example).
+- **Another model provider:** on the **Environment** page, set `KEELCHAT_MODEL_GENERATE`, `KEELCHAT_MODEL_CLASSIFY`
+  and the provider's key (`ANTHROPIC_API_KEY` with `KEELCHAT_LLM=anthropic`; any litellm provider with its usual key),
+  as in [`.env.example`](.env.example).
 - **Updates are not automatic.** Auto-deploy is off in [`render.yaml`](render.yaml). To redeploy each time CI passes
   on your fork, set **Auto-Deploy** to "After CI checks pass" in the service's **Settings**, or press
   **Manual Deploy**.
@@ -321,11 +322,13 @@ Type hints become the schema; the docstring is what the model reads. Load its pa
 
 ```bash
 uv run keelchat evals generate my_bot.yaml           # a test set from the policy, in evals/<agent>/
-uv run keelchat evals check evals/support_assistant  # the folder is the agent name, with _ for -
+uv run keelchat evals run evals/support_assistant    # replay its conversations, score them against thresholds.yaml
+uv run keelchat evals check evals/support_assistant  # the checks every conversation must pass; judged ones with EVALS_JUDGE_MODEL
+uv run keelchat simulate my_bot.yaml script.yaml     # play scripted users against a policy and read the transcripts
 ```
 
-In the console, **Test → Judge** has a stronger model review a chat and propose fixes. [Evals](docs/EVALS.md) has the
-detail.
+In the console, **Test** plays pretend users against your bot and **Judge** has a stronger model review a chat and
+propose fixes. [Evals](docs/EVALS.md) has the detail.
 
 ## Where a stronger model helps
 

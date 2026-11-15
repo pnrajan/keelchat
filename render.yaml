@@ -1,7 +1,8 @@
 # Render Blueprint: keelchat's API with the console on one web service in your Render account. Deploy: https://render.com/deploy?repo=<your fork's URL>; docs/REFERENCE.md#deploy-from-github
-# Render asks for ANTHROPIC_API_KEY once. KEELCHAT_API_KEY is generated: copy it from the service's Environment page to
-# sign in to the console. Another provider: in Environment, set KEELCHAT_LLM=litellm, KEELCHAT_MODEL_GENERATE,
-# KEELCHAT_MODEL_CLASSIFY and its key (e.g. OPENROUTER_API_KEY), as in .env.example.
+# Render asks for OPENROUTER_API_KEY once (Kimi K2.5 writes, Claude Haiku 5.5 classifies). KEELCHAT_API_KEY is
+# generated: copy it from the service's Environment page to sign in to the console. Another provider: in Environment,
+# set KEELCHAT_MODEL_GENERATE, KEELCHAT_MODEL_CLASSIFY and its key (ANTHROPIC_API_KEY with KEELCHAT_LLM=anthropic), as
+# in .env.example.
 # State is in memory unless you add DATABASE_URL (and REDIS_URL): saved bots go on restart without them.
 services:
   - type: web
@@ -18,5 +19,11 @@ services:
         value: "8080"
       - key: KEELCHAT_API_KEY
         generateValue: true
-      - key: ANTHROPIC_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false
+      - key: KEELCHAT_LLM
+        value: litellm
+      - key: KEELCHAT_MODEL_GENERATE
+        value: openrouter/moonshotai/kimi-k2.5
+      - key: KEELCHAT_MODEL_CLASSIFY
+        value: openrouter/anthropic/claude-haiku-5.5

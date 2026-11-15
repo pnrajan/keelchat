@@ -159,9 +159,9 @@ your copy. State is in memory until you set `DATABASE_URL` (and
 `REDIS_URL`): without them, saved bots go when the app restarts. The console asks for `KEELCHAT_API_KEY` to sign in.
 
 **Render.** Open `https://render.com/deploy?repo=<your fork's URL>` and sign in to Render. It reads
-[`render.yaml`](../render.yaml), asks for `ANTHROPIC_API_KEY`, and generates `KEELCHAT_API_KEY` (on the service's
-**Environment** page). For another provider, set `KEELCHAT_LLM=litellm`, the two `KEELCHAT_MODEL_*` and its key there,
-as in `.env.example`. The free plan sleeps when idle. The Blueprint turns auto-deploy off, as Render advises for Deploy
+[`render.yaml`](../render.yaml), asks for `OPENROUTER_API_KEY` (Kimi K2.5 writes, Claude Haiku 5.5 classifies), and
+generates `KEELCHAT_API_KEY` (on the service's **Environment** page). For another provider, set the two
+`KEELCHAT_MODEL_*` and its key there (`ANTHROPIC_API_KEY` with `KEELCHAT_LLM=anthropic`), as in `.env.example`. The free plan sleeps when idle. The Blueprint turns auto-deploy off, as Render advises for Deploy
 buttons, so a push to this repository never redeploys your service; to redeploy when CI passes on your fork, set
 **Auto-Deploy** to "After CI checks pass" in the service's **Settings**.
 
@@ -169,7 +169,7 @@ buttons, so a push to this repository never redeploys your service; to redeploy 
 
 ```bash
 fly apps create <your-app>
-fly secrets set -a <your-app> KEELCHAT_API_KEY=$(openssl rand -hex 24) ANTHROPIC_API_KEY=...
+fly secrets set -a <your-app> KEELCHAT_API_KEY=$(openssl rand -hex 24) OPENROUTER_API_KEY=...
 fly deploy -c deploy/fly.toml -a <your-app> .          # the first deploy
 fly tokens create deploy -a <your-app> | gh secret set FLY_API_TOKEN
 gh variable set FLY_APP --body <your-app>
