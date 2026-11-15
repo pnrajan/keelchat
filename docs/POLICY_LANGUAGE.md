@@ -283,3 +283,23 @@ Small talk is never taken as an answer. Two such turns in a row are answered; th
   lowercase letters, digits and `_`, starting with a letter.
 - **Text** can span lines with `>` (folded) or `|` (kept as written).
 - Text YAML would read as true/false/null (`yes`, `no`, `on`, `off`) needs quotes: `"yes"`.
+
+## What stays stable
+
+keelchat is 0.x, but a saved bot is a promise. Three things hold across upgrades:
+
+- **Saved policies keep their hash.** A session pins the policy it started on by content hash, and saved versions are
+  addressed by it. An upgrade must not move the hash of a policy whose YAML did not change. A default added later goes
+  in `HASH_SINCE_ADDED` (`keelchat/policy/compiler.py`) so it enters the hash only when a policy sets it, and
+  `tests/test_policy.py` pins the hash of every example policy; a change that moves one fails CI.
+- **Keys on this page are the language.** A key documented here is read the same way in every later 0.x release. A
+  key is removed only after a release in which it still works and the build warns, with the replacement named in
+  [CHANGELOG.md](../CHANGELOG.md) under "Changed".
+- **A deliberate hash change is announced.** When a policy key, a capability version or a default must change what a
+  policy compiles to, the CHANGELOG entry says which policies are affected and what happens to their open sessions
+  (they finish on the old build if it is still saved; otherwise they end with a clear message, and the user can start
+  again).
+
+Outside this promise: the HTTP API and the Python API may still change between minor versions; each change is in the
+CHANGELOG.
+

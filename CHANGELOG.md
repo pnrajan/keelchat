@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The hash of every example policy is pinned in `tests/test_policy.py`, so a change that would strand sessions pinned
+  on a saved policy fails CI unless it is deliberate and noted. [What stays stable](docs/POLICY_LANGUAGE.md#what-stays-stable)
+  states the compatibility promise: saved hashes hold, documented keys hold, deliberate changes are announced.
 - The planner–verifier loop closes: the verifier returns a typed verdict (`issue`, `unmet`, `evidence`,
   `repairable`, unsupported claims) that goes back to the planner as data on its next step; the planner can call a
   tool, recalculate, revise, or `ask` the user one question. A missing, late or malformed verdict approves nothing;
