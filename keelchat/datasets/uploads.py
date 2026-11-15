@@ -18,6 +18,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 from keelchat.logging import get_logger
+from keelchat.optional import optional
 
 log = get_logger("uploads")
 
@@ -84,8 +85,8 @@ def file_text(name: str, data: bytes) -> str:
         raise UploadRejected(f"{name} is larger than 10 MB")
     lower = name.lower()
     if lower.endswith(".pdf"):
-        from pypdf import PdfReader
-        from pypdf.errors import PdfReadError
+        pypdf = optional("pypdf", "api", needed_for="a PDF upload")
+        PdfReader, PdfReadError = pypdf.PdfReader, pypdf.errors.PdfReadError
 
         try:
             pages = [page.extract_text() or "" for page in PdfReader(io.BytesIO(data)).pages]

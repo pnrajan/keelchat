@@ -18,6 +18,7 @@ from typing import Any
 from keelchat.knowledge.models import Chunk, Hit
 from keelchat.knowledge.vectorstore import VectorIndex, VectorStoreConfig, vector_store
 from keelchat.logging import get_logger
+from keelchat.optional import optional
 
 log = get_logger("vector_stores")
 #: pgvector's HNSW index takes vectors of up to this many dimensions
@@ -238,8 +239,7 @@ class PgVectorIndex(VectorIndex):
 
     async def _db(self) -> Any:
         if self._pool is None:
-            import asyncpg
-
+            asyncpg = optional("asyncpg", "postgres", needed_for="KNOWLEDGE_VECTOR_STORE=pgvector")
             self._pool = await asyncpg.create_pool(self.dsn, min_size=1, max_size=4)
         return self._pool
 

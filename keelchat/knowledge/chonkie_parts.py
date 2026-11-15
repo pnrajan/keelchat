@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from keelchat.knowledge.chunker import Chunker, chunker
 from keelchat.knowledge.embedder import Embedder, embedder
+from keelchat.optional import optional
 
 #: a small static-embedding model: fast on CPU, about 30 MB
 DEFAULT_MODEL = "minishlab/potion-base-8M"
@@ -26,11 +27,7 @@ def installed() -> bool:
 
 
 def _need() -> Any:
-    try:
-        import chonkie
-    except ImportError as e:
-        raise RuntimeError('chonkie is not installed: pip install "chonkie[semantic]"') from e
-    return chonkie
+    return optional("chonkie", "chonkie", needed_for="the chonkie chunker and embedder")
 
 
 @chunker("chonkie")
