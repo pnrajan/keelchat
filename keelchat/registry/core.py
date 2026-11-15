@@ -259,12 +259,56 @@ class GuardrailSpec:
         return _schema_hash({"stage": self.stage})
 
 
+# ---------------------------------------------------------------- checks
+
+#: what a verifier, code or model, can find wrong with a draft (the planner reads both the same way)
+Issue = Literal["none", "missing_evidence", "calculation_error", "incomplete", "conflicting_evidence", "missing_user_information", "policy_violation"]
+
+
+@dataclass
+class Evidence:
+    """What a check may hold a draft against: the sources it must stay within (tool outputs, the plain version, the
+    user's own words), the question it must still ask, and internal names that must not reach the user."""
+
+    sources: list[str] = dc_field(default_factory=list)
+    asked: str = ""
+    names: set[str] = dc_field(default_factory=set)
+    language: str = "en"
+
+
+@dataclass(frozen=True)
+class Finding:
+    """A check's rejection, in the verifier's own terms, so the planner and the rewriter read code and model findings
+    alike. `unmet` is written for the model that redrafts; `unsupported` lists loose figures."""
+
+    issue: Issue
+    unmet: str
+    explanation: str = ""
+    unsupported: tuple[str, ...] = ()
+    repairable: bool = True
+
+
+#: a check: pure code over a draft and its evidence; None when the draft passes. No model, no network, no side effects.
+CheckFn = Callable[[str, Evidence], Finding | None]
+
+
+@dataclass(frozen=True)
+class CheckSpec:
+    name: str
+    fn: CheckFn
+    version: str = "1"
+    description: str = ""
+
+    def schema_hash(self) -> str:
+        return _schema_hash({"check": self.name})
+
+
 # ---------------------------------------------------------------- manifest
 
 
 class ManifestEntry(BaseModel):
     name: str
-    kind: Literal["tool", "action", "node", "guardrail", "preprocessor"]
+    kind: Literal["tool", "action", "node", "guardrail", "preprocessor", "check"]
     version: str
     schema_hash: str
     description: str = ""
@@ -295,6 +339,7 @@ class Registry:
         self._nodes: dict[str, NodeSpec] = {}
         self._guards: dict[str, GuardrailSpec] = {}
         self._pre: dict[str, PreProcessorSpec] = {}
+        self._checks: dict[str, CheckSpec] = {}
         self._discovered = False
 
     # registration
@@ -325,6 +370,9 @@ class Registry:
 
     def add_preprocessor(self, spec: PreProcessorSpec) -> None:
         self._pre[spec.name] = spec
+
+    def add_check(self, spec: CheckSpec) -> None:
+        self._checks[spec.name] = spec
 
     # lookups
     def _visible(self, tenant: str | None) -> dict[str, ToolSpec]:
@@ -379,6 +427,19 @@ class Registry:
 
     def preprocessors(self) -> list[PreProcessorSpec]:
         return sorted(self._pre.values(), key=lambda p: (p.order, p.name))
+
+    def has_check(self, name: str) -> bool:
+        return name in self._checks
+
+    def check(self, name: str) -> CheckSpec:
+        try:
+            return self._checks[name]
+        except KeyError:
+            raise RegistryError(f"unknown check {name!r}; known: {sorted(self._checks)}") from None
+
+    def checks(self) -> list[CheckSpec]:
+        """Every registered check, by name: all of them run on every draft (there is no per-policy list)."""
+        return sorted(self._checks.values(), key=lambda c: c.name)
 
     def tool_names(self, tenant: str | None = None) -> list[str]:
         return sorted(self._visible(tenant))
@@ -455,6 +516,9 @@ class Registry:
                 name=p.name, kind="preprocessor", version=p.version, schema_hash=p.schema_hash(), description=p.description, properties={"order": p.order}
             )
             for p in self._pre.values()
+        ]
+        entries += [
+            ManifestEntry(name=c.name, kind="check", version=c.version, schema_hash=c.schema_hash(), description=c.description) for c in self._checks.values()
         ]
         return Manifest(entries=sorted(entries, key=lambda e: (e.kind, e.name)))
 
@@ -577,6 +641,16 @@ def guardrail(name: str, *, stage: GuardStage, version: str = "1") -> Callable[[
     def deco(cls: type[Guardrail]) -> type[Guardrail]:
         REGISTRY.add_guardrail(GuardrailSpec(name=name, cls=cls, stage=stage, version=version, description=inspect.getdoc(cls) or ""))
         return cls
+
+    return deco
+
+
+def check(name: str, *, version: str = "1") -> Callable[[CheckFn], CheckFn]:
+    """Register a code check that every draft passes before a model verifier sees it (docs/ADDING_A_CAPABILITY.md)."""
+
+    def deco(fn: CheckFn) -> CheckFn:
+        REGISTRY.add_check(CheckSpec(name=name, fn=fn, version=version, description=inspect.getdoc(fn) or ""))
+        return fn
 
     return deco
 

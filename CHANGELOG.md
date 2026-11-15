@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Checks**: code that reads every draft before a model verifier does, registered with `@check` and run on every
+  planner draft and every rewrite; a rejection goes back as the verifier's own typed feedback and the model verifier is
+  not asked that round. Built in: `no_reasoning_leak` (a model thinking out loud), `no_internal_names`,
+  `numbers_grounded` (every figure in a source), `question_kept`. When every rewrite fails and the plain version goes
+  out without a matched rule, the audit log records `rules_unspoken`. [Adding a capability](docs/ADDING_A_CAPABILITY.md#check).
 - The hash of every example policy is pinned in `tests/test_policy.py`, so a change that would strand sessions pinned
   on a saved policy fails CI unless it is deliberate and noted. [What stays stable](docs/POLICY_LANGUAGE.md#what-stays-stable)
   states the compatibility promise: saved hashes hold, documented keys hold, deliberate changes are announced.

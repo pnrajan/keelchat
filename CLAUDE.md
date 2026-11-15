@@ -23,7 +23,7 @@ auto-discovered registry. If a change conflicts with a rule here, stop and flag 
 | Adding | Goes in |
 |---|---|
 | Policy key, model or default | `keelchat/policy/` |
-| Tool, action, node, guardrail, preprocessor | `keelchat/capabilities/`, as a decorated function or class |
+| Tool, action, node, guardrail, preprocessor, check | `keelchat/capabilities/`, as a decorated function or class |
 | Pipeline step | `keelchat/runtime/understand/`, `decide/` or `respond/` |
 | Channel | `keelchat/channels/` |
 | Store or other external dependency | a port plus an in-memory fake (store fakes: `keelchat/state/store.py`; tool fakes: `keelchat/testing/fakes.py`); adapters in `keelchat/state/` |
