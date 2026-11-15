@@ -168,7 +168,7 @@ link can start a draft:
 
 ```bash
 git clone https://github.com/pnrajan/keelchat && cd keelchat
-./setup.sh        # checks for git, uv, Node 20+; offers to install what's missing; asks for a model key (OpenRouter by default)
+./setup.sh        # checks for git, uv, Node 20+; offers to install what's missing; asks for a model key
 scripts/try.sh    # opens the console with a sample bot, everything in memory
 ```
 
@@ -201,9 +201,10 @@ Run keelchat in your own Render account, on the free plan.
 <details>
 <summary><b>Good to know:</b> other model providers, updates, sleeping</summary>
 
-- **Another model provider:** on the **Environment** page, set `KEELCHAT_MODEL_GENERATE`, `KEELCHAT_MODEL_CLASSIFY`
-  and the provider's key (`ANTHROPIC_API_KEY` with `KEELCHAT_LLM=anthropic`; any litellm provider with its usual key),
-  as in [`.env.example`](.env.example).
+- **Another model provider:** on the **Environment** page, add its key. `ANTHROPIC_API_KEY` alone means Anthropic
+  directly on its own models; for anything else set `KEELCHAT_LLM=litellm`, `KEELCHAT_MODEL_GENERATE` and
+  `KEELCHAT_MODEL_CLASSIFY` too, as in [`.env.example`](.env.example). Knowledge-base embeddings need
+  `KNOWLEDGE_EMBED_MODEL` or a `SILICONFLOW_API_KEY` / `OPENAI_API_KEY`; OpenRouter has no embeddings.
 - **Updates are not automatic.** Auto-deploy is off in [`render.yaml`](render.yaml). To redeploy each time CI passes
   on your fork, set **Auto-Deploy** to "After CI checks pass" in the service's **Settings**, or press
   **Manual Deploy**.
@@ -327,8 +328,8 @@ uv run keelchat evals check evals/support_assistant  # the checks every conversa
 uv run keelchat simulate my_bot.yaml script.yaml     # play scripted users against a policy and read the transcripts
 ```
 
-In the console, **Test** plays pretend users against your bot and **Judge** has a stronger model review a chat and
-propose fixes. [Evals](docs/EVALS.md) has the detail.
+In the console, **Test → Simulate** plays pretend users against your bot and **Test → Judge** has a stronger model
+review a chat and propose fixes. [Evals](docs/EVALS.md) has the detail.
 
 ## Where a stronger model helps
 

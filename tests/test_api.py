@@ -388,3 +388,27 @@ async def test_a_structured_call_cut_at_the_budget_is_retried_with_room_to_finis
     assert await torn.structured(req, {"type": "object"}) == {"ok": True} and torn.budgets == [100, 200]
     twice = Scripted([reply("{}", "length"), reply("{}", "length"), SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"ok": 1}'))])])
     assert await twice.structured(req, {"type": "object"}) == {"ok": 1} and twice.budgets == [100, 200, 400]  # JSON mode at the grown budget
+
+
+def test_the_provider_and_its_models_follow_the_key_that_is_set(monkeypatch):
+    """No KEELCHAT_LLM and no model ids: an OpenRouter key alone means litellm on Kimi K2.5 and Claude Haiku 5.5; an
+    Anthropic key alone (or both: existing deploys) means Anthropic directly on its own ids; explicit ids always win."""
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm import AnthropicLLMClient, ModelConfig, provider_from_env
+    from keelchat.runtime.llm_factory import llm_from_env
+
+    unset = ("KEELCHAT_LLM", "KEELCHAT_MODEL_GENERATE", "KEELCHAT_MODEL_CLASSIFY", "LITELLM_PROXY_URL", "HEADROOM_PROXY_URL")
+    for var in (*unset, "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    assert provider_from_env() == "litellm" and isinstance(llm_from_env(), LiteLLMClient)
+    assert (ModelConfig.from_env().generate, ModelConfig.from_env().classify) == ("openrouter/moonshotai/kimi-k2.5", "openrouter/anthropic/claude-haiku-5.5")
+    monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "openrouter/deepseek/deepseek-v3.2")
+    assert ModelConfig.from_env().generate == "openrouter/deepseek/deepseek-v3.2"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")  # both keys: Anthropic, as before this default existed
+    monkeypatch.delenv("KEELCHAT_MODEL_GENERATE")
+    assert provider_from_env() == "anthropic" and isinstance(llm_from_env(), AnthropicLLMClient)
+    assert ModelConfig.from_env().generate == "claude-opus-5-5"
+    monkeypatch.setenv("LITELLM_PROXY_URL", "http://gateway:4000")  # through a gateway, ids are its aliases: no OpenRouter defaults
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    assert ModelConfig.from_env().generate == "claude-opus-5-5"

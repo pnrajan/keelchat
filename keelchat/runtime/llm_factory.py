@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from keelchat.runtime.llm import AnthropicLLMClient, LLMClient, ModelConfig
+from keelchat.runtime.llm import AnthropicLLMClient, LLMClient, ModelConfig, provider_from_env
 
 #: tools that reach an HTTP backend, keyed by the env var that configures it (used to decide what FakeTools may replace)
 TOOL_BACKENDS: dict[str, str] = {
@@ -50,8 +50,9 @@ def litellm_settings(model: str) -> dict[str, Any]:
 
 
 def llm_from_env() -> LLMClient:
-    """KEELCHAT_LLM=anthropic|litellm (default: anthropic when ANTHROPIC_API_KEY is set). A missing key raises."""
-    choice = os.getenv("KEELCHAT_LLM") or ("anthropic" if os.getenv("ANTHROPIC_API_KEY") else "")
+    """KEELCHAT_LLM=anthropic|litellm; unset, the provider whose key is set (anthropic for ANTHROPIC_API_KEY, else
+    litellm with OpenRouter's models for OPENROUTER_API_KEY). A missing key raises."""
+    choice = provider_from_env()
     if choice == "anthropic":
         if not os.getenv("ANTHROPIC_API_KEY"):
             raise RuntimeError("KEELCHAT_LLM=anthropic needs ANTHROPIC_API_KEY")
