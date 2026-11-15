@@ -121,6 +121,16 @@ class CompiledPolicy(BaseModel):
         return {m.name for m in self.memory if m.sensitive}
 
 
+#: defaults added after policies were first saved: left out of the hash while at their default value, so an unchanged
+#: policy keeps the hash its sessions are pinned to (law 7); a policy that sets one is hashed with it
+HASH_SINCE_ADDED: tuple[str, ...] = ("tool_corrections",)
+
+
+def _defaults_payload(resolved: Defaults) -> dict[str, Any]:
+    dump: dict[str, Any] = resolved.model_dump(mode="json")
+    return {k: v for k, v in dump.items() if k not in HASH_SINCE_ADDED or v != getattr(DEFAULTS, k)}
+
+
 def content_hash(payload: dict[str, Any]) -> str:
     canon = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canon.encode()).hexdigest()[:16]
@@ -227,7 +237,7 @@ def compile_policy(
         "allowed_tools": tool_set,
         **({"datasets": sorted(used_datasets)} if used_datasets else {}),  # absent when unused: existing hashes stay stable
         "memory": [m.model_dump(mode="json") for m in memory],
-        "defaults": resolved.model_dump(mode="json"),
+        "defaults": _defaults_payload(resolved),
         "manifest": used,
         **({"handoff": _handoff_payload(policy.handoff)} if policy.handoff else {}),  # absent when unused: hashes stay stable
         **({"rules": [r.model_dump(mode="json") for r in policy.rules]} if policy.rules else {}),

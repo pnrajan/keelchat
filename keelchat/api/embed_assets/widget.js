@@ -7,7 +7,8 @@
   const me = document.currentScript;
   if (!me || !me.dataset.agent || window.__keelchatWidget) return;
   window.__keelchatWidget = true;
-  const origin = new URL(me.dataset.host || me.src).origin;
+  const host = me.dataset.host && (/^https?:\/\//i.test(me.dataset.host) ? me.dataset.host : "https://" + me.dataset.host);
+  const origin = new URL(host || me.src).origin;
   start(me.dataset.agent);
 
   function start(agent) {

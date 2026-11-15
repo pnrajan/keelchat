@@ -176,3 +176,35 @@ async def test_a_tool_that_is_down_is_not_described_to_the_user() -> None:
     assert not res.ok and res.error_kind == "config"
     prompt = res.as_prompt_data()
     assert "config" not in prompt and "unavailable" in prompt
+
+
+async def test_a_policy_violation_discards_an_earlier_partial_answer() -> None:
+    r, llm = await run(
+        {
+            "plan": [tool(role="backend", location="Austin"), ANSWER, ANSWER],
+            "planner_answer": ["Backend Engineer in Austin.", "Backend Engineer in Austin; legally you must sue them."],
+            "verify_grounded": [verdict("incomplete", "the pay"), verdict("policy_violation", "legal advice", answers_ask=False, repairable=False)],
+        }
+    )
+    assert len(llm.calls_for("verify_grounded")) == 2
+    text = r.outbound.text  # the plain fallback (plus the verbatim listing, as always); neither draft
+    assert "Backend Engineer in Austin." not in text and "sue" not in text.lower() and "couldn't settle" not in text, text
+
+
+async def test_the_gap_named_belongs_to_the_partial_answer_delivered() -> None:
+    """The partial is the last grounded draft; the gap shown with it is that draft's gap, not whatever the final
+    verdict (about a later, worse draft) complained of."""
+    r, llm = await run(
+        {
+            "plan": [tool(role="backend", location="Austin")] + [ANSWER] * 4,
+            "planner_answer": ["Backend Engineer in Austin.", "Pays $1,800k a year.", "Pays $1,800k a year."],
+            "verify_grounded": [
+                verdict("incomplete", "the pay"),
+                verdict("calculation_error", "the annual total", unsupported=["$1,800k"]),
+                verdict("calculation_error", "the annual total", unsupported=["$1,800k"]),
+            ],
+        }
+    )
+    assert len(llm.calls_for("verify_grounded")) == 3  # the same failure twice stopped it
+    assert "Backend Engineer in Austin" in r.outbound.text and "$1,800k" not in r.outbound.text, r.outbound.text
+    assert "the pay" in r.outbound.text and "annual total" not in r.outbound.text, r.outbound.text

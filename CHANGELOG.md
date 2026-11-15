@@ -70,6 +70,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Adding `tool_corrections` to the defaults had changed the hash of every saved policy, so after a restart a session
+  pinned before the deploy failed closed (`PolicyRetired`). Defaults added after policies were first saved
+  (`HASH_SINCE_ADDED`) stay out of the hash at their default value; saved hashes are unchanged.
+- The planner delivers no part of a path the verifier found a policy violation on, and the gap it names with a
+  partial answer is that draft's own gap. A review reached without a bound confirmation asks to confirm this
+  version instead of saying the application changed. `widget.js` accepts `data-host` without a scheme.
 - `@tool(..., side_effects="write")` is no longer retried by default (a retried write could happen twice), as HTTP
   and MCP tools already weren't; an explicit `retries` is kept.
 - `KEELCHAT_LLM=litellm` works with any provider litellm supports, using its usual key variables (e.g.

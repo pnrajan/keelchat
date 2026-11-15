@@ -111,7 +111,9 @@ needed; each has a platform default.
    tools; cap `repairs` at each capability's maxima; pin model tiers.
 4. **Hash.** A session pins the hash at start and keeps it for its whole life. Saved versions are addressed by
    `(tenant, agent, hash)`; `manifest_versions` records the version of each capability named, so a changed
-   capability is detectable.
+   capability is detectable. A knob added to `Defaults` after policies were first saved goes in `HASH_SINCE_ADDED`
+   in `policy/compiler.py`: it enters the hash only when a policy sets it, so saved hashes and the sessions pinned
+   to them survive the upgrade.
 
 Entry points: `uv run keelchat build file.yaml`, `uv run keelchat schema`, `POST /v1/agents/validate`,
 `POST /v1/tenants/{t}/agents` (saves a version; `.../versions/{v}/activate` switches). The console's Compose writes
@@ -321,8 +323,8 @@ step, and the planner decides: another tool call, a recalculation, a revised dra
 to the user, which ends the turn as a clarification). The verifier runs no tool and settles nothing. Bounds, all in
 code: the step budget, the planner timeout, the correction budget, and a no-progress stop when the same issue comes
 back twice or the verifier says it is not repairable. A `policy_violation` stops the path at once. Outcomes are
-distinct: a checked answer; a supported partial answer (the last grounded draft, with the unmet part named as a short
-phrase, or generically when the verifier wrote commentary); a
+distinct: a checked answer; a supported partial answer (the last grounded draft, with its own unmet part named as a
+short phrase, or generically when the verifier wrote commentary; dropped if a later draft broke policy); a
 clarification question; the safe fallback. None of them completes a step or ends a session: the flow, counters and
 `handoff.when` do that. Rewriting afterwards keeps the facts (`kept` check) and the verbatim items are appended as
 posted.
