@@ -14,9 +14,10 @@
   <a href="#get-started">Get started</a> · <a href="#deploy-to-render">Deploy to Render</a> · <a href="#docs">Docs</a> · <a href="https://pnrajan.github.io/keelchat/">Website</a>
 </p>
 
-keelchat is an open-source framework for chatbots that talk to your customers: bookings, support requests, intake
-forms, surveys. A bot is **one YAML policy**. One shared runtime runs every bot and enforces its steps, limits and
-handover to a person **in code**. The model reads and phrases; code decides.
+keelchat is an open-source Python framework for developers who ship chatbots that talk to customers: bookings,
+support requests, intake forms, surveys. A bot is **one YAML policy** you can diff and review. One shared runtime runs
+every bot and enforces its steps, limits and handover to a person **in code**. The model reads and phrases; code
+decides.
 
 ## Overview
 
@@ -24,9 +25,8 @@ A bot with a job to finish can't just "try its best". Prompt-only bots drift: th
 person and never hand over. keelchat keeps the model for understanding and wording, and puts every decision where you
 can read and test it.
 
-You don't need to know YAML. Describe the bot in plain English, in the console's **Compose** view or the
-[browser demo](https://keelchat-demo.fly.dev), and keelchat writes the YAML, reads it back to you in plain words, and
-lets you try it.
+You write the YAML, or describe the bot in plain English and let keelchat draft it ([Describe it in plain
+English](#describe-it-in-plain-english)). Either way the file is the bot: it is what you test, review and deploy.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/pnrajan/keelchat/main/docs/assets/make-a-bot.gif" width="900" alt="In the keelchat console: a dental clinic's booking bot is described in two sentences, keelchat writes it and reads it back in plain words, then a test chat where a patient mentions a knocked-out tooth and the bot hands the chat to a person" />
@@ -143,14 +143,20 @@ flowchart LR
 
 ## Get started
 
+```bash
+pip install keelchat                      # Python 3.12+
+export OPENROUTER_API_KEY=...             # or ANTHROPIC_API_KEY
+keelchat build examples/support_assistant.yaml && keelchat serve   # the API and console on http://localhost:8000
+```
+
 | Path | Time | You need |
 |---|---|---|
-| [Try it in your browser](#try-it-in-your-browser) | 1 minute | Nothing |
 | [Run it locally](#run-it-locally) | 5 minutes | macOS, Linux or WSL 2, and a model key |
+| [Try it in your browser](#try-it-in-your-browser) | 1 minute | Nothing |
 | [Deploy to Render](#deploy-to-render) | 10 minutes | GitHub and Render accounts, and a model key |
 
-The package is also on PyPI: `pip install "keelchat[api]"` (Python 3.12+); add `knowledge` for LanceDB, or `qdrant` or `chroma`, for those vector
-stores.
+Extras: `pip install "keelchat[api]"` adds Postgres, Redis, S3 and PDF uploads; `knowledge` adds LanceDB, or pick
+`qdrant` or `chroma`.
 
 ### Try it in your browser
 
@@ -394,8 +400,13 @@ Claude drafts the policy, tries a few conversations and shows you the result bef
 
 ## Status
 
-Alpha (0.x): the policy language and APIs may still change between minor versions; [CHANGELOG.md](CHANGELOG.md)
-lists every change.
+Alpha (0.x). What holds across upgrades is written down in [What stays stable](docs/POLICY_LANGUAGE.md#what-stays-stable):
+saved policies keep their hash, documented keys keep their meaning, deliberate changes are announced in
+[CHANGELOG.md](CHANGELOG.md). The HTTP and Python APIs may still change between minor versions.
+
+**Self-hosted, by design.** keelchat is a framework you run: on your laptop, in Docker, on Render or Fly, in your own
+cloud. There is no hosted keelchat service and none is planned; the [demo](https://keelchat-demo.fly.dev) exists to
+try the idea, not to run your bots. If you need one, open an issue and say what for.
 
 ## License
 
