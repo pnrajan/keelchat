@@ -62,8 +62,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - OpenRouter is the default model provider: `.env.example`, `./setup.sh` (first choice, Enter picks it) and the LiteLLM
-  gateway config use `openrouter/anthropic/claude-sonnet-5.5` to write and `claude-haiku-5.5` to classify. SiliconFlow
-  remains a choice; knowledge embeddings still default to it (OpenRouter has no embeddings).
+  gateway config use `openrouter/anthropic/claude-haiku-5.5` to write and to classify; the demo drafts bots on it too.
+  SiliconFlow remains a choice; knowledge embeddings still default to it (OpenRouter has no embeddings).
 - `widget.js` takes `data-host`: the address the chat runs from, when the script itself is served from a CDN.
 - Docs checked against the code and corrected throughout (policy defaults, guardrail defaults, memory types,
   architecture, knowledge search, the API walkthrough, extension examples). A plugin README; complete policies in the
