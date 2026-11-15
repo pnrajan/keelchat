@@ -151,7 +151,8 @@ class LiteLLMClient(LLMClient):
                 continue
             try:
                 return dict(_unstring(json.loads(calls[0].function.arguments), schema, schema))
-            except json.JSONDecodeError as e:
+            except json.JSONDecodeError as e:  # most often cut at the budget without the provider saying so
+                budget = min(budget * 2, req.max_tokens * 4)
                 last = LLMError(f"tool arguments were not valid JSON (attempt {attempt + 1})")
                 last.__cause__ = e
         # last resort: JSON mode in the message body (some open-weight models truncate tool-call arguments)

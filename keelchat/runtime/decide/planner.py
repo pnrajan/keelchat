@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -30,15 +30,7 @@ PLAN_SCHEMA: dict[str, Any] = {
 }
 
 Issue = Literal["none", "missing_evidence", "calculation_error", "incomplete", "conflicting_evidence", "missing_user_information", "policy_violation"]
-ISSUES: tuple[str, ...] = (
-    "none",
-    "missing_evidence",
-    "calculation_error",
-    "incomplete",
-    "conflicting_evidence",
-    "missing_user_information",
-    "policy_violation",
-)
+ISSUES: tuple[str, ...] = get_args(Issue)  # one source for the type and the schema
 
 VERIFY_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -160,7 +152,8 @@ def verify_system(tool_outputs: list[str], conversation: str = "", constraints: 
 
 
 def grounded(verdict: dict[str, Any]) -> bool:
-    """Decided in code from the verifier's list: nothing unsupported."""
+    """Decided in code from the verifier's list: nothing unsupported. Unused since the loop moved to
+    `VerifierFeedback.passed` (which also requires `issue == "none"`); kept, not deleted, per the project rule."""
     return isinstance(verdict.get("unsupported"), list) and not verdict["unsupported"]
 
 

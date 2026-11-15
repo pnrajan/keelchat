@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 import uuid
 from datetime import UTC, datetime
@@ -60,8 +61,6 @@ class PendingAction(BaseModel):
 
     @staticmethod
     def hash_args(args: dict[str, Any]) -> str:
-        import json
-
         return hashlib.sha256(json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:24]
 
     def expired(self, at: datetime | None = None) -> bool:

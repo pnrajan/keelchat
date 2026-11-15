@@ -9,10 +9,12 @@ model_list:
     litellm_params:
       model: openrouter/moonshotai/kimi-k2.5
       api_key: os.environ/OPENROUTER_API_KEY
-  - model_name: large
-    litellm_params:
-      model: anthropic/claude-sonnet-5-5
-      api_key: os.environ/ANTHROPIC_API_KEY
+  # Two deployments with the same model_name are load-balanced. To write on Anthropic directly instead of Kimi,
+  # replace the `large` entry above with:
+  # - model_name: large
+  #   litellm_params:
+  #     model: anthropic/claude-sonnet-5-5
+  #     api_key: os.environ/ANTHROPIC_API_KEY
   # SiliconFlow (OpenAI-compatible), if you prefer it for `small`:
   # - model_name: small
   #   litellm_params:

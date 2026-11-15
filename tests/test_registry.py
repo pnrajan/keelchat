@@ -199,10 +199,12 @@ async def test_a_contract_check_blocks_only_its_own_task(monkeypatch):
     from keelchat.registry.contract import no_network
 
     seen: list[str] = []
+    real = socket.socket
 
     async def bystander() -> None:
         await asyncio.sleep(0.01)
         s = socket.socket()  # a concurrent coroutine outside the block
+        assert isinstance(s, socket.socket) and issubclass(socket.socket, real)  # still a socket type while guarded
         s.close()
         seen.append("ok")
 

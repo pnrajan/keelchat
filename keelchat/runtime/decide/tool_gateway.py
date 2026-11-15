@@ -61,8 +61,8 @@ def _arg_fix(e: ValidationError, spec: ToolSpec) -> str:
     for err in e.errors()[:6]:
         where = ".".join(str(x) for x in err["loc"]) or "arguments"
         problems.append(f"`{where}`: {err['msg'].lower()}")
-    props = spec.input_model.model_json_schema().get("properties", {})
-    required = set(spec.input_model.model_json_schema().get("required", []))
+    schema = spec.input_model.model_json_schema()
+    props, required = schema.get("properties", {}), set(schema.get("required", []))
     takes = ", ".join(f"{n} ({p.get('type') or 'value'}{', required' if n in required else ''})" for n, p in props.items())
     return "; ".join(problems) + f". {spec.name} takes: {takes}."
 
