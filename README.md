@@ -146,7 +146,7 @@ flowchart LR
 ```bash
 pip install keelchat                      # Python 3.12+
 export OPENROUTER_API_KEY=...             # or ANTHROPIC_API_KEY
-keelchat build examples/support_assistant.yaml && keelchat serve   # the API and console on http://localhost:8000
+keelchat build my_bot.yaml && keelchat serve       # the API on http://localhost:8000; the console ships with the repo (below)
 ```
 
 | Path | Time | You need |
