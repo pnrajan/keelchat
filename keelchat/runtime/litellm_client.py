@@ -27,8 +27,16 @@ def _direct() -> bool:
 MUST_REASON: set[str] = set()
 
 
+#: models that, told not to reason, think out loud in the reply instead ("The user wants to know..."); left to reason,
+#: they return it in a separate field and the reply is clean. The budget then absorbs the reasoning tokens: a cut
+#: structured call is asked again with more (structured()).
+THINKS_IN_CONTENT_IF_OFF: tuple[str, ...] = ("openrouter/moonshotai/",)
+
+
 def _reasoning_off(model: str) -> bool:
     """We switch hidden reasoning off for this model: it would consume max_tokens (budgets here assume none)."""
+    if model.startswith(THINKS_IN_CONTENT_IF_OFF):
+        return False
     return _direct() and model.startswith(("siliconflow/", "openrouter/")) and model not in MUST_REASON
 
 

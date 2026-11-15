@@ -87,6 +87,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Kimi K2.5 through OpenRouter no longer thinks out loud in replies ("The user wants to know..."): told not to reason
+  it put its reasoning in the reply text; it is now left to reason, which it returns in a separate field, and a
+  structured call cut by the reasoning tokens is asked again with more.
 - `pip install keelchat` with only `OPENROUTER_API_KEY` works: litellm is a core dependency now, since the default
   provider goes through it. A missing optional dependency (boto3, pypdf, asyncpg, chonkie) says which extra installs it
   instead of a bare `ModuleNotFoundError`.
