@@ -64,6 +64,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The eval judge defaults to `openrouter/anthropic/claude-haiku-5.5` in `.env.example`: it agreed with every
+  support-assistant label in two calibration runs; Kimi K2.5 passed out-of-scope replies. The support thresholds record
+  the new calibration; [Evals](docs/EVALS.md) lists both judges.
 - A clone with no model key runs `uv run pytest` and gets the offline tests, with the model tests skipped and a header
   saying so, instead of a usage error. `uv run pytest -m smoke` is the short real-model set (flow, planner loop,
   confirmations), for a quick check before the full suite.

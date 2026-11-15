@@ -217,6 +217,10 @@ a ceiling until labels from real conversations are added.
 |---|---|---|---|---|---|
 | support-assistant | `in_scope` | 20 | 95–100% over two runs | Qwen3.5-27B | 2026-11-05 |
 | support-assistant | `rule_followed` | 20 | 95–100% over two runs (90–95% before the rule was judged part by part) | Qwen3.5-27B | 2026-11-05 |
+| support-assistant | `in_scope` | 20 | 100% over two runs | Claude Haiku 5.5 (OpenRouter) | 2026-11-15 |
+| support-assistant | `rule_followed` | 20 | 100% over two runs | Claude Haiku 5.5 (OpenRouter) | 2026-11-15 |
+| support-assistant | `in_scope` | 20 | 90% over two runs: passed two replies labelled out of scope each run | Kimi K2.5 (OpenRouter) | 2026-11-15 |
+| support-assistant | `rule_followed` | 20 | 100% over two runs | Kimi K2.5 (OpenRouter) | 2026-11-15 |
 
 ## Online (production)
 
