@@ -412,3 +412,26 @@ def test_the_provider_and_its_models_follow_the_key_that_is_set(monkeypatch):
     monkeypatch.setenv("LITELLM_PROXY_URL", "http://gateway:4000")  # through a gateway, ids are its aliases: no OpenRouter defaults
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     assert ModelConfig.from_env().generate == "claude-opus-5-5"
+
+
+async def test_kimi_is_left_to_reason_because_told_not_to_it_thinks_in_the_reply(monkeypatch):
+    """Seen live on the concierge: with `reasoning: {enabled: false}` Kimi K2.5 answered "The user wants to know until when
+    breakfast is served..." as the reply. Left to reason, its reasoning comes back in its own field and the reply is clean."""
+    from types import SimpleNamespace
+
+    from keelchat.runtime.litellm_client import LiteLLMClient
+    from keelchat.runtime.llm import LLMRequest
+
+    for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
+        monkeypatch.delenv(var, raising=False)
+    sent: dict[str, Any] = {}
+
+    class Capture(LiteLLMClient):
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            sent[req.model] = kwargs.get("extra_body")
+            return SimpleNamespace(choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content="ok", tool_calls=None))])
+
+    for model in ("openrouter/moonshotai/kimi-k2.5", "openrouter/anthropic/claude-haiku-5.5"):
+        await Capture().complete(LLMRequest("t", model, "s", []))
+    assert "reasoning" not in sent["openrouter/moonshotai/kimi-k2.5"]  # the provider's default: reasoning on, kept apart
+    assert sent["openrouter/anthropic/claude-haiku-5.5"] == {"reasoning": {"enabled": False}}  # unchanged for the rest
