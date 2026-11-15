@@ -21,12 +21,21 @@ except RuntimeError as e:
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption("--offline", action="store_true", help="no model key: skip the tests that need the model, run the rest")
+    parser.addoption("--offline", action="store_true", help="skip the tests that need the model even when a key is set")
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    if MODEL_ERROR and not config.getoption("--offline"):
-        raise pytest.UsageError(f"tests need a real model: {MODEL_ERROR} (or run the offline tests only: uv run pytest --offline)")
+    """Without a model key, `pytest` runs the offline tests and skips the rest (a stranger's clone must not error out);
+    `-m smoke` is the short real-model set, `-m "not smoke"` the rest."""
+    config.addinivalue_line("markers", "smoke: a short real-model set (about 30 tests) that covers the pipeline end to end")
+    if MODEL_ERROR:
+        config.option.offline = True
+
+
+def pytest_report_header(config: pytest.Config) -> list[str]:
+    if MODEL_ERROR:
+        return [f"model: none ({MODEL_ERROR}); running the offline tests, model tests are skipped. A key in .env runs everything."]
+    return ["model: " + ("offline (--offline): model tests skipped" if config.getoption("--offline") else "the provider in .env")]
 
 
 @pytest.hookimpl(hookwrapper=True)

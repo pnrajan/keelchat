@@ -6,9 +6,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
+
 from keelchat.state.models import now
 from keelchat.testing.fakes import FakeTools
 from tests.helpers import fill_form, make_runtime, reach_form, say
+
+pytestmark = pytest.mark.smoke  # part of the short real-model set: `uv run pytest -m smoke`
 
 
 async def _at_review(policy_yaml: str, tools: FakeTools):

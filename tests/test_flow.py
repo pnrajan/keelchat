@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from keelchat.policy.compiler import build
 from keelchat.registry.contract import make_context
 from keelchat.runtime.decide.intent_detector import ROUTE_PLANNER
@@ -8,6 +10,8 @@ from keelchat.runtime.llm import LLMRequest, ModelConfig
 from keelchat.runtime.llm_factory import llm_from_env
 from tests.conftest import ROOT
 from tests.helpers import fill_form, make_runtime, mutate, reach_form, say
+
+pytestmark = pytest.mark.smoke  # part of the short real-model set: `uv run pytest -m smoke`
 
 
 async def test_happy_path_every_step_complete(policy_yaml):

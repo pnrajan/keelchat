@@ -6,8 +6,9 @@ auto-discovered registry. If a change conflicts with a rule here, stop and flag 
 ## Commands
 
 - `uv run pytest tests/test_<area>.py`: run one area first. Tests call the real model.
+- `uv run pytest -m smoke`: the short real-model set (flow, planner loop, confirmations; about 30 tests, a few minutes).
 - `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`: full checks.
-- `uv run pytest --offline`: with no model key, runs the tests that need none and skips the rest. With a key in `.env`, runs everything. `-n0` runs tests one at a time.
+- With no model key, `uv run pytest` runs the tests that need none and skips the rest (`--offline` forces that with a key). With a key in `.env`, runs everything. `-n0` runs tests one at a time.
 
 ## Done means
 

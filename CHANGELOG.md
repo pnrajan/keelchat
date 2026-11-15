@@ -64,6 +64,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- A clone with no model key runs `uv run pytest` and gets the offline tests, with the model tests skipped and a header
+  saying so, instead of a usage error. `uv run pytest -m smoke` is the short real-model set (flow, planner loop,
+  confirmations), for a quick check before the full suite.
 - README speaks to one reader, the developer: install, key, build, serve in four lines up top; the browser demo and
   Compose follow; Status says keelchat is self-hosted by design and points at what stays stable.
 - OpenRouter is the default model provider. With `KEELCHAT_LLM` unset, the provider follows the key that is set:

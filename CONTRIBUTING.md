@@ -13,15 +13,16 @@ uv run pre-commit install       # ruff + mypy on commit
 ./run.sh                        # console, API, Knowledge and Analytics Services
 ```
 
-With no model key, `uv run pytest --offline` runs the tests that need none and skips the rest. With a key in `.env`,
+With no model key, `uv run pytest` runs the tests that need none and skips the rest. With a key in `.env`,
 everything runs.
 
 ## Before opening a pull request
 
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run mypy
-uv run pytest                   # calls the model in .env; 3 workers; one automatic rerun per flaky test
-uv run pytest --offline         # no key: only the tests that don't call the model (CI runs this on forks)
+uv run pytest -m smoke          # the short real-model set: flow, planner loop, confirmations (a few minutes)
+uv run pytest                   # everything, on the model in .env; 3 workers; one automatic rerun per flaky test
+uv run pytest --offline         # only the tests that don't call the model; also what runs with no key (CI on forks)
 (cd frontend && npm run build)  # when the console changed
 uv run keelchat evals run        # when a policy, prompt or example agent changed
 ```

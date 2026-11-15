@@ -6,10 +6,14 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from keelchat.runtime.decide.planner import FALLBACK, VerifierFeedback, gap_for_user, read_feedback
 from keelchat.runtime.llm import LLMError
 from keelchat.testing.fakes import FakeTools
 from tests.helpers import ScriptedLLM, make_runtime, say
+
+pytestmark = pytest.mark.smoke  # part of the short real-model set: `uv run pytest -m smoke`
 
 POLICY = """agent: jobs-helper
 charter: "Answer questions about open jobs at our company. Out of scope: anything else."
