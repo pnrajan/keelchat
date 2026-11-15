@@ -3,7 +3,7 @@ from __future__ import annotations
 from keelchat.policy.compiler import build
 from keelchat.registry.contract import make_context
 from keelchat.runtime.decide.intent_detector import ROUTE_PLANNER
-from keelchat.runtime.decide.planner import VERIFY_SCHEMA, grounded, planner_tools, verify_system
+from keelchat.runtime.decide.planner import VERIFY_SCHEMA, planner_tools, read_feedback, verify_system
 from keelchat.runtime.llm import LLMRequest, ModelConfig
 from keelchat.runtime.llm_factory import llm_from_env
 from tests.conftest import ROOT
@@ -116,8 +116,9 @@ async def test_verifier_rejects_unsupported_pay_rate():
             max_tokens=200,
         )
         verdicts[draft] = await llm_from_env().structured(req, VERIFY_SCHEMA)
-    assert not grounded(verdicts["The Backend Engineer role pays $999k."])
-    assert grounded(verdicts["The Backend Engineer role pays $150k and is in Austin."]), verdicts
+    bad, good = (read_feedback(verdicts[d]) for d in verdicts)  # grounding only: the ask itself is left unanswered
+    assert bad is not None and not bad.passed and "$999k" in " ".join(bad.unsupported), verdicts
+    assert good is not None and not good.unsupported, verdicts
 
 
 async def test_plain_answer_never_routes_to_planner(policy_yaml):

@@ -51,10 +51,14 @@ _REAL_SOCKET = socket.socket
 _ACTIVE_BLOCKS = 0
 
 
-def _guarded_socket(*a: Any, **k: Any) -> Any:
-    if _NO_NETWORK.get():
-        raise ContractViolation("direct network access outside the Tool Gateway")
-    return _REAL_SOCKET(*a, **k)
+class _GuardedSocket(_REAL_SOCKET):
+    """`socket.socket` while any block is active: still a socket type, so `isinstance`, `issubclass` and subclassing
+    in other tasks keep working; creating one in the task that asked for the block raises."""
+
+    def __init__(self, *a: Any, **k: Any) -> None:
+        if _NO_NETWORK.get():
+            raise ContractViolation("direct network access outside the Tool Gateway")
+        super().__init__(*a, **k)
 
 
 @contextmanager
@@ -65,7 +69,7 @@ def no_network() -> Any:
     global _ACTIVE_BLOCKS
     token = _NO_NETWORK.set(True)
     _ACTIVE_BLOCKS += 1
-    socket.socket = _guarded_socket  # type: ignore[misc,assignment]
+    socket.socket = _GuardedSocket  # type: ignore[misc]
     try:
         yield
     finally:
