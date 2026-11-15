@@ -201,6 +201,7 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
     feedback: VerifierFeedback | None = None
     last_key: str | None = None
     partial: str | None = None
+    partial_gap = ""  # what that draft lacked, by the verdict on it
     constraints = ctx.policy.charter + ("\n" + rules.instructions(ctx.rules) if ctx.rules else "")
     for step in range(1, d.planner_step_budget + 1):
         # a question to the user is a verdict-driven move, not a way out of looking things up: offered and accepted
@@ -308,9 +309,10 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
         ctx.decide("step", f"verifier_{feedback.issue}", reason=feedback.unmet or feedback.explanation, ref="planner", ok=False)
         if feedback.issue == "policy_violation":  # the unsafe path stops here; the safe reply is the plain fallback
             log.warning("verifier found a policy violation; planner stopped")
+            partial = None  # an earlier draft on this path was never cleared of the breach: nothing of it is delivered
             break
         if not feedback.unsupported and feedback.issue in ("incomplete", "missing_evidence"):
-            partial = draft  # what it says is supported; what it lacks is named
+            partial, partial_gap = draft, feedback.unmet  # what it says is supported; what it lacks is named
         if not feedback.repairable or feedback.key == last_key:  # no fix possible, or the same failure twice: no progress
             log.warning("planner stopped: no progress", issue=feedback.issue, repairable=feedback.repairable)
             break
@@ -318,8 +320,8 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
     else:
         log.warning("planner budget exhausted", budget=d.planner_step_budget)
     if partial is not None:
-        ctx.decide("step", "planner_partial", reason=feedback.unmet if feedback else "", ref="planner")
-        missing = gap_for_user(feedback.unmet if feedback else "")
+        ctx.decide("step", "planner_partial", reason=partial_gap, ref="planner")
+        missing = gap_for_user(partial_gap)
         return NodeResult(
             f"{partial}\n\nI couldn't settle this part: {missing}.",
             goal=f"Give this answer as written, then say plainly that you could not settle this: {missing}.",

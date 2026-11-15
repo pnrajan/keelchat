@@ -105,7 +105,7 @@ async def test_the_installable_app_has_a_manifest_icon_and_offline_shell(client)
     assert sw.status_code == 200 and "/v1/" in sw.text  # conversations are never cached
     w = await client.get("/widget.js")
     assert w.status_code == 200 and w.headers["content-type"].startswith("text/javascript") and "/embed/" in w.text
-    assert "me.dataset.host || me.src" in w.text  # served from a CDN, data-host says where the chat runs
+    assert "me.dataset.host" in w.text and '"https://" + ' in w.text  # a CDN copy: data-host says where the chat runs, scheme optional
 
 
 def test_tokens_are_bound_to_one_conversation_and_expire(monkeypatch):

@@ -329,17 +329,17 @@ class FormFill(Node[FormFillConfig]):
                 complete=True,
             )
         if pending is None or pending.status != "pending" or pending.expired() or not pending.matches("submit_application", args):
-            why = "expired" if pending is not None and pending.expired() else "changed"
+            why = "unbound" if pending is None else "expired" if pending.expired() else "changed"
             log.warning("submit confirmation not bound to what is shown; review again", reason=why)
             ctx.decide("step", f"submit_confirmation_{why}", ref="form_fill", ok=False)
             r = self._review(ctx, "", set())
-            lead = (
-                "That confirmation had expired, so here is the application again. "
-                if why == "expired"
-                else "The application changed since you last saw it, so here it is again. "
-            )
+            lead, said = {
+                "unbound": ("Please confirm this version of your application. ", "Ask them to confirm this version"),
+                "expired": ("That confirmation had expired, so here is the application again. ", "Say the confirmation expired"),
+                "changed": ("The application changed since you last saw it, so here it is again. ", "Say the application changed since they last saw it"),
+            }[why]
             r.text = lead + r.text
-            r.goal = ("Say the confirmation expired" if why == "expired" else "Say the application changed since they last saw it") + ", then " + r.goal
+            r.goal = said + ", then " + r.goal
             return r
         assert ctx.services.actions is not None
         res = await ctx.services.actions.run("submit_application", args, ctx.candidate_action, operation_id=pending.id)

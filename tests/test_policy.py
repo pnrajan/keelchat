@@ -300,3 +300,14 @@ def test_a_bad_memory_item_is_named_by_its_position():
         build("agent: a\ncharter: c\nmemory:\n  - name_of_pet\n  - {field: contact, extract: How to reach them, type: email}\n")
     assert [x.path for x in e.value.errors] == ["memory[1].type"]
     assert "unknown type 'email'" in e.value.errors[0].message
+
+
+def test_a_default_added_later_does_not_change_the_hash_of_an_unchanged_policy():
+    """A session is pinned by hash (law 7). Adding a knob to Defaults must not move the hash of every policy already
+    saved: a default-valued late knob stays out of the payload; a policy that sets it is hashed with it."""
+    from keelchat.policy.compiler import HASH_SINCE_ADDED, _defaults_payload
+    from keelchat.policy.defaults import DEFAULTS
+
+    assert "tool_corrections" in HASH_SINCE_ADDED
+    assert "tool_corrections" not in _defaults_payload(DEFAULTS) and "reasks" in _defaults_payload(DEFAULTS)
+    assert _defaults_payload(DEFAULTS.model_copy(update={"tool_corrections": 3}))["tool_corrections"] == 3

@@ -74,3 +74,18 @@ async def test_a_clear_failure_shows_the_review_again_and_a_fresh_submit_resends
     tools.fail.clear()
     r = await say(rt, sid, "submit")
     assert len(tools.submitted) == 1 and r.state.completed
+
+
+async def test_a_review_without_a_bound_confirmation_asks_to_confirm_without_claiming_a_change(policy_yaml):
+    """A session that reached the review before confirmations were bound has no pending action: it is asked to confirm
+    this version, not told the application changed."""
+    tools = FakeTools()
+    rt, sid = await _at_review(policy_yaml, tools)
+    st = await rt.sessions.load(sid)
+    st.pending_action = None
+    await rt.sessions.save(st)
+    r = await say(rt, sid, "submit")
+    assert not tools.submitted and "Reply 'submit'" in r.outbound.text and r.state.pending_action is not None
+    assert "changed" not in r.outbound.text.lower() and "expired" not in r.outbound.text.lower(), r.outbound.text
+    r = await say(rt, sid, "submit")
+    assert len(tools.submitted) == 1 and r.state.completed
