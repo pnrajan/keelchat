@@ -318,3 +318,33 @@ def test_a_default_added_later_does_not_change_the_hash_of_an_unchanged_policy()
         assert "memory_half_life" not in _defaults_payload(DEFAULTS)
     finally:
         compiler.HASH_SINCE_ADDED = HASH_SINCE_ADDED
+
+
+#: the content hash of each example policy, built with fixed model tiers (the models are part of the hash). A session
+#: pins its policy by hash (law 7) and saved versions are addressed by it, so a change that moves these strands every
+#: pinned session at the next restart. If a change here is intended (a policy key, a capability version, a default that
+#: must enter the hash), update the value and add a "Changed" entry with a migration note to CHANGELOG.md.
+EXAMPLE_HASHES = {
+    "career_coach.yaml": "3bee4c119f4ad9b8",
+    "concierge.yaml": "b53e6c7d750920ef",
+    "customer_feedback.yaml": "26a227fc3aa27f6e",
+    "hiring_agent.yaml": "4de4dd91c8288d7b",
+    "nps_survey.yaml": "6d8ba041b6a1b0c3",
+    "sales_analyst.yaml": "1ff09944e96f146d",
+    "support_assistant.yaml": "787fe7edc4ba1714",
+}
+
+
+@pytest.mark.parametrize("name", sorted(EXAMPLE_HASHES))
+def test_example_policy_hashes_are_pinned(name):
+    """Saved policies keep their hash across upgrades unless the change is deliberate and noted (see EXAMPLE_HASHES)."""
+    from pathlib import Path
+
+    from keelchat.policy.compiler import compile_policy, load_policy
+
+    text = (Path(__file__).resolve().parent.parent / "examples" / name).read_text(encoding="utf-8")
+    policy = compile_policy(load_policy(text), models={"small": "small-model", "large": "large-model"})
+    assert policy.hash == EXAMPLE_HASHES[name], (
+        f"{name} now hashes {policy.hash}: sessions pinned on {EXAMPLE_HASHES[name]} would fail closed after a restart. "
+        "If this change is intended, update EXAMPLE_HASHES and note the migration in CHANGELOG.md under Changed."
+    )
