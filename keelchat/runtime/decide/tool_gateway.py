@@ -50,8 +50,8 @@ class ToolResult:
             body = json.dumps(self.data, default=_dump)
             if len(body) > PROMPT_DATA_MAX_CHARS:  # a backend cannot grow the prompt without bound
                 body = body[:PROMPT_DATA_MAX_CHARS] + f" …[truncated: {PROMPT_DATA_MAX_CHARS} of {len(body)} chars]"
-        else:
-            body = json.dumps({"error": self.error_kind or "failed", **({"fix": self.fix} if self.fix else {})})
+        else:  # the kind and the error text stay in the logs: a model that saw "config" or "circuit open" would say it
+            body = json.dumps({"error": "unavailable", **({"fix": self.fix} if self.fix else {})})
         return untrusted("tool_output", body, tool=self.tool)
 
 

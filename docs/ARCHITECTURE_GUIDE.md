@@ -321,7 +321,8 @@ step, and the planner decides: another tool call, a recalculation, a revised dra
 to the user, which ends the turn as a clarification). The verifier runs no tool and settles nothing. Bounds, all in
 code: the step budget, the planner timeout, the correction budget, and a no-progress stop when the same issue comes
 back twice or the verifier says it is not repairable. A `policy_violation` stops the path at once. Outcomes are
-distinct: a checked answer; a supported partial answer (the last grounded draft, with the unmet part named); a
+distinct: a checked answer; a supported partial answer (the last grounded draft, with the unmet part named as a short
+phrase, or generically when the verifier wrote commentary); a
 clarification question; the safe fallback. None of them completes a step or ends a session: the flow, counters and
 `handoff.when` do that. Rewriting afterwards keeps the facts (`kept` check) and the verbatim items are appended as
 posted.

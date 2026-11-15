@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from keelchat.runtime.decide.planner import FALLBACK, VerifierFeedback, read_feedback
+from keelchat.runtime.decide.planner import FALLBACK, VerifierFeedback, gap_for_user, read_feedback
 from keelchat.runtime.llm import LLMError
 from keelchat.testing.fakes import FakeTools
 from tests.helpers import ScriptedLLM, make_runtime, say
@@ -158,3 +158,21 @@ async def test_a_question_is_not_a_way_out_of_looking_things_up() -> None:
     )
     assert "ask" not in llm.calls_for("plan")[0].system.split("Choose action")[1][:120]  # not offered cold
     assert r.tool_calls == 1 and "$150k" in r.outbound.text and "city" not in r.outbound.text.lower()
+
+
+def test_the_gap_named_to_the_user_is_a_short_phrase_never_the_verifiers_commentary() -> None:
+    assert gap_for_user("the pay for each role") == "the pay for each role"
+    assert gap_for_user("The pay.") == "the pay"
+    long = "The user asked for open backend jobs in Austin and their pay; the draft explicitly states it cannot provide this."
+    assert gap_for_user(long) == gap_for_user("") == gap_for_user("what the draft says") == "part of what was asked"
+
+
+async def test_a_tool_that_is_down_is_not_described_to_the_user() -> None:
+    """With no backend configured the tool fails with kind `config`; the user hears neither that word nor "circuit"."""
+    from keelchat.runtime.decide.tool_gateway import ToolGateway
+
+    gw = ToolGateway({"job_search"}, {})  # the real tool, no JOB_SEARCH_URL
+    res = await gw.call("job_search", {"role": "backend", "location": "Austin"})
+    assert not res.ok and res.error_kind == "config"
+    prompt = res.as_prompt_data()
+    assert "config" not in prompt and "unavailable" in prompt

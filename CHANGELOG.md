@@ -11,6 +11,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   tool, recalculate, revise, or `ask` the user one question. A missing, late or malformed verdict approves nothing;
   the same issue twice stops the loop; a grounded but incomplete draft is delivered as a partial answer with the gap
   named; a policy violation stops the path. Deterministic tests in `tests/test_planner_loop.py` (`ScriptedLLM`).
+- A tool that failed enters the prompt as `unavailable`; its error kind and text stay in the logs, so a bot never tells
+  the user "configuration error" or "circuit open". The gap named in a partial answer is a short phrase about the ask,
+  or a generic one, never the verifier's commentary.
 - A confirmed action is bound to what was shown: `form_fill` records a `PendingAction` (operation id, argument hash,
   15-minute window) at the review; "submit" runs only that operation, once; a changed or expired confirmation shows
   the review again; a timeout leaves the outcome `unknown` and is never resent on its own; actions that declare

@@ -178,6 +178,18 @@ async def test_a_huge_tool_result_is_cut_before_it_enters_a_prompt():
     assert "truncated" not in ToolResult("t", True, data={"ok": 1}).as_prompt_data()
 
 
+def test_a_failed_tool_enters_a_prompt_as_unavailable_not_by_its_error_kind():
+    """The planner must not be able to tell the user "configuration error" or "circuit open": the kind stays in the
+    logs; a code-written fix (a correctable call) is still shown."""
+    from keelchat.runtime.decide.tool_gateway import ToolResult
+
+    down = ToolResult("job_search", False, error="JOB_SEARCH_URL is not configured", error_kind="config").as_prompt_data()
+    assert "unavailable" in down and "config" not in down and "JOB_SEARCH_URL" not in down
+    assert "circuit" not in ToolResult("job_search", False, error="circuit open", error_kind="circuit_open").as_prompt_data()
+    fixable = ToolResult("job_search", False, error="1 error(s)", error_kind="invalid_args", fix="role is required").as_prompt_data()
+    assert "role is required" in fixable and "invalid_args" not in fixable
+
+
 async def test_a_contract_check_blocks_only_its_own_task(monkeypatch):
     """The socket guard is process-wide but raises only inside the task that asked for it: a tenant registration on a
     live server must not trip the request, database or model calls running beside it."""

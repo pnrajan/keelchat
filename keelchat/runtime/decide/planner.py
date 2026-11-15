@@ -46,7 +46,11 @@ VERIFY_SCHEMA: dict[str, Any] = {
         "unsupported": {"type": "array", "items": {"type": "string"}, "description": "each claim or figure the sources do not support"},
         "answers_ask": {"type": "boolean"},
         "issue": {"type": "string", "enum": list(ISSUES), "description": "the one thing most wrong with the draft, or none"},
-        "unmet": {"type": "string", "description": "the requirement of the ask the draft does not meet; empty when none"},
+        "unmet": {
+            "type": "string",
+            "description": "the part of the ask the draft does not meet, as a short noun phrase for the user (e.g. 'the pay for "
+            "each role'); never a sentence about the draft or the user; empty when none",
+        },
         "evidence": {"type": "array", "items": {"type": "string"}, "description": "tool names or quoted source lines the judgement rests on"},
         "repairable": {"type": "boolean", "description": "false when no further lookup, calculation or question would fix it"},
         "reason": {"type": "string"},
@@ -91,6 +95,20 @@ class VerifierFeedback(BaseModel):
         }.get(self.issue, "revise the answer")
         body = json.dumps({"issue": self.issue, "unmet": self.unmet, "unsupported": self.unsupported, "why": self.explanation, "do": advice})
         return untrusted("verifier_feedback", body)
+
+
+GAP_MAX_CHARS = 80
+GAP_FALLBACK = "part of what was asked"
+
+
+def gap_for_user(unmet: str) -> str:
+    """The verifier's `unmet` as something the user can be told: a short phrase about the ask, or a generic one. A
+    sentence of commentary ("the draft states...", "the user asked...") never reaches the user."""
+    gap = unmet.strip().rstrip(".").strip()
+    words = gap.lower().split()
+    if not gap or len(gap) > GAP_MAX_CHARS or {"draft", "user", "verifier", "answer"} & set(words) or ";" in gap:
+        return GAP_FALLBACK
+    return gap[0].lower() + gap[1:]
 
 
 def read_feedback(verdict: dict[str, Any]) -> VerifierFeedback | None:
@@ -252,7 +270,7 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
             "planner_answer",
             models.generate,
             system + "\nWrite the answer now, citing only the tool outputs. Never copy the tags around them. If a lookup "
-            "found nothing, say what you can without it.",
+            "found nothing or was unavailable, say what you can without it; never describe the failure or its cause.",
             [{"role": "user", "content": ctx.text}],
             max_tokens=400,
             effort=models.effort_generate,
@@ -301,7 +319,7 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
         log.warning("planner budget exhausted", budget=d.planner_step_budget)
     if partial is not None:
         ctx.decide("step", "planner_partial", reason=feedback.unmet if feedback else "", ref="planner")
-        missing = feedback.unmet if feedback and feedback.unmet else "part of what was asked"
+        missing = gap_for_user(feedback.unmet if feedback else "")
         return NodeResult(
             f"{partial}\n\nI couldn't settle this part: {missing}.",
             goal=f"Give this answer as written, then say plainly that you could not settle this: {missing}.",
