@@ -15,6 +15,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from keelchat.optional import optional
+
 #: keys are relative, slash-separated and made of safe characters; no "..", no leading slash
 _KEY = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9._@=+-]+(?:/[A-Za-z0-9._@=+-]+)*$")
 
@@ -125,8 +127,7 @@ class S3ArtifactStore(ArtifactStore):
     def __init__(self, bucket: str, client: Any = None):
         self.bucket = bucket
         if client is None:
-            import boto3
-
+            boto3 = optional("boto3", "api", needed_for="an S3 artifact store")
             client = boto3.client("s3", region_name=os.getenv("AWS_REGION"))
         self.s3 = client
 

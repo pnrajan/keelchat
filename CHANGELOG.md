@@ -79,6 +79,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `pip install keelchat` with only `OPENROUTER_API_KEY` works: litellm is a core dependency now, since the default
+  provider goes through it. A missing optional dependency (boto3, pypdf, asyncpg, chonkie) says which extra installs it
+  instead of a bare `ModuleNotFoundError`.
 - Adding `tool_corrections` to the defaults had changed the hash of every saved policy, so after a restart a session
   pinned before the deploy failed closed (`PolicyRetired`). Defaults added after policies were first saved
   (`HASH_SINCE_ADDED`) stay out of the hash at their default value; saved hashes are unchanged.

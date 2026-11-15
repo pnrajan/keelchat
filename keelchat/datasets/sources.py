@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from keelchat.datasets.models import DatasetSpec, StructuredDataset
+from keelchat.optional import optional
 
 
 class SourceRejected(ValueError):
@@ -59,8 +60,7 @@ def read_bytes(uri: str, limit: int = MAX_DOCUMENT_BYTES) -> bytes:
     check_uri(uri)
     parsed = urlparse(uri)
     if parsed.scheme == "s3":
-        import boto3
-
+        boto3 = optional("boto3", "api", needed_for="an s3:// dataset")
         body = boto3.client("s3", region_name=os.getenv("AWS_REGION")).get_object(Bucket=parsed.netloc, Key=parsed.path.lstrip("/"))["Body"]
         data: bytes = body.read(limit + 1)
     else:
@@ -83,8 +83,7 @@ def local_copy(uri: str, scratch: Path, suffix: str) -> Path:
     if parsed.scheme != "s3":
         path = Path(parsed.path if parsed.scheme == "file" else uri).resolve()
     else:
-        import boto3
-
+        boto3 = optional("boto3", "api", needed_for="an s3:// dataset")
         s3 = boto3.client("s3", region_name=os.getenv("AWS_REGION"))
         key = parsed.path.lstrip("/")
         if not key.endswith("/"):
