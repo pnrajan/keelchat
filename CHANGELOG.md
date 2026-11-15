@@ -61,6 +61,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `widget.js` takes `data-host`: the address the chat runs from, when the script itself is served from a CDN.
 - Docs checked against the code and corrected throughout (policy defaults, guardrail defaults, memory types,
   architecture, knowledge search, the API walkthrough, extension examples). A plugin README; complete policies in the
   docs are built by `tests/test_docs.py`.

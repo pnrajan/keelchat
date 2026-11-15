@@ -1,12 +1,13 @@
 /* keelchat website widget.
    <script src="https://YOUR-HOST/widget.js" data-agent="pk_..." async></script>
    Options: data-position="left|right", data-label="Chat with us", data-open="true".
+   data-host="https://YOUR-HOST": where the chat runs, when this file is served from somewhere else (a CDN).
    The chat runs in an iframe from YOUR-HOST: the host page's styles cannot change it and its scripts cannot read it. */
 (() => {
   const me = document.currentScript;
   if (!me || !me.dataset.agent || window.__keelchatWidget) return;
   window.__keelchatWidget = true;
-  const origin = new URL(me.src).origin;
+  const origin = new URL(me.dataset.host || me.src).origin;
   start(me.dataset.agent);
 
   function start(agent) {
