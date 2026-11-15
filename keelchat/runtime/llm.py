@@ -17,6 +17,22 @@ from keelchat.runtime.usage import metered
 log = get_logger("llm")
 
 
+#: the default models when the provider is OpenRouter (KEELCHAT_LLM unset, OPENROUTER_API_KEY present)
+OPENROUTER_GENERATE = "openrouter/moonshotai/kimi-k2.5"
+OPENROUTER_CLASSIFY = "openrouter/anthropic/claude-haiku-5.5"
+
+
+def provider_from_env() -> str:
+    """KEELCHAT_LLM, or the provider whose key is set: anthropic (ANTHROPIC_API_KEY), else litellm for OpenRouter
+    (OPENROUTER_API_KEY); empty when none."""
+    return os.getenv("KEELCHAT_LLM") or ("anthropic" if os.getenv("ANTHROPIC_API_KEY") else "litellm" if os.getenv("OPENROUTER_API_KEY") else "")
+
+
+def _openrouter_defaults() -> bool:
+    """Unset model ids mean OpenRouter's when that is the provider by key (not through a gateway, whose aliases differ)."""
+    return provider_from_env() == "litellm" and bool(os.getenv("OPENROUTER_API_KEY")) and not os.getenv("LITELLM_PROXY_URL")
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     generate: str = "claude-opus-5-5"
@@ -36,9 +52,10 @@ class ModelConfig:
 
     @classmethod
     def from_env(cls) -> ModelConfig:
+        generate, classify = (OPENROUTER_GENERATE, OPENROUTER_CLASSIFY) if _openrouter_defaults() else (cls.generate, cls.classify)
         return cls(
-            generate=os.getenv("KEELCHAT_MODEL_GENERATE", cls.generate),
-            classify=os.getenv("KEELCHAT_MODEL_CLASSIFY", cls.classify),
+            generate=os.getenv("KEELCHAT_MODEL_GENERATE") or generate,
+            classify=os.getenv("KEELCHAT_MODEL_CLASSIFY") or classify,
             verify=os.getenv("KEELCHAT_MODEL_VERIFY", ""),
             critic=os.getenv("KEELCHAT_MODEL_CRITIC", ""),
             effort_generate=os.getenv("KEELCHAT_EFFORT_GENERATE") or cls.effort_generate,

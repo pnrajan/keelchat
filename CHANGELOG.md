@@ -61,10 +61,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- OpenRouter is the default model provider: `.env.example`, `./setup.sh` (first choice, Enter picks it) and the LiteLLM
-  gateway config use `openrouter/moonshotai/kimi-k2.5` to write and `openrouter/anthropic/claude-haiku-5.5` to classify;
-  the demo drafts bots on Kimi. SiliconFlow remains a choice; knowledge embeddings still default to it (OpenRouter has
-  no embeddings).
+- OpenRouter is the default model provider. With `KEELCHAT_LLM` unset, the provider follows the key that is set:
+  `ANTHROPIC_API_KEY` means Anthropic directly as before; `OPENROUTER_API_KEY` alone means litellm on
+  `openrouter/moonshotai/kimi-k2.5` to write and `openrouter/anthropic/claude-haiku-5.5` to classify, so a deploy with
+  only that key starts. `.env.example`, `./setup.sh` (first choice, Enter picks it), the LiteLLM gateway config, the
+  Render blueprint and the demo follow. SiliconFlow remains a choice; knowledge embeddings still default to it
+  (OpenRouter has no embeddings).
 - `widget.js` takes `data-host`: the address the chat runs from, when the script itself is served from a CDN.
 - Docs checked against the code and corrected throughout (policy defaults, guardrail defaults, memory types,
   architecture, knowledge search, the API walkthrough, extension examples). A plugin README; complete policies in the
