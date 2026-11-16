@@ -272,7 +272,9 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
         )
         draft = await llm.complete(draft_req)
         ctx.llm_calls += 1
-        hit = run_checks(draft, Evidence(sources=[h["prompt"] for h in history] + [ctx.text], names=internal_names(ctx.policy)))
+        # the sources are what the verifier reads: this turn's tool results and the conversation (an answer may rest on
+        # what an earlier turn listed)
+        hit = run_checks(draft, Evidence(sources=[h["prompt"] for h in history] + [ctx.transcript()], names=internal_names(ctx.policy)))
         if hit is not None:  # code found the fault: it goes back in the verifier's terms, and the model verifier is not asked
             name, found = hit
             feedback = VerifierFeedback(

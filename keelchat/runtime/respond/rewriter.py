@@ -238,7 +238,8 @@ class Rewriter:
             out = await self._write(ctx, models, system, body, r.text)
             if out is None:
                 return ctx
-            hit = run_checks(out, Evidence(sources=[r.text, ctx.text], asked=q.ask if asks and q is not None else "", names=internal_names(ctx.policy)))
+            evidence = Evidence(sources=[r.text, ctx.transcript()], asked=q.ask if asks and q is not None else "", names=internal_names(ctx.policy))
+            hit = run_checks(out, evidence)  # the plain version and the user's own words are the figures a rewrite may use
             if hit is not None:  # code found the fault; the rewrite is asked for again with it
                 name, found = hit
                 log.info("check rejected the rewrite", check=name, attempt=attempt + 1, unmet=found.unmet)

@@ -8,7 +8,9 @@ from typing import Any
 from keelchat.capabilities.checks import no_internal_names, no_reasoning_leak, numbers_grounded, question_kept
 from keelchat.registry.core import REGISTRY, Evidence, Finding
 from keelchat.runtime.decide.checks import run_checks
-from tests.test_planner_loop import ANSWER, run, tool, verdict
+from keelchat.testing.fakes import FakeTools
+from tests.helpers import ScriptedLLM, make_runtime, say
+from tests.test_planner_loop import ANSWER, JOBS, POLICY, run, tool, verdict
 
 
 def test_the_built_in_checks_reject_what_they_name_and_pass_plain_replies():
@@ -84,3 +86,21 @@ def test_the_check_kind_is_in_the_registry_manifest_and_the_contract_suite():
     assert {"no_reasoning_leak", "no_internal_names", "numbers_grounded", "question_kept"} <= names
     for n in names:
         check_check(REGISTRY.check(n))
+
+
+async def test_a_figure_from_an_earlier_turn_is_grounded() -> None:
+    """The planner's sources are what its verifier reads: this turn's tool results and the conversation. An answer that
+    rests on what an earlier turn listed ($150k) is not rejected as a figure from nowhere."""
+    llm = ScriptedLLM(
+        {
+            "plan": [tool(role="backend", location="Austin"), ANSWER, ANSWER],
+            "planner_answer": ["Backend Engineer in Austin, $150k.", "The Backend Engineer pays $150k."],
+            "verify_grounded": [verdict(), verdict()],
+        }
+    )
+    rt, _ = await make_runtime(POLICY, llm=llm, tools=FakeTools(jobs=JOBS))
+    s = await rt.start_session("jobs-helper", "u1")
+    await say(rt, s.id, "What backend jobs are open in Austin?")
+    r = await say(rt, s.id, "Which pays more?")  # no lookup this turn: the figure is in the conversation
+    assert len(llm.calls_for("verify_grounded")) == 2 and r.tool_calls == 0 and "$150k" in r.outbound.text, r.outbound.text
+    assert all(p.metadata["feedback"] is None for p in llm.calls_for("plan"))  # no check sent the planner back
