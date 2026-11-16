@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Literal, get_args
+from typing import Any, get_args
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from keelchat.logging import get_logger
-from keelchat.registry.core import NodeResult
+from keelchat.registry.core import Evidence, Issue, NodeResult
 from keelchat.runtime.context import TurnContext
 from keelchat.runtime.decide import rules
+from keelchat.runtime.decide.checks import internal_names, run_checks
 from keelchat.runtime.llm import LLMError, LLMRequest, untrusted
 
 log = get_logger("planner")
@@ -29,7 +30,6 @@ PLAN_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
-Issue = Literal["none", "missing_evidence", "calculation_error", "incomplete", "conflicting_evidence", "missing_user_information", "policy_violation"]
 ISSUES: tuple[str, ...] = get_args(Issue)  # one source for the type and the schema
 
 VERIFY_SCHEMA: dict[str, Any] = {
@@ -272,28 +272,43 @@ async def _plan_loop(ctx: TurnContext) -> NodeResult:
         )
         draft = await llm.complete(draft_req)
         ctx.llm_calls += 1
-        v_req = LLMRequest(
-            "verify_grounded",
-            models.classify,
-            verify_system([h["prompt"] for h in history], ctx.transcript(), constraints),
-            [{"role": "user", "content": f"Ask: {ctx.text}\nDraft: {draft}"}],
-            max_tokens=300,
-            effort=models.effort_classify,
-            metadata={"attempt": attempt, "history": history, "draft": draft},
-        )
-        try:
-            verdict = await asyncio.wait_for(llm.structured(v_req, VERIFY_SCHEMA), timeout=d.intent_timeout_s)
-        except (LLMError, TimeoutError) as e:  # no verdict is no approval: the draft is never delivered as checked
-            log.error("verifier unavailable; draft rejected", attempt=attempt, error=e.__class__.__name__)
-            ctx.errors.append(f"planner verifier: {e.__class__.__name__}")
-            ctx.decide("step", "verifier_unavailable", ref="planner", ok=False)
-            break
-        ctx.llm_calls += 1
-        feedback = read_feedback(verdict)
-        if feedback is None:  # a verdict the schema does not fit approves nothing
-            log.error("verifier verdict malformed; draft rejected", attempt=attempt)
-            ctx.decide("step", "verifier_malformed", ref="planner", ok=False)
-            break
+        # the sources are what the verifier reads: this turn's tool results and the conversation (an answer may rest on
+        # what an earlier turn listed)
+        hit = run_checks(draft, Evidence(sources=[h["prompt"] for h in history] + [ctx.transcript()], names=internal_names(ctx.policy)))
+        if hit is not None:  # code found the fault: it goes back in the verifier's terms, and the model verifier is not asked
+            name, found = hit
+            feedback = VerifierFeedback(
+                issue=found.issue,
+                unmet=found.unmet,
+                explanation=f"check {name}: {found.explanation}",
+                unsupported=list(found.unsupported),
+                repairable=found.repairable,
+            )
+            log.info("check rejected draft", step=step, attempt=attempt, check=name, unmet=found.unmet)
+            ctx.decide("step", f"check_{name}", reason=found.unmet, ref="planner", ok=False)
+        else:
+            v_req = LLMRequest(
+                "verify_grounded",
+                models.classify,
+                verify_system([h["prompt"] for h in history], ctx.transcript(), constraints),
+                [{"role": "user", "content": f"Ask: {ctx.text}\nDraft: {draft}"}],
+                max_tokens=300,
+                effort=models.effort_classify,
+                metadata={"attempt": attempt, "history": history, "draft": draft},
+            )
+            try:
+                verdict = await asyncio.wait_for(llm.structured(v_req, VERIFY_SCHEMA), timeout=d.intent_timeout_s)
+            except (LLMError, TimeoutError) as e:  # no verdict is no approval: the draft is never delivered as checked
+                log.error("verifier unavailable; draft rejected", attempt=attempt, error=e.__class__.__name__)
+                ctx.errors.append(f"planner verifier: {e.__class__.__name__}")
+                ctx.decide("step", "verifier_unavailable", ref="planner", ok=False)
+                break
+            ctx.llm_calls += 1
+            feedback = read_feedback(verdict)
+            if feedback is None:  # a verdict the schema does not fit approves nothing
+                log.error("verifier verdict malformed; draft rejected", attempt=attempt)
+                ctx.decide("step", "verifier_malformed", ref="planner", ok=False)
+                break
         if feedback.passed:
             log.info("planner done", steps=step, attempts=attempt)
             ctx.decide("step", "planner_answer", ref="planner", ok=True)

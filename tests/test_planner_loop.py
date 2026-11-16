@@ -28,6 +28,9 @@ def tool(**args: Any) -> dict[str, Any]:
 
 
 ANSWER = {"action": "answer", "tool": None, "args": {}, "question": None, "rationale": "enough"}
+#: a wrong draft whose figure the source does have: a figure the source lacks is rejected by the `numbers_grounded`
+#: check in code before any verifier (tests/test_checks.py), so these tests use claims only a model verifier can judge
+BONUS = "Pays $150k plus a guaranteed bonus."
 
 
 def ask(q: str) -> dict[str, Any]:
@@ -95,12 +98,12 @@ async def test_a_calculation_error_asks_for_a_recalculation() -> None:
     r, llm = await run(
         {
             "plan": [tool(role="backend", location="Austin"), ANSWER, ANSWER],
-            "planner_answer": ["That is $1,800k a year.", "That is $150k a year."],
-            "verify_grounded": [verdict("calculation_error", "annual pay", unsupported=["$1,800k"]), verdict()],
+            "planner_answer": ["That is $150k a month.", "That is $150k a year."],
+            "verify_grounded": [verdict("calculation_error", "the pay period", unsupported=["$150k a month"]), verdict()],
         }
     )
     drafts = llm.calls_for("planner_answer")
-    assert len(drafts) == 2 and "recalculate" in drafts[1].system and "$1,800k" not in r.outbound.text and "$150k" in r.outbound.text
+    assert len(drafts) == 2 and "recalculate" in drafts[1].system and "month" not in r.outbound.text.lower() and "$150k" in r.outbound.text
 
 
 async def test_missing_user_information_becomes_one_question() -> None:
@@ -140,13 +143,11 @@ async def test_an_unrepairable_or_policy_breaking_draft_falls_back_safely() -> N
 
 
 async def test_a_verifier_outage_or_malformed_verdict_approves_nothing() -> None:
-    r, llm = await run(
-        {"plan": [tool(role="backend", location="Austin"), ANSWER], "planner_answer": ["Pays $999k."], "verify_grounded": [LLMError("provider down")]}
-    )
-    assert "$999k" not in r.outbound.text and "planner verifier: LLMError" in r.errors and len(llm.calls_for("plan")) == 2
-    malformed = {"plan": [tool(role="backend", location="Austin"), ANSWER], "planner_answer": ["Pays $999k."], "verify_grounded": [{"reason": "fine"}]}
+    r, llm = await run({"plan": [tool(role="backend", location="Austin"), ANSWER], "planner_answer": [BONUS], "verify_grounded": [LLMError("provider down")]})
+    assert "bonus" not in r.outbound.text.lower() and "planner verifier: LLMError" in r.errors and len(llm.calls_for("plan")) == 2
+    malformed = {"plan": [tool(role="backend", location="Austin"), ANSWER], "planner_answer": [BONUS], "verify_grounded": [{"reason": "fine"}]}
     r2, llm2 = await run(malformed)
-    assert "$999k" not in r2.outbound.text and len(llm2.calls_for("plan")) == 2
+    assert "bonus" not in r2.outbound.text.lower() and len(llm2.calls_for("plan")) == 2
     assert FALLBACK.split(".")[0].lower()[:12] in r2.outbound.text.lower() or "couldn't" in r2.outbound.text.lower(), r2.outbound.text
 
 
@@ -201,14 +202,14 @@ async def test_the_gap_named_belongs_to_the_partial_answer_delivered() -> None:
     r, llm = await run(
         {
             "plan": [tool(role="backend", location="Austin")] + [ANSWER] * 4,
-            "planner_answer": ["Backend Engineer in Austin.", "Pays $1,800k a year.", "Pays $1,800k a year."],
+            "planner_answer": ["Backend Engineer in Austin.", "Pays $150k a month.", "Pays $150k a month."],
             "verify_grounded": [
                 verdict("incomplete", "the pay"),
-                verdict("calculation_error", "the annual total", unsupported=["$1,800k"]),
-                verdict("calculation_error", "the annual total", unsupported=["$1,800k"]),
+                verdict("calculation_error", "the pay period", unsupported=["$150k a month"]),
+                verdict("calculation_error", "the pay period", unsupported=["$150k a month"]),
             ],
         }
     )
     assert len(llm.calls_for("verify_grounded")) == 3  # the same failure twice stopped it
-    text = r.outbound.text.lower()  # the rewriter rephrases; the facts and the gap must survive, the wrong figure must not
-    assert "backend engineer" in text and "$1,800k" not in text and "pay" in text and "annual total" not in text, r.outbound.text
+    text = r.outbound.text.lower()  # the rewriter rephrases; the facts and the gap must survive, the wrong claim must not
+    assert "backend engineer" in text and "month" not in text and "pay" in text and "pay period" not in text, r.outbound.text

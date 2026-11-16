@@ -212,6 +212,33 @@ defaults, so repeat any you want to keep. `prompt_injection` and `pii` always ru
 guardrails can stop a turn; output guardrails redact or replace the reply. Flagged turns are never written to memory.
 Full example: [`examples/extensions/booking_caps/guardrails.py`](../examples/extensions/booking_caps/guardrails.py).
 
+## Check
+
+A check is code that reads a draft before any model verifier does, and rejects it in the verifier's own terms. Every
+registered check runs on every draft the planner writes and every rewrite the Rewriter makes; there is no list in the
+policy. A rejection goes back to the planner (or the Rewriter) as typed feedback, and the model verifier is not asked
+that round.
+
+```python
+from keelchat import Evidence, Finding, check
+
+
+@check("no_competitor_prices")
+def no_competitor_prices(draft: str, ev: Evidence) -> Finding | None:
+    """Prices in a reply come from our own price list, never from a competitor passage."""
+    if "Globex" in draft and "$" in draft:
+        return Finding("calculation_error", "prices from our list only", "quotes a Globex price")
+    return None
+```
+
+`Evidence` carries the sources the draft must stay within (tool outputs, the plain version, the user's words), the
+question the step still has to ask, and the policy's internal names. `Finding.issue` is one of the verifier's issues
+(`incomplete`, `calculation_error`, `missing_evidence`, `conflicting_evidence`, `missing_user_information`,
+`policy_violation`); `unmet` is written for the model that redrafts. A check calls no model and touches no network;
+the contract suite runs it on empty, plain and very long text and requires that a plain, grounded reply passes.
+Built in: `no_reasoning_leak`, `no_internal_names`, `numbers_grounded`, `question_kept`
+([`keelchat/capabilities/checks.py`](../keelchat/capabilities/checks.py)).
+
 ## Channel
 
 A channel turns its platform's payload into an `InboundMessage`, and a channel-neutral reply into its own messages

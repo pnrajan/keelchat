@@ -31,6 +31,8 @@ if TYPE_CHECKING:  # explicit re-exports, so type checkers see them (mypy --stri
     from keelchat.knowledge.vectorstore import vector_store as vector_store
     from keelchat.registry.contract import check_capability as check_capability
     from keelchat.registry.core import CapabilityConfig as CapabilityConfig
+    from keelchat.registry.core import Evidence as Evidence
+    from keelchat.registry.core import Finding as Finding
     from keelchat.registry.core import GuardContext as GuardContext
     from keelchat.registry.core import Guardrail as Guardrail
     from keelchat.registry.core import GuardResult as GuardResult
@@ -38,6 +40,7 @@ if TYPE_CHECKING:  # explicit re-exports, so type checkers see them (mypy --stri
     from keelchat.registry.core import NodeResult as NodeResult
     from keelchat.registry.core import PreProcessor as PreProcessor
     from keelchat.registry.core import action as action
+    from keelchat.registry.core import check as check
     from keelchat.registry.core import guardrail as guardrail
     from keelchat.registry.core import node as node
     from keelchat.registry.core import preprocessor as preprocessor
@@ -50,6 +53,9 @@ _EXPORTS = {
     "node": "keelchat.registry.core",
     "guardrail": "keelchat.registry.core",
     "preprocessor": "keelchat.registry.core",
+    "check": "keelchat.registry.core",
+    "Evidence": "keelchat.registry.core",
+    "Finding": "keelchat.registry.core",
     "CapabilityConfig": "keelchat.registry.core",
     "Node": "keelchat.registry.core",
     "NodeResult": "keelchat.registry.core",

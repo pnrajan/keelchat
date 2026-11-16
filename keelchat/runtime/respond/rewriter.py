@@ -21,9 +21,10 @@ import re
 from dataclasses import asdict, dataclass
 
 from keelchat.logging import get_logger
-from keelchat.registry.core import REGISTRY
+from keelchat.registry.core import REGISTRY, Evidence
 from keelchat.runtime.context import TurnContext
 from keelchat.runtime.decide import rules
+from keelchat.runtime.decide.checks import internal_names, run_checks
 from keelchat.runtime.llm import LLMRequest, ModelConfig, untrusted
 
 log = get_logger("rewriter")
@@ -237,7 +238,14 @@ class Rewriter:
             out = await self._write(ctx, models, system, body, r.text)
             if out is None:
                 return ctx
-            if not kept(r.text, out, asks, listed=bool(r.verbatim)):
+            evidence = Evidence(sources=[r.text, ctx.transcript()], asked=q.ask if asks and q is not None else "", names=internal_names(ctx.policy))
+            hit = run_checks(out, evidence)  # the plain version and the user's own words are the figures a rewrite may use
+            if hit is not None:  # code found the fault; the rewrite is asked for again with it
+                name, found = hit
+                log.info("check rejected the rewrite", check=name, attempt=attempt + 1, unmet=found.unmet)
+                ctx.decide("step", f"check_{name}", reason=found.unmet, ref="rewriter", ok=False)
+                problems = [f"{found.unmet} ({found.explanation})"]
+            elif not kept(r.text, out, asks, listed=bool(r.verbatim)):
                 log.info("rewrite dropped a fact or the question", attempt=attempt + 1)
                 problems = ["It dropped a number, id or code from the plain version, or did not ask the question."]
             elif not check:
@@ -256,5 +264,8 @@ class Rewriter:
                 log.info("sending the plain version, translated", step=step)
                 r.text = translated
                 return ctx
+        if ctx.rules:  # the plain version does not carry what a matched rule asks for: the audit log says so
+            log.warning("rules unspoken: the plain version is sent without them", rules=[x.name for x in ctx.rules])
+            ctx.decide("step", "rules_unspoken", reason=",".join(x.name for x in ctx.rules), ref="rewriter", ok=False)
         log.info("sending the plain version", step=step)
         return ctx

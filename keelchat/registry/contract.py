@@ -16,6 +16,9 @@ from keelchat.policy.compiler import CompiledPolicy, build
 from keelchat.registry.core import (
     REGISTRY,
     ActionSpec,
+    CheckSpec,
+    Evidence,
+    Finding,
     GuardContext,
     GuardrailSpec,
     GuardResult,
@@ -232,6 +235,19 @@ async def check_preprocessor(spec: PreProcessorSpec) -> None:
     _require(out is ctx, f"{spec.name}.run must return the TurnContext it received")
 
 
+def check_check(spec: CheckSpec) -> None:
+    """A check is pure code: no network, a Finding or None for any text, a reason when it rejects, and a pass for a
+    plain, grounded reply (a check that rejects everything is not a check)."""
+    grounded = ("Breakfast is served until 11:00 on Saturday.", Evidence(sources=["Breakfast is served 6:30 to 10:30, 11:00 on weekends."]))
+    with no_network():
+        for text in ("", "Hello, I am looking for a backend role in Austin.", "x" * 10_000):
+            r = spec.fn(text, Evidence(sources=[text]))
+            _require(r is None or isinstance(r, Finding), f"{spec.name} must return Finding or None")
+            if r is not None:
+                _require(bool(r.unmet or r.unsupported), f"{spec.name}: a rejection needs `unmet` or `unsupported`")
+        _require(spec.fn(*grounded) is None, f"{spec.name}: must pass a plain, grounded reply")
+
+
 async def check_capability(kind: str, name: str, fake_impl: Callable[..., Awaitable[Any]] | None = None) -> None:
     if kind == "tool":
         await check_tool(REGISTRY.tool(name), fake_impl)
@@ -243,6 +259,8 @@ async def check_capability(kind: str, name: str, fake_impl: Callable[..., Awaita
         await check_node(REGISTRY.node(name))
     elif kind == "guardrail":
         await check_guardrail(REGISTRY.guardrail(name))
+    elif kind == "check":
+        check_check(REGISTRY.check(name))
     else:  # pragma: no cover
         raise ContractViolation(f"unknown kind {kind}")
 

@@ -312,7 +312,10 @@ before the gateway and the refusal fed back as data; a rejected call with a `fix
 per turn, and past `Defaults.tool_corrections` (2) the tool is dropped for the rest of the turn; when the budget is
 spent the planner answers from what it has.
 
-**The planner–verifier loop.** A draft is never delivered unchecked. The verifier (classify model) sees the ask,
+**The planner–verifier loop.** A draft is never delivered unchecked. Code looks first: every registered `@check`
+(`no_reasoning_leak`, `no_internal_names`, `numbers_grounded`, `question_kept`, and any a package adds) reads the
+draft against its evidence, and the first rejection goes back to the planner as typed feedback without a model
+verdict that round. Then the verifier (classify model) sees the ask,
 the charter and matched rules as constraints, the draft, the tool outputs and the conversation, and returns a typed
 verdict: `unsupported` claims, `answers_ask`, one `issue` (`none`, `missing_evidence`, `calculation_error`,
 `incomplete`, `conflicting_evidence`, `missing_user_information`, `policy_violation`), the `unmet` requirement,
