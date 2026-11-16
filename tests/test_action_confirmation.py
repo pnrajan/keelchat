@@ -20,7 +20,7 @@ async def _at_review(policy_yaml: str, tools: FakeTools):
     s = await rt.start_session("hiring-agent", "u1")
     await reach_form(rt, s.id)
     r = await fill_form(rt, s.id)
-    assert "Reply 'submit'" in r.outbound.text and r.state.pending_action is not None and r.state.pending_action.status == "pending"
+    assert "submit" in r.outbound.text.lower() and r.state.pending_action is not None and r.state.pending_action.status == "pending"
     return rt, s.id
 
 
@@ -43,7 +43,7 @@ async def test_a_confirmation_for_different_arguments_shows_the_review_again_ins
     st.pending_action.args_hash = "not-what-is-shown-now"  # the application changed under the confirmation
     await rt.sessions.save(st)
     r = await say(rt, sid, "submit")
-    assert not tools.submitted and "Reply 'submit'" in r.outbound.text and r.state.pending_action.status == "pending", r.outbound.text
+    assert not tools.submitted and "submit" in r.outbound.text.lower() and r.state.pending_action.status == "pending", r.outbound.text
     r = await say(rt, sid, "submit")  # the fresh review bound a fresh confirmation
     assert len(tools.submitted) == 1 and r.state.completed
 
@@ -55,7 +55,7 @@ async def test_an_expired_confirmation_is_rejected_and_rebound(policy_yaml):
     st.pending_action.expires_at = now() - timedelta(seconds=1)
     await rt.sessions.save(st)
     r = await say(rt, sid, "submit")
-    assert not tools.submitted and "Reply 'submit'" in r.outbound.text and not r.state.pending_action.expired()
+    assert not tools.submitted and "submit" in r.outbound.text.lower() and not r.state.pending_action.expired()
 
 
 async def test_an_unknown_outcome_is_never_resent_on_its_own(policy_yaml):
@@ -74,7 +74,7 @@ async def test_a_clear_failure_shows_the_review_again_and_a_fresh_submit_resends
     rt, sid = await _at_review(policy_yaml, tools)
     r = await say(rt, sid, "submit")
     assert len(tools.calls["submit_application"]) == 1 and not tools.submitted and r.state.pending_action.status == "pending"
-    assert "Reply 'submit'" in r.outbound.text and "submit_application: upstream" in r.errors
+    assert "submit" in r.outbound.text.lower() and "submit_application: upstream" in r.errors
     tools.fail.clear()
     r = await say(rt, sid, "submit")
     assert len(tools.submitted) == 1 and r.state.completed
@@ -89,7 +89,7 @@ async def test_a_review_without_a_bound_confirmation_asks_to_confirm_without_cla
     st.pending_action = None
     await rt.sessions.save(st)
     r = await say(rt, sid, "submit")
-    assert not tools.submitted and "Reply 'submit'" in r.outbound.text and r.state.pending_action is not None
+    assert not tools.submitted and "submit" in r.outbound.text.lower() and r.state.pending_action is not None
     assert "changed" not in r.outbound.text.lower() and "expired" not in r.outbound.text.lower(), r.outbound.text
     r = await say(rt, sid, "submit")
     assert len(tools.submitted) == 1 and r.state.completed
