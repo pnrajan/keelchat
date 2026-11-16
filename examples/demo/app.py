@@ -31,6 +31,7 @@ from keelchat.runtime.llm import LLMError
 from keelchat.runtime.runtime import Runtime
 from keelchat.state.models import Embed
 from keelchat.state.store import InMemoryEmbedStore
+from keelchat.testing.fakes import FakeTools
 
 from .needs import Need, from_policy, suggested
 
@@ -48,6 +49,30 @@ TRY_CHATS = 30
 #: a stronger model for writing bots than for chatting (YAML that builds, handoffs in the right place); unset: the
 #: chat's own KEELCHAT_MODEL_GENERATE
 DRAFT_MODEL = os.getenv("KEELCHAT_DEMO_DRAFT_MODEL", "")
+#: what the ready-made support bot answers side questions from: the fake knowledge tool's sample documents are an HR
+#: team's, and the page promises answers about returns (KEELCHAT_TOOLS=fake, as the demo deploys)
+SUPPORT_PASSAGES = [
+    {
+        "title": "Returns",
+        "text": "Items can be returned within 30 days of delivery for a full refund. After 30 days we offer store credit, up to 90 days.",
+        "source": "help/returns",
+    },
+    {
+        "title": "Refunds",
+        "text": "A refund reaches the original payment method within 5 to 7 working days of the item arriving back with us.",
+        "source": "help/refunds",
+    },
+    {
+        "title": "Damaged items",
+        "text": "An item that arrives damaged or broken is replaced free of charge. Keep the packaging and tell us the order number.",
+        "source": "help/damaged",
+    },
+    {
+        "title": "Delivery",
+        "text": "Standard delivery takes 3 to 5 working days. Express orders placed before 2pm arrive the next working day.",
+        "source": "help/delivery",
+    },
+]
 log = get_logger("demo")
 
 
@@ -93,6 +118,8 @@ def create_app() -> FastAPI:
     embeds = InMemoryEmbedStore()
     app = create_api(embeds=embeds)
     rt: Runtime = app.state.runtime
+    if os.getenv("KEELCHAT_TOOLS") == "fake" and "knowledge_search" in rt.tool_impls:
+        rt.tool_impls["knowledge_search"] = FakeTools(passages=SUPPORT_PASSAGES).impls()["knowledge_search"]
     drafting = replace(rt.models, generate=DRAFT_MODEL) if DRAFT_MODEL else rt.models
     inner = app.router.lifespan_context
 

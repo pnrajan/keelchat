@@ -97,6 +97,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The policy drafter keeps the first key of a reply that starts with a stray space (Kimi K2.5 writes ` agent: ...`):
+  the YAML extractor skipped that line, every draft came back with `agent: Field required`, and the demo's Try button
+  failed. The public demo drafts on Claude Haiku 5.5 now (measured 2026-11-16: 60 s a draft on Kimi, 2 s on Haiku).
+- `numbers_grounded` accepts a figure with a word hung on it ("30-day") when the sources give the figure ("30 days");
+  it rejected the Rewriter's every reply to "can I return something after 30 days?". An id (`ORD-99999`) or a date is
+  still held to the sources whole. The check's log line names the figures it rejected.
+- The public demo's support bot has a shop's documents to answer from (returns, refunds, damaged items, delivery) instead
+  of the fake knowledge tool's HR passages: the page's own "How long do refunds take?" card got "I couldn't find that".
 - A rule whose `then` asks for something ("ask for the order number") no longer deadlocks the Rewriter while a step
   asks for something else (consent): the writer and the reply verifier both hold that the step's question comes first
   and the rule's request waits for its step, so the rule's statement ("a free replacement can be sent") is spoken

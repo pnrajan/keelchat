@@ -28,6 +28,10 @@ def test_the_built_in_checks_reject_what_they_name_and_pass_plain_replies():
     assert loose is not None and loose.issue == "calculation_error" and loose.unsupported == ("$1800k",)
     assert numbers_grounded("It pays $1,500k.", Evidence(sources=["pay: $1,500k"])) is None  # the same tokens on both sides
     assert numbers_grounded("Backend Engineer, **$150k**, zip 78701. 1. first 2. second", ev) is None  # markup, list markers
+    said = Evidence(sources=["User: can I return something after 30 days?"])
+    assert numbers_grounded("I couldn't confirm the 30-day return window.", said) is None  # the user's figure, with a word hung on it
+    assert numbers_grounded("The 2-week window has passed.", said) is not None
+    assert numbers_grounded("Order ORD-99999 is on its way.", Evidence(sources=["ORD-12345"])) is not None  # an id is not a compound figure
     assert question_kept("Thanks.", Evidence(asked="What is your full name?")) is not None and question_kept("Thanks. Your name?", Evidence(asked="x")) is None
     assert question_kept("Thanks.", Evidence()) is None
 
