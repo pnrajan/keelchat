@@ -403,15 +403,59 @@ def test_the_provider_and_its_models_follow_the_key_that_is_set(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "k")
     assert provider_from_env() == "litellm" and isinstance(llm_from_env(), LiteLLMClient)
     assert (ModelConfig.from_env().generate, ModelConfig.from_env().classify) == ("openrouter/moonshotai/kimi-k2.5", "openrouter/anthropic/claude-haiku-5.5")
+    assert ModelConfig.from_env().verifier == "openrouter/anthropic/claude-haiku-5.5"  # checks on the small model, as the planner's are
     monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "openrouter/deepseek/deepseek-v3.2")
-    assert ModelConfig.from_env().generate == "openrouter/deepseek/deepseek-v3.2"
+    monkeypatch.setenv("KEELCHAT_MODEL_VERIFY", "openrouter/deepseek/deepseek-v3.2")
+    assert ModelConfig.from_env().generate == ModelConfig.from_env().verifier == "openrouter/deepseek/deepseek-v3.2"
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")  # both keys: Anthropic, as before this default existed
     monkeypatch.delenv("KEELCHAT_MODEL_GENERATE")
+    monkeypatch.delenv("KEELCHAT_MODEL_VERIFY")
     assert provider_from_env() == "anthropic" and isinstance(llm_from_env(), AnthropicLLMClient)
-    assert ModelConfig.from_env().generate == "claude-opus-5-5"
+    assert ModelConfig.from_env().generate == ModelConfig.from_env().verifier == "claude-opus-5-5"  # as before
     monkeypatch.setenv("LITELLM_PROXY_URL", "http://gateway:4000")  # through a gateway, ids are its aliases: no OpenRouter defaults
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     assert ModelConfig.from_env().generate == "claude-opus-5-5"
+
+
+async def test_a_model_that_reasons_gets_headroom_and_an_empty_cut_reply_is_asked_for_again(monkeypatch):
+    """Kimi K2.5 spends 350-700 tokens reasoning before a short reply or verdict, and ignores every cap OpenRouter offers
+    (`reasoning.effort`, `reasoning.max_tokens`); a budget sized for the answer alone came back empty with finish_reason
+    `length`. Reasoning models get headroom on top of the ask; a reply that is still empty is asked for once more with
+    twice the ask. A model with reasoning off (Haiku) is sent the budget as it is."""
+    from types import SimpleNamespace
+
+    from keelchat.runtime.litellm_client import REASONING_HEADROOM, LiteLLMClient
+    from keelchat.runtime.llm import LLMRequest
+
+    for var in ("LITELLM_PROXY_URL", "HEADROOM_PROXY_URL"):
+        monkeypatch.delenv(var, raising=False)
+
+    def reply(content: str, finish: str = "stop") -> Any:
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason=finish, message=SimpleNamespace(content=content, tool_calls=None))])
+
+    class Scripted(LiteLLMClient):
+        def __init__(self, replies: list[Any]) -> None:
+            super().__init__()
+            self.replies, self.budgets = replies, []
+
+        async def _send(self, req: LLMRequest, **kwargs: Any) -> Any:
+            self.budgets.append(kwargs["max_tokens"])
+            return self.replies.pop(0)
+
+    kimi, haiku = "openrouter/moonshotai/kimi-k2.5", "openrouter/anthropic/claude-haiku-5.5"
+    plain = Scripted([reply("ok")])
+    assert await plain.complete(LLMRequest("t", haiku, "s", [], max_tokens=600)) == "ok" and plain.budgets == [600]
+    room = Scripted([reply("ok")])
+    assert await room.complete(LLMRequest("t", kimi, "s", [], max_tokens=600)) == "ok" and room.budgets == [600 + REASONING_HEADROOM]
+    cut = Scripted([reply("", "length"), reply("Hi there.")])
+    assert await cut.complete(LLMRequest("t", kimi, "s", [], max_tokens=600)) == "Hi there."
+    assert cut.budgets == [600 + REASONING_HEADROOM, 1200 + REASONING_HEADROOM]
+    partial = Scripted([reply("Hi th", "length")])  # a reply that began is kept as it is, not asked for again
+    assert await partial.complete(LLMRequest("t", kimi, "s", [], max_tokens=600)) == "Hi th" and len(partial.budgets) == 1
+    call = SimpleNamespace(function=SimpleNamespace(arguments='{"ok": true}'))
+    tool = Scripted([SimpleNamespace(choices=[SimpleNamespace(finish_reason="tool_calls", message=SimpleNamespace(tool_calls=[call], content=""))])])
+    assert await tool.structured(LLMRequest("t", kimi, "s", [], max_tokens=300), {"type": "object"}) == {"ok": True}
+    assert tool.budgets == [300 + REASONING_HEADROOM]  # structured calls too
 
 
 async def test_kimi_is_left_to_reason_because_told_not_to_it_thinks_in_the_reply(monkeypatch):

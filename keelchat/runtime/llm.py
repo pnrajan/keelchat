@@ -52,11 +52,15 @@ class ModelConfig:
 
     @classmethod
     def from_env(cls) -> ModelConfig:
-        generate, classify = (OPENROUTER_GENERATE, OPENROUTER_CLASSIFY) if _openrouter_defaults() else (cls.generate, cls.classify)
+        openrouter = _openrouter_defaults()
+        generate, classify = (OPENROUTER_GENERATE, OPENROUTER_CLASSIFY) if openrouter else (cls.generate, cls.classify)
+        # OpenRouter: checks run on the classify model, as the planner's do; Kimi reasons at length (uncapped: it ignores
+        # `reasoning.effort` and `reasoning.max_tokens`) and a verdict is not worth thousands of hidden tokens
+        verify = OPENROUTER_CLASSIFY if openrouter else cls.verify
         return cls(
             generate=os.getenv("KEELCHAT_MODEL_GENERATE") or generate,
             classify=os.getenv("KEELCHAT_MODEL_CLASSIFY") or classify,
-            verify=os.getenv("KEELCHAT_MODEL_VERIFY", ""),
+            verify=os.getenv("KEELCHAT_MODEL_VERIFY") or verify,
             critic=os.getenv("KEELCHAT_MODEL_CRITIC", ""),
             effort_generate=os.getenv("KEELCHAT_EFFORT_GENERATE") or cls.effort_generate,
             effort_classify=os.getenv("KEELCHAT_EFFORT_CLASSIFY") or cls.effort_classify,

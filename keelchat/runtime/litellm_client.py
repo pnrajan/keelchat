@@ -32,6 +32,11 @@ MUST_REASON: set[str] = set()
 #: structured call is asked again with more (structured()).
 THINKS_IN_CONTENT_IF_OFF: tuple[str, ...] = ("openrouter/moonshotai/",)
 
+#: tokens added to every budget for a model whose reasoning counts against max_tokens (reasoning left on, or a gateway
+#: that owns the setting): Kimi K2.5 spends 1,700-2,500 on a short reply (measured 2026-11-15; 350-4,600 on a verdict),
+#: so a budget sized for the answer alone returns nothing (finish_reason `length`, empty content)
+REASONING_HEADROOM = 3000
+
 
 def _reasoning_off(model: str) -> bool:
     """We switch hidden reasoning off for this model: it would consume max_tokens (budgets here assume none)."""
@@ -104,6 +109,8 @@ class LiteLLMClient(LLMClient):
             **self.defaults,
             **extra,
         }
+        if not _reasoning_off(req.model):  # the budget was sized for the answer; the reasoning comes on top
+            kwargs["max_tokens"] = int(kwargs["max_tokens"]) + REASONING_HEADROOM
         if self.api_key or settings["api_key"]:
             kwargs["api_key"] = self.api_key or settings["api_key"]
         if self.api_base or settings["api_base"]:
@@ -131,7 +138,12 @@ class LiteLLMClient(LLMClient):
 
     async def complete(self, req: LLMRequest) -> str:
         resp = await self._call(req)
-        return str(resp.choices[0].message.content or "")  # reasoning_content is never a reply
+        choice = resp.choices[0]
+        if getattr(choice, "finish_reason", None) == "length" and not (choice.message.content or "").strip():
+            # the reasoning used the whole budget and no reply came: once more with twice the room
+            log.info("reply cut at the budget before it began; asking again with more", purpose=req.purpose, max_tokens=req.max_tokens * 2)
+            choice = (await self._call(req, max_tokens=req.max_tokens * 2)).choices[0]
+        return str(choice.message.content or "")  # reasoning_content is never a reply
 
     async def structured(self, req: LLMRequest, schema: dict[str, Any]) -> dict[str, Any]:
         name = f"emit_{req.purpose}"

@@ -69,6 +69,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- With OpenRouter by key, `KEELCHAT_MODEL_VERIFY` unset means the classify model (Claude Haiku 5.5), as the planner's
+  grounding check already was, instead of the generate model: Kimi K2.5 spends hundreds to thousands of reasoning
+  tokens on a two-field verdict and ignores every cap OpenRouter offers. Set `KEELCHAT_MODEL_VERIFY` to keep Kimi.
+  Anthropic deploys are unchanged.
 - The eval judge defaults to `openrouter/anthropic/claude-haiku-5.5` in `.env.example`: it agreed with every
   support-assistant label in two calibration runs; Kimi K2.5 passed out-of-scope replies. The support thresholds record
   the new calibration; [Evals](docs/EVALS.md) lists both judges.
@@ -92,6 +96,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A model whose reasoning counts against `max_tokens` (Kimi K2.5) no longer returns an empty reply when the reasoning
+  used the whole budget: every budget gets headroom for the reasoning, and an empty reply cut at the budget is asked
+  for once more. Before, the Rewriter's rewrites came back empty and the plain version was sent; the reply verifier on
+  Kimi failed the same way and took minutes.
 - Kimi K2.5 through OpenRouter no longer thinks out loud in replies ("The user wants to know..."): told not to reason
   it put its reasoning in the reply text; it is now left to reason, which it returns in a separate field, and a
   structured call cut by the reasoning tokens is asked again with more.
@@ -119,7 +127,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A re-index that failed part-way embeds the documents still missing; a changed method is applied after a restart.
 - An embedding model litellm can't route (an older `.env`'s SiliconFlow model name, no key) no longer breaks indexing;
   embedding failures return 502 with a short reason.
-- A vector store, chunker or embedder you register under a built-in name is kept.
 - A vector store, chunker or embedder you register under a built-in name is kept.
 - Tests that build the knowledge service no longer read `KNOWLEDGE_S3_BUCKET` from `.env`, so they never write to a
   real bucket. A local Qdrant no longer warns about filter indexes.

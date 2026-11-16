@@ -70,7 +70,8 @@ With `KEELCHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry
 | Headroom → LiteLLM | add `HEADROOM_PROXY_URL`; context is compressed before the gateway |
 
 `KEELCHAT_MODEL_CLASSIFY` (intents, validation, planning) and `KEELCHAT_MODEL_GENERATE` (replies) are the two tiers, and
-`KEELCHAT_MODEL_VERIFY` checks reasoning and replies. `KEELCHAT_MODEL_CRITIC` names a stronger model that judges trial
+`KEELCHAT_MODEL_VERIFY` checks reasoning and replies (unset: the classify model with OpenRouter by key, the generate
+model otherwise). `KEELCHAT_MODEL_CRITIC` names a stronger model that judges trial
 conversations in the console's Judge tab; unset, the tab explains how to turn it on.
 
 **Cost tracking** works with every layout. Each model call is recorded with its tokens in and out, cached tokens,
