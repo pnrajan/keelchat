@@ -391,7 +391,7 @@ async def test_a_structured_call_cut_at_the_budget_is_retried_with_room_to_finis
 
 
 def test_the_provider_and_its_models_follow_the_key_that_is_set(monkeypatch):
-    """No KEELCHAT_LLM and no model ids: an OpenRouter key alone means litellm on Kimi K2.5 and Claude Haiku 5.5; an
+    """No KEELCHAT_LLM and no model ids: an OpenRouter key alone means litellm on Claude Haiku 5.5 for both tiers; an
     Anthropic key alone (or both: existing deploys) means Anthropic directly on its own ids; explicit ids always win."""
     from keelchat.runtime.litellm_client import LiteLLMClient
     from keelchat.runtime.llm import AnthropicLLMClient, ModelConfig, provider_from_env
@@ -402,8 +402,9 @@ def test_the_provider_and_its_models_follow_the_key_that_is_set(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "k")
     assert provider_from_env() == "litellm" and isinstance(llm_from_env(), LiteLLMClient)
-    assert (ModelConfig.from_env().generate, ModelConfig.from_env().classify) == ("openrouter/moonshotai/kimi-k2.5", "openrouter/anthropic/claude-haiku-5.5")
-    assert ModelConfig.from_env().verifier == "openrouter/anthropic/claude-haiku-5.5"  # checks on the small model, as the planner's are
+    haiku = "openrouter/anthropic/claude-haiku-5.5"
+    assert (ModelConfig.from_env().generate, ModelConfig.from_env().classify) == (haiku, haiku)
+    assert ModelConfig.from_env().verifier == haiku  # checks on the small model, as the planner's are
     monkeypatch.setenv("KEELCHAT_MODEL_GENERATE", "openrouter/deepseek/deepseek-v3.2")
     monkeypatch.setenv("KEELCHAT_MODEL_VERIFY", "openrouter/deepseek/deepseek-v3.2")
     assert ModelConfig.from_env().generate == ModelConfig.from_env().verifier == "openrouter/deepseek/deepseek-v3.2"

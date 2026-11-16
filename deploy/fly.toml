@@ -3,7 +3,7 @@
 #
 #   fly apps create <your-app>
 #   fly secrets set -a <your-app> KEELCHAT_API_KEY=$(openssl rand -hex 24) OPENROUTER_API_KEY=...
-#   (that key alone: Kimi K2.5 writes, Claude Haiku 5.5 classifies; ANTHROPIC_API_KEY alone: Anthropic directly;
+#   (that key alone: Claude Haiku 5.5 for both model tiers; ANTHROPIC_API_KEY alone: Anthropic directly;
 #   anything else: KEELCHAT_LLM and the two KEELCHAT_MODEL_* as secrets too, as in .env.example)
 #   fly deploy -c deploy/fly.toml -a <your-app> .
 #

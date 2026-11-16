@@ -18,7 +18,7 @@ log = get_logger("llm")
 
 
 #: the default models when the provider is OpenRouter (KEELCHAT_LLM unset, OPENROUTER_API_KEY present)
-OPENROUTER_GENERATE = "openrouter/moonshotai/kimi-k2.5"
+OPENROUTER_GENERATE = "openrouter/anthropic/claude-haiku-5.5"
 OPENROUTER_CLASSIFY = "openrouter/anthropic/claude-haiku-5.5"
 
 
@@ -54,8 +54,7 @@ class ModelConfig:
     def from_env(cls) -> ModelConfig:
         openrouter = _openrouter_defaults()
         generate, classify = (OPENROUTER_GENERATE, OPENROUTER_CLASSIFY) if openrouter else (cls.generate, cls.classify)
-        # OpenRouter: checks run on the classify model, as the planner's do; Kimi reasons at length (uncapped: it ignores
-        # `reasoning.effort` and `reasoning.max_tokens`) and a verdict is not worth thousands of hidden tokens
+        # OpenRouter: checks run on the classify model, as the planner's do, whatever the writer is set to
         verify = OPENROUTER_CLASSIFY if openrouter else cls.verify
         return cls(
             generate=os.getenv("KEELCHAT_MODEL_GENERATE") or generate,

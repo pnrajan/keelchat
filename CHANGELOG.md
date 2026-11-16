@@ -69,10 +69,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- With OpenRouter by key, `KEELCHAT_MODEL_VERIFY` unset means the classify model (Claude Haiku 5.5), as the planner's
-  grounding check already was, instead of the generate model: Kimi K2.5 spends hundreds to thousands of reasoning
-  tokens on a two-field verdict and ignores every cap OpenRouter offers. Set `KEELCHAT_MODEL_VERIFY` to keep Kimi.
-  Anthropic deploys are unchanged.
+- With OpenRouter by key, `KEELCHAT_MODEL_VERIFY` unset means the classify model, as the planner's grounding check
+  already was, instead of the generate model; a reasoning writer set with `KEELCHAT_MODEL_GENERATE` no longer spends
+  thousands of hidden tokens on a two-field verdict. Anthropic deploys are unchanged.
 - The eval judge defaults to `openrouter/anthropic/claude-haiku-5.5` in `.env.example`: it agreed with every
   support-assistant label in two calibration runs; Kimi K2.5 passed out-of-scope replies. The support thresholds record
   the new calibration; [Evals](docs/EVALS.md) lists both judges.
@@ -83,8 +82,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Compose follow; Status says keelchat is self-hosted by design and points at what stays stable.
 - OpenRouter is the default model provider. With `KEELCHAT_LLM` unset, the provider follows the key that is set:
   `ANTHROPIC_API_KEY` means Anthropic directly as before; `OPENROUTER_API_KEY` alone means litellm on
-  `openrouter/moonshotai/kimi-k2.5` to write and `openrouter/anthropic/claude-haiku-5.5` to classify, so a deploy with
-  only that key starts. `.env.example`, `./setup.sh` (first choice, Enter picks it), the LiteLLM gateway config, the
+  `openrouter/anthropic/claude-haiku-5.5` for both tiers, so a deploy with only that key starts. (Kimi K2.5 was the
+  writer for a day: measured, it spends 1,700-2,500 reasoning tokens and 46-69 s on a short reply, leaks its reasoning
+  into the reply when told not to reason, and costs five times Haiku's list price; `KEELCHAT_MODEL_GENERATE` still
+  takes it or any other model.) `.env.example`, `./setup.sh` (first choice, Enter picks it), the LiteLLM gateway config, the
   Render blueprint and the demo follow. SiliconFlow remains a choice; knowledge embeddings still default to it
   (OpenRouter has no embeddings).
 - `widget.js` takes `data-host`: the address the chat runs from, when the script itself is served from a CDN.
