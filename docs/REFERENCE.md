@@ -63,14 +63,15 @@ With `KEELCHAT_JWT_SECRET`, keys are signed JWTs whose tenant, scopes and expiry
 
 | Layout | Set |
 |---|---|
-| By key (default) | `KEELCHAT_LLM` unset: `ANTHROPIC_API_KEY` alone means Anthropic directly (`claude-opus-5-5`, `claude-haiku-5-5`); `OPENROUTER_API_KEY` alone means litellm on `openrouter/moonshotai/kimi-k2.5` and `openrouter/anthropic/claude-haiku-5.5`. `KEELCHAT_MODEL_*` override either |
+| By key (default) | `KEELCHAT_LLM` unset: `ANTHROPIC_API_KEY` alone means Anthropic directly (`claude-opus-5-5`, `claude-haiku-5-5`); `OPENROUTER_API_KEY` alone means litellm on `openrouter/anthropic/claude-haiku-5.5` for both tiers. `KEELCHAT_MODEL_*` override either |
 | Anthropic directly | `KEELCHAT_LLM=anthropic` and `ANTHROPIC_API_KEY` |
 | Any litellm provider | `KEELCHAT_LLM=litellm` and the provider's usual key variable: OpenAI (`OPENAI_API_KEY`), OpenRouter, SiliconFlow, Gemini (`GEMINI_API_KEY` for `gemini/...`), Bedrock, Ollama and others. Model ids are litellm's, like `openai/gpt-4o-mini` or `siliconflow/<model>` |
 | LiteLLM gateway | `LITELLM_PROXY_URL`, `LITELLM_PROXY_KEY`; model ids are the gateway's aliases |
 | Headroom → LiteLLM | add `HEADROOM_PROXY_URL`; context is compressed before the gateway |
 
 `KEELCHAT_MODEL_CLASSIFY` (intents, validation, planning) and `KEELCHAT_MODEL_GENERATE` (replies) are the two tiers, and
-`KEELCHAT_MODEL_VERIFY` checks reasoning and replies. `KEELCHAT_MODEL_CRITIC` names a stronger model that judges trial
+`KEELCHAT_MODEL_VERIFY` checks reasoning and replies (unset: the classify model with OpenRouter by key, the generate
+model otherwise). `KEELCHAT_MODEL_CRITIC` names a stronger model that judges trial
 conversations in the console's Judge tab; unset, the tab explains how to turn it on.
 
 **Cost tracking** works with every layout. Each model call is recorded with its tokens in and out, cached tokens,
@@ -160,8 +161,8 @@ your copy. State is in memory until you set `DATABASE_URL` (and
 `REDIS_URL`): without them, saved bots go when the app restarts. The console asks for `KEELCHAT_API_KEY` to sign in.
 
 **Render.** Open `https://render.com/deploy?repo=<your fork's URL>` and sign in to Render. It reads
-[`render.yaml`](../render.yaml), asks for `OPENROUTER_API_KEY` (that key alone: Kimi K2.5 writes, Claude Haiku 5.5
-classifies), and generates `KEELCHAT_API_KEY` (on the service's **Environment** page). For another provider, add its
+[`render.yaml`](../render.yaml), asks for `OPENROUTER_API_KEY` (that key alone: Claude Haiku 5.5 for both
+model tiers), and generates `KEELCHAT_API_KEY` (on the service's **Environment** page). For another provider, add its
 key there (`ANTHROPIC_API_KEY` alone means Anthropic directly), or `KEELCHAT_LLM` and the two `KEELCHAT_MODEL_*`, as in
 `.env.example`. The free plan sleeps when idle. The Blueprint turns auto-deploy off, as Render advises for Deploy
 buttons, so a push to this repository never redeploys your service; to redeploy when CI passes on your fork, set

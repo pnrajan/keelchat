@@ -161,7 +161,9 @@ memory:
 ### Rules: what to do in a particular situation
 
 The charter is always on. A rule applies only to the messages it fits, so the bot can carry many of them without a
-long prompt. Put rules on the agent (any turn) or on a step (only while that step is asking):
+long prompt. Put rules on the agent (any turn) or on a step (only while that step is asking). A step's question comes
+first: when a rule's `then` also asks for something ("ask for the order number") while a step is asking for something
+else, the reply says the rest of the rule now and the rule's request waits for its step; a reply asks one thing.
 
 ```yaml
 rules:

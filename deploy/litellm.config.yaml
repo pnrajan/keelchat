@@ -7,9 +7,9 @@ model_list:
       api_key: os.environ/OPENROUTER_API_KEY
   - model_name: large
     litellm_params:
-      model: openrouter/moonshotai/kimi-k2.5
+      model: openrouter/anthropic/claude-haiku-5.5
       api_key: os.environ/OPENROUTER_API_KEY
-  # Two deployments with the same model_name are load-balanced. To write on Anthropic directly instead of Kimi,
+  # Two deployments with the same model_name are load-balanced. To write on Anthropic directly instead,
   # replace the `large` entry above with:
   # - model_name: large
   #   litellm_params:

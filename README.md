@@ -103,7 +103,7 @@ the policy or the code. Test sets are generated from the YAML.
 
 ### Any model, any channel
 
-OpenRouter by default (Kimi K2.5 writes, Claude Haiku 5.5 classifies), Anthropic directly, or anything litellm reaches
+OpenRouter by default (Claude Haiku 5.5, both tiers), Anthropic directly, or anything litellm reaches
 (OpenAI, Gemini, Bedrock, Ollama). Web widget (also from a CDN), WhatsApp, SMS, Slack, phone.
 
 </td>

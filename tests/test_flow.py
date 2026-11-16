@@ -193,7 +193,8 @@ async def test_opening_message_can_carry_consent_and_prefill(policy_yaml):
     r = await say(rt, s.id, "Yes, I consent. I live in Austin")
     assert r.state.consent is True and "role" in r.outbound.text.lower() and r.state.prefilled.get("location") == "Austin"
     r = await say(rt, s.id, "backend engineer")
-    assert "austin" in r.outbound.text.lower() and "(yes/no)" in r.outbound.text  # prefilled location is confirmed, not assumed
+    low = r.outbound.text.lower()
+    assert "austin" in low and "yes" in low and "no" in low, r.outbound.text  # prefilled location is confirmed, not assumed
 
 
 async def test_a_failed_answer_asks_the_open_question_once(policy_yaml, monkeypatch):

@@ -100,8 +100,8 @@ anything else litellm routes. `runtime/llm_factory.py:llm_from_env` chooses from
 provider with a missing key raises. Routing is layered by environment: direct provider, a LiteLLM gateway
 (`LITELLM_PROXY_URL`, owns fallbacks, retries, cost logging), or a Headroom proxy in front of it (`HEADROOM_PROXY_URL`,
 context compression). Model tiers are pinned per build in `CompiledPolicy.models` and honoured per session. Three model roles: `classify` (intent, validation, planning steps, the planner's grounding check),
-`generate` (replies, knowledge answers, planner drafts) and `verify` (reply and reasoning checks; the generate model
-when `KEELCHAT_MODEL_VERIFY` is unset). There is no fake model anywhere: tests, simulations and
+`generate` (replies, knowledge answers, planner drafts) and `verify` (reply and reasoning checks; when
+`KEELCHAT_MODEL_VERIFY` is unset, the classify model with OpenRouter by key, the generate model otherwise). There is no fake model anywhere: tests, simulations and
 evals call the configured provider.
 
 Usage and cost: each client's provider call is decorated with `runtime/usage.py:metered`. It records model, purpose,

@@ -69,6 +69,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- With OpenRouter by key, `KEELCHAT_MODEL_VERIFY` unset means the classify model, as the planner's grounding check
+  already was, instead of the generate model; a reasoning writer set with `KEELCHAT_MODEL_GENERATE` no longer spends
+  thousands of hidden tokens on a two-field verdict. Anthropic deploys are unchanged.
 - The eval judge defaults to `openrouter/anthropic/claude-haiku-5.5` in `.env.example`: it agreed with every
   support-assistant label in two calibration runs; Kimi K2.5 passed out-of-scope replies. The support thresholds record
   the new calibration; [Evals](docs/EVALS.md) lists both judges.
@@ -79,8 +82,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Compose follow; Status says keelchat is self-hosted by design and points at what stays stable.
 - OpenRouter is the default model provider. With `KEELCHAT_LLM` unset, the provider follows the key that is set:
   `ANTHROPIC_API_KEY` means Anthropic directly as before; `OPENROUTER_API_KEY` alone means litellm on
-  `openrouter/moonshotai/kimi-k2.5` to write and `openrouter/anthropic/claude-haiku-5.5` to classify, so a deploy with
-  only that key starts. `.env.example`, `./setup.sh` (first choice, Enter picks it), the LiteLLM gateway config, the
+  `openrouter/anthropic/claude-haiku-5.5` for both tiers, so a deploy with only that key starts. (Kimi K2.5 was the
+  writer for a day: measured, it spends 1,700-2,500 reasoning tokens and 46-69 s on a short reply, leaks its reasoning
+  into the reply when told not to reason, and costs five times Haiku's list price; `KEELCHAT_MODEL_GENERATE` still
+  takes it or any other model.) `.env.example`, `./setup.sh` (first choice, Enter picks it), the LiteLLM gateway config, the
   Render blueprint and the demo follow. SiliconFlow remains a choice; knowledge embeddings still default to it
   (OpenRouter has no embeddings).
 - `widget.js` takes `data-host`: the address the chat runs from, when the script itself is served from a CDN.
@@ -92,6 +97,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A rule whose `then` asks for something ("ask for the order number") no longer deadlocks the Rewriter while a step
+  asks for something else (consent): the writer and the reply verifier both hold that the step's question comes first
+  and the rule's request waits for its step, so the rule's statement ("a free replacement can be sent") is spoken
+  instead of every rewrite failing and the plain version going out (`rules_unspoken` in the audit log).
+- A model whose reasoning counts against `max_tokens` (Kimi K2.5) no longer returns an empty reply when the reasoning
+  used the whole budget: every budget gets headroom for the reasoning, and an empty reply cut at the budget is asked
+  for once more. Before, the Rewriter's rewrites came back empty and the plain version was sent; the reply verifier on
+  Kimi failed the same way and took minutes.
 - Kimi K2.5 through OpenRouter no longer thinks out loud in replies ("The user wants to know..."): told not to reason
   it put its reasoning in the reply text; it is now left to reason, which it returns in a separate field, and a
   structured call cut by the reasoning tokens is asked again with more.
@@ -119,7 +132,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A re-index that failed part-way embeds the documents still missing; a changed method is applied after a restart.
 - An embedding model litellm can't route (an older `.env`'s SiliconFlow model name, no key) no longer breaks indexing;
   embedding failures return 502 with a short reason.
-- A vector store, chunker or embedder you register under a built-in name is kept.
 - A vector store, chunker or embedder you register under a built-in name is kept.
 - Tests that build the knowledge service no longer read `KNOWLEDGE_S3_BUCKET` from `.env`, so they never write to a
   real bucket. A local Qdrant no longer warns about filter indexes.

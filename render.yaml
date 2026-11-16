@@ -1,6 +1,5 @@
 # Render Blueprint: keelchat's API with the console on one web service in your Render account. Deploy: https://render.com/deploy?repo=<your fork's URL>; docs/REFERENCE.md#deploy-from-github
-# Render asks for OPENROUTER_API_KEY once; with that key alone keelchat writes on Kimi K2.5 and classifies on Claude
-# Haiku 5.5. KEELCHAT_API_KEY is generated: copy it from the service's Environment page to sign in to the console.
+# Render asks for OPENROUTER_API_KEY once; with that key alone keelchat runs on Claude Haiku 5.5 (both model tiers). KEELCHAT_API_KEY is generated: copy it from the service's Environment page to sign in to the console.
 # Another provider: in Environment, set its key (ANTHROPIC_API_KEY alone means Anthropic directly) or KEELCHAT_LLM,
 # KEELCHAT_MODEL_GENERATE and KEELCHAT_MODEL_CLASSIFY, as in .env.example. Knowledge-base embeddings need
 # KNOWLEDGE_EMBED_MODEL or SILICONFLOW_API_KEY / OPENAI_API_KEY (OpenRouter has no embeddings).
