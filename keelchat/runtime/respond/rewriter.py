@@ -252,7 +252,7 @@ class Rewriter:
             hit = run_checks(out, evidence)  # the plain version and the user's own words are the figures a rewrite may use
             if hit is not None:  # code found the fault; the rewrite is asked for again with it
                 name, found = hit
-                log.info("check rejected the rewrite", check=name, attempt=attempt + 1, unmet=found.unmet)
+                log.info("check rejected the rewrite", check=name, attempt=attempt + 1, unmet=found.unmet, detail=found.explanation)
                 ctx.decide("step", f"check_{name}", reason=found.unmet, ref="rewriter", ok=False)
                 problems = [f"{found.unmet} ({found.explanation})"]
             elif not kept(r.text, out, asks, listed=bool(r.verbatim)):
@@ -266,7 +266,7 @@ class Rewriter:
                 if not problems:
                     r.text = out
                     return ctx
-                log.info("reply verifier found problems", attempt=attempt + 1, problems=len(problems))
+                log.info("reply verifier found problems", attempt=attempt + 1, problems=len(problems), detail=[x[:200] for x in problems])
             body = brief + f"\n\nYour previous reply:\n{out}\nA reviewer found these problems; fix them:\n- " + "\n- ".join(problems)
         if not english:  # the plain version is English: a literal translation keeps the session's language
             translated = await self._write(ctx, models, TRANSLATE.format(language=ctx.language), untrusted("text", r.text), r.text)

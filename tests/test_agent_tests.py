@@ -141,3 +141,4 @@ def test_the_yaml_is_taken_from_a_reply_that_says_something_first() -> None:
 
     assert _yaml_only("Here is the revised policy:\n\n# change: x\nagent: a\n") == "# change: x\nagent: a\n"
     assert _yaml_only("```yaml\nagent: a\n```\nDone.") == "agent: a\n"
+    assert _yaml_only(" agent: a\ncharter: b\n") == "agent: a\ncharter: b\n"  # a stray space first (Kimi K2.5): the first key stays

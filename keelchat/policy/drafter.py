@@ -104,12 +104,12 @@ def catalog(tenant: str, datasets: Mapping[str, DatasetKind]) -> str:
 
 
 #: where a policy's YAML starts: a comment or a top-level key
-_YAML_START = re.compile(r"^(#|[a-z_]+:)", re.MULTILINE)
+_YAML_START = re.compile(r"^[ \t]*(#|[a-z_]+:)", re.MULTILINE)
 
 
 def _yaml_only(text: str) -> str:
     """The YAML in a reply: inside a fence if there is one, else from the first comment or top-level key (a model may
-    say something first)."""
+    say something first, or start with a stray space, as Kimi K2.5 does: the first key must not be lost with it)."""
     fenced = re.search(r"```(?:ya?ml)?\n(.*?)```", text, re.DOTALL)
     if fenced:
         return fenced.group(1).strip() + "\n"

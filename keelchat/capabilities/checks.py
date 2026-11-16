@@ -34,17 +34,27 @@ def no_internal_names(draft: str, ev: Evidence) -> Finding | None:
     return Finding("incomplete", "no internal names in the reply", f"mentions {hit!r}") if hit else None
 
 
+#: a figure with a word hung on it ("30-day", "2-week", "$150k-a-year"): the figure is the fact; an id or a date is not one
+COMPOUND = re.compile(r"([^-]*\d[^-]*)-[^\d]+")
+
+
 def _plain(token: str) -> str:
     return token.strip("*_`.").replace(",", "")
+
+
+def _core(fact: str) -> str:
+    m = COMPOUND.fullmatch(fact)
+    return m.group(1) if m else fact
 
 
 @check("numbers_grounded")
 def numbers_grounded(draft: str, ev: Evidence) -> Finding | None:
     """Every number, id, amount, date or code in the draft appears in a source: a tool output, the plain version or the
-    user's own words. Bare one- or two-digit integers (list markers, ordinals) are not held to it."""
+    user's own words. Bare one- or two-digit integers (list markers, ordinals) are not held to it, and a figure with a
+    word hung on it ("30-day") is grounded by the figure ("30 days")."""
     have = {_plain(f) for src in ev.sources for f in facts(src)}
     loose = sorted({_plain(f) for f in facts(draft)} - have - {""})
-    loose = [f for f in loose if not (f.isdigit() and len(f) <= 2)]
+    loose = [f for f in loose if _core(f) not in have and not (f.isdigit() and len(f) <= 2)]
     return Finding("calculation_error", "only figures the sources give", f"not in any source: {loose}", tuple(loose)) if loose else None
 
 

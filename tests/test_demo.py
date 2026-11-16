@@ -9,6 +9,15 @@ from keelchat.policy.compiler import build
 from tests.conftest import ROOT
 
 
+@pytest.fixture
+def in_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The demo app with nothing outside the process: a local .env may name a database or a knowledge bucket."""
+    for k in ("KNOWLEDGE_URL", "KNOWLEDGE_S3_BUCKET", "KNOWLEDGE_INDEX_URI"):
+        monkeypatch.delenv(k, raising=False)
+    for k in ("DATABASE_URL", "REDIS_URL"):
+        monkeypatch.setenv(k, "")
+
+
 def test_the_list_names_what_the_yaml_uses_and_how_to_connect_it() -> None:
     needs = {n.name: n for n in from_policy(build((ROOT / "examples" / "support_assistant.yaml").read_text()))}
     # the support example searches documents, hands over to people and remembers a contact preference
@@ -34,11 +43,8 @@ def test_the_landing_page_yaml_builds() -> None:
     assert build(html.unescape(re.sub(r"<[^>]+>", "", shown.group(0)))).agent == "support-assistant"
 
 
-def test_a_draft_can_be_put_up_to_chat_with_and_a_broken_one_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_draft_can_be_put_up_to_chat_with_and_a_broken_one_is_refused(in_memory: None) -> None:
     from fastapi.testclient import TestClient
-
-    for k in ("KNOWLEDGE_S3_BUCKET", "KNOWLEDGE_INDEX_URI"):  # the demo's knowledge index stays in memory in tests
-        monkeypatch.delenv(k, raising=False)
 
     from examples.demo.app import create_app
 
@@ -115,14 +121,12 @@ async def test_the_drafting_model_asks_what_the_description_leaves_open() -> Non
     assert c.understood and 2 <= len(c.questions) <= 5 and all(2 <= len(q.options) <= 5 and q.ask for q in c.questions)
 
 
-def test_the_demo_asks_first_and_drafts_with_the_answers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_demo_asks_first_and_drafts_with_the_answers(in_memory: None) -> None:
     import yaml as pyyaml
     from fastapi.testclient import TestClient
 
     from examples.demo.app import create_app
 
-    for k in ("KNOWLEDGE_S3_BUCKET", "KNOWLEDGE_INDEX_URI"):
-        monkeypatch.delenv(k, raising=False)
     text = "Answer questions about our bike shop."
     with TestClient(create_app()) as c:
         r = c.post("/demo/clarify", json={"text": text})
@@ -131,3 +135,17 @@ def test_the_demo_asks_first_and_drafts_with_the_answers(monkeypatch: pytest.Mon
         d = c.post("/demo/draft", json={"text": text, "questions": [lang], "answers": {"languages": ["Both"]}}).json()
     assert not d["errors"], d["errors"]
     assert "es" in pyyaml.safe_load(d["yaml"]).get("languages", [])  # the picked option reached the draft
+
+
+def test_the_demo_support_bot_has_a_shops_documents_to_answer_from(in_memory: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    from fastapi.testclient import TestClient
+
+    from examples.demo.app import create_app
+
+    monkeypatch.setenv("KEELCHAT_TOOLS", "fake")
+    with TestClient(create_app()) as c:
+        search = c.app.state.runtime.tool_impls["knowledge_search"]
+        hits = asyncio.run(search("How long do refunds take?"))
+    assert any("refund" in p["text"].lower() for p in hits), hits  # the page's own example question has a passage
