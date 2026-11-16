@@ -97,6 +97,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A rule whose `then` asks for something ("ask for the order number") no longer deadlocks the Rewriter while a step
+  asks for something else (consent): the writer and the reply verifier both hold that the step's question comes first
+  and the rule's request waits for its step, so the rule's statement ("a free replacement can be sent") is spoken
+  instead of every rewrite failing and the plain version going out (`rules_unspoken` in the audit log).
 - A model whose reasoning counts against `max_tokens` (Kimi K2.5) no longer returns an empty reply when the reasoning
   used the whole budget: every budget gets headroom for the reasoning, and an empty reply cut at the budget is asked
   for once more. Before, the Rewriter's rewrites came back empty and the plain version was sent; the reply verifier on

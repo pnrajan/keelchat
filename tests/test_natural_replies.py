@@ -51,6 +51,7 @@ async def test_replies_respond_to_what_the_user_said_and_keep_the_question():
     r = await say(rt, s.id, "hello, my shoes arrived damaged")
     ask = r.state.open_question.ask
     assert "?" in r.outbound.text and r.outbound.text != f"Hi! {ask}", r.outbound.text  # phrased for this conversation
+    assert "replacement" in r.outbound.text.lower(), r.outbound.text  # the damaged_item rule is spoken; its order-number ask waits for its step
     render = llm.calls_for("render")[0].last_user_text
     assert "shoes arrived damaged" in render and "Ask for: consent" in render and "This step: Greets" in render
     r = await say(rt, s.id, "yes that's fine")
